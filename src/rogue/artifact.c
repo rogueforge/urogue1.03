@@ -25,22 +25,12 @@ apply()
 	obj = OBJPTR(item);
 	which = obj->o_which;
 	if (!(obj->art_stats.ar_flags & ISACTIVE)) {
-	    chance = rnd(100);
-	    if (wizard) {
-		msg("What roll? ");
-		if(get_str(prbuf,cw) == NORM) {
-		    chance = atoi(prbuf);
-		    if(chance < 0 || chance > 99) {
-			msg("Invalid selection.");
-			chance = rnd(100);
-		    }
-		}
-	    }
+	    chance = rnd(100) - 10 * rnd(luck);
 	    debug("Rolled %d.", chance);
-	    if (chance < 75)
-		do_minor(obj);
-	    else if (chance < 80)
+	    if (chance < 5)
 		do_major(obj);
+	    else if (chance < 50)
+		do_minor(obj);
 	    else
 		obj->art_stats.ar_flags |= ISACTIVE;
 	}
@@ -156,16 +146,6 @@ struct object *tr;
     register int which;
 
     which = rnd(115);
-    if (wizard) {
-	msg("Which minor effect? (%d)", which);
-	if(get_str(prbuf,cw) == NORM) {
-	    which = atoi(prbuf);
-	    if(which < 0 || which > 104) {
-		msg("Invalid selection.");
-		which = rnd(105);
-	    }
-	}
-    }
     debug("Rolled %d.", which);
     switch(which) {
 	when 0:
@@ -610,16 +590,6 @@ struct object *tr;
     register int which;
 
     which = rnd(12);
-    if (wizard) {
-	msg("Which major effect? (%d)", which);
-	if(get_str(prbuf,cw) == NORM) {
-	    which = atoi(prbuf);
-	    if(which < 0 || which > 11) {
-		msg("Invalid selection.");
-		which = rnd(12);
-	    }
-	}
-    }
     debug("Rolled %d.", which);
     switch (which) {
     when 0:
@@ -956,62 +926,7 @@ do_amulet()
     else
 	msg("Your attempt is successful.");
     switch (which) {
-	when 0: {
-		register int count = 0;
-		register int max_nasty = 0;
-		register struct linked_list *item;
-		register struct thing *tp;
-		char *colour, *temp;
-
-		for (item = mlist; item != NULL; item = next(item)) {
-		    tp = THINGPTR(item);
-		    count++;
-		    max_nasty = max(max_nasty, 
-			(10 - tp->t_stats.s_arm) * tp->t_stats.s_hpt);
-		}
-
-		if (count < 3) 
-		    colour = "black";
-		else if (count < 6)
-		    colour = "red";
-		else if (count < 9)
-		    colour = "orange";
-		else if (count < 12)
-		    colour = "yellow";
-		else if (count < 15)
-		    colour = "green";
-		else if (count < 18)
-		    colour = "blue";
-		else if (count < 25)
-		    colour = "violet";
-		else
-		    colour = "pink with purple polka dots";
-
-		if (max_nasty < 10)
-		    temp = "feels cold in your hand";
-		else if (max_nasty < 30)
-		    temp = "feels cool";
-		else if (max_nasty < 200)
-		    temp = "feels warm and soft";
-		else if (max_nasty < 1000)
-		    temp = "feels warm and slippery";
-	        else if (max_nasty < 5000)
-		    temp = "feels hot and dry";
-		else if (max_nasty < 10000)
-		    temp = "feels too hot to hold";
-		else if (max_nasty < 20000) {
-		    temp = "burns your hand badly";
-		    if ((pstats.s_hpt -= roll(1,6)) <= 0) {
-			msg("You die from the burning oil that spews forth.");
-			death(D_FIRE);
-			return;
-		    }
-		}
-		else
-		    temp = "tingles your hand";
-
-		msg("The amulet glows %s and %s.", colour, temp);
-	}
+	when 0: level_eval();
 	when 1: quaff(&player, P_INVIS, ISNORMAL);
 	otherwise:
 		msg("What a strange thing to do!!");
@@ -1378,4 +1293,59 @@ do_crown()
     otherwise:
 	msg("What a strange thing to do!!");
     }
+}
+
+/*
+ * level_eval - have amulet evaluate danger on this level
+ */
+level_eval()
+{
+    register int count = 0;
+    register int max_nasty = 0;
+    register struct linked_list *item;
+    register struct thing *tp;
+    char *colour, *temp;
+
+    for (item = mlist; item != NULL; item = next(item)) {
+	tp = THINGPTR(item);
+	count++;
+	max_nasty = max(max_nasty, 
+	    (10 - tp->t_stats.s_arm) * tp->t_stats.s_hpt);
+    }
+
+    if (count < 3) 
+	colour = "black";
+    else if (count < 6)
+	colour = "red";
+    else if (count < 9)
+	colour = "orange";
+    else if (count < 12)
+	colour = "yellow";
+    else if (count < 15)
+	colour = "green";
+    else if (count < 18)
+	colour = "blue";
+    else if (count < 25)
+	colour = "violet";
+    else
+	colour = "pink with purple polka dots";
+
+    if (max_nasty < 10)
+	temp = "feels cold and lifeless";
+    else if (max_nasty < 30)
+	temp = "feels cool";
+    else if (max_nasty < 200)
+	temp = "feels warm and soft";
+    else if (max_nasty < 1000)
+	temp = "feels warm and slippery";
+    else if (max_nasty < 5000)
+	temp = "feels hot and dry";
+    else if (max_nasty < 10000)
+	temp = "feels too hot to hold";
+    else if (max_nasty < 20000)
+	temp = "burns your hand";
+    else
+	temp = "jumps up and down shrieking 'DANGER! DANGER'";
+
+    msg("The amulet glows %s and %s.", colour, temp);
 }

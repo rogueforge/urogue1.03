@@ -1487,4 +1487,25 @@
 1)	applied patches by Mike Cooper to make variable names unique in
 	first 7 characters
 
+1.03 Alpha, Sep 28, 86
+1)	Made artifact activation luck dependant and less likely
+	to blow up.
+2)	Made level_eval() automatic when holding AMULET.
+3)	Added wizard command 'M' to makemon().
+4)	Changed wizard command 'o' bennies.
+5)	Removed lots of POSTLEV references.
+6)	Fixed unshield() bug.
+7)	Changed inital class weapons and armor.
+8)	Revamped prices for weapons and armor.
+9)	Aarakocra is now 'a' to not conflict with Giant Ant.
+10)	R_WIZARD allows summonning of familiars.
+11)	R_PIETY detects undead monsters.
+12)	Twiddled identification potions and scrolls on usage.
+13)	***Detect Magic II shows blessed, cursed magic.***
+14)	ISTWOH prints out "two-handed".
+15)	Fixed code in things.c.
+16)	Tinkered with trader.c.
+17)	fixed experience point bug in fight.c
+	above by Cark Hommel
+
 -------	End of File ------

@@ -521,8 +521,11 @@ reg struct object *obj;
 		}
 	    when ARMOR:
 		if (wh < maxarmors) {
+		    int plusses = armors[wh].a_class - obj->o_ac;
+
 		    worth = armors[wh].a_worth;
-		    worth *= (1 + (10 * (armors[wh].a_class - obj->o_ac)));
+		    if (plusses > 0)
+			worth *= (1 + (10 * (armors[wh].a_class - obj->o_ac)));
 		}
 	    when SCROLL:
 		if (wh < maxscrolls)

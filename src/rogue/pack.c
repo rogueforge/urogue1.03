@@ -96,7 +96,7 @@ bool silent;
   
   if (itemweight(obj) + pstats.s_pack > pstats.s_carry) {
       msg("Too much for you to carry.");
-      if (!silent && levtype != POSTLEV) {
+      if (!silent) {
 	  msg("%s onto %s", terse ? "Moved" : "You moved",
 	      inv_name(obj, TRUE));
 	}
@@ -141,7 +141,7 @@ bool silent;
   
   if (count_bag(pack, obj->o_type, NULL) == max_print()) {
       msg("You have no room for more %s.", name_type(obj->o_type));
-      if (!silent && levtype != POSTLEV) {
+      if (!silent) {
 	obj = OBJPTR(item);
 	msg("%s onto %s.", terse ? "Moved" : "You moved",
 	    inv_name(obj, TRUE));

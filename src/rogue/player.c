@@ -200,6 +200,7 @@ prayer()
 /*
  * gsense:
  *	Sense gold
+ *	returns TRUE if gold was detected
  */
 
 gsense()
@@ -218,13 +219,13 @@ gsense()
 	    }
 	}
 	if (gtotal) {
-	    know_items[TYP_SCROLL][S_GFIND] = TRUE;
 	    msg("You sense gold!");
 	    overlay(hw,cw);
-	    return;
+	    return(TRUE);
 	}
     }
-    msg("You can sense no gold on this level.");
+    nothing_message();
+    return(FALSE);
 }
 
 

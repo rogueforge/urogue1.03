@@ -189,8 +189,11 @@ int flags;
 	}
     when P_MONSTDET:
 	/*
-	 * Potion of monster detection, if there are monters, detect them
+	 * Potion of monster detection, if there are monsters, detect them
 	 */
+	if (is_potion)
+	    know_items[TYP_POTION][P_MONSTDET] = TRUE;
+
 	if(cursed) {
 	    register int num = roll(3,6);
 	    register int i;
@@ -214,19 +217,14 @@ int flags;
 	    wrefresh(cw);
 	    wait_for(' ');
 	    msg("");
-	    if (is_potion) 
-		know_items[TYP_POTION][P_MONSTDET] = TRUE;
-	    break;
 	}
-	if (mlist != NULL) {
+	else if (mlist != NULL) {
 	    msg("You begin to sense the presence of monsters.");
 	    waddstr(cw, morestr);
 	    overlay(mw, cw);
 	    wrefresh(cw);
 	    wait_for(' ');
 	    msg("");
-	    if (is_potion) 
-		know_items[TYP_POTION][P_MONSTDET] = TRUE;
 	    if (blessed)
 		turn_on(player, BLESSMONS);
 	}
@@ -278,8 +276,9 @@ int flags;
 		if (is_magic(tp)) {
 		    char mag_type=MAGIC;
 
-		    if (tp->o_flags & ISCURSED) mag_type = CMAGIC;
-		    else if (tp->o_flags & ISBLESSED) mag_type = BMAGIC;
+		    if (blessed)
+			if (tp->o_flags & ISCURSED) mag_type = CMAGIC;
+			else if (tp->o_flags & ISBLESSED) mag_type = BMAGIC;
 		    show = TRUE;
 		    mvwaddch(hw, tp->o_pos.y, tp->o_pos.x, mag_type);
 		}
@@ -320,6 +319,8 @@ int flags;
 		msg("Your eyes stop tingling for a moment.");
 	}
 	else if (off(player, PERMBLIND)) {
+	    if (is_potion)
+		know_items[TYP_POTION][P_SEEINVIS] = TRUE;
 	    if (off(player, CANSEE)) {
 		turn_on(player, CANSEE);
 		msg("Your eyes begin to tingle.");
@@ -338,6 +339,8 @@ int flags;
 	else {
 	    short duration = (blessed ? 3 : 1);
 
+	    if (is_potion)
+		know_items[TYP_POTION][P_PHASE] = TRUE;
 	    if (on(player, CANINWALL))
 		lengthen(unphase, duration*PHASEDURATION);
 	    else {
@@ -381,12 +384,14 @@ int flags;
 		msg("You feel yourself moving %sfaster.",
 		    blessed ? "much " : "");
 	    add_haste(blessed);
+	    if (is_potion) know_items[TYP_POTION][P_HASTE] = TRUE;
 	}
-	if (is_potion) know_items[TYP_POTION][P_HASTE] = TRUE;
     when P_RESTORE: {
 	register int i;
 
 	msg("Hey, this tastes great.  It make you feel warm all over.");
+	if (is_potion)
+	    know_items[TYP_POTION][P_RESTORE] = TRUE;
 
 	if (lost_str) {
 	    for (i=0; i<lost_str; i++)
@@ -418,6 +423,8 @@ int flags;
 	    fuse(appear, 0, blessed ? WANDERTIME*3 : WANDERTIME, AFTER);
 	    PLAYER = IPLAYER;
 	    light(&hero);
+	    if (is_potion)
+		know_items[TYP_POTION][P_INVIS] = TRUE;
 	}
 	else lengthen(appear, blessed ? WANDERTIME*3 : WANDERTIME);
     when P_SMELL:
@@ -440,6 +447,8 @@ int flags;
 	else {
 	    short duration = (blessed ? 3 : 1);
 
+	    if (is_potion)
+		know_items[TYP_POTION][P_SMELL] = TRUE;
 	    if (on(player, CANSCENT))
 		lengthen(unscent, duration*PHASEDURATION);
 	    else {
@@ -468,6 +477,8 @@ int flags;
 	else {
 	    short duration = (blessed ? 3 : 1);
 
+	    if (is_potion)
+		know_items[TYP_POTION][P_HEAR] = TRUE;
 	    if (on(player, CANHEAR))
 		lengthen(unhear, duration*PHASEDURATION);
 	    else {
@@ -537,6 +548,8 @@ int flags;
 		    fuse(unshero, 0, HEROTIME + rnd(HEROTIME), AFTER);
 		    msg("You suddenly feel invulnerable.");
 		}
+		if (is_potion)
+		    know_items[TYP_POTION][P_SHERO] = TRUE;
 	    }
 	}
     when P_DISGUISE:
@@ -549,6 +562,8 @@ int flags;
 	    else
 	       PLAYER = 'A' + rnd(26);
 	    light(&hero);
+	    if (is_potion)
+		know_items[TYP_POTION][P_DISGUISE] = TRUE;
 	}
 	else if (off(player, ISINVIS))
 	    lengthen(undisguise, blessed ? GONETIME*3 : GONETIME);
@@ -579,11 +594,13 @@ int flags;
 		msg("You feel a brief chill.");
 	}
 	else {
-	    if (blessed) {	/* Make player immune for the whole game */
-		extinguish(unhot);  /* If we have a fuse, put it out */
+	    if (is_potion)
+		know_items[TYP_POTION][P_FIRERESIST] = TRUE;
+	    if (blessed) {
+		extinguish(unhot);
 		msg("You feel a strong continuous warm glow.");
 	    }
-	    else {	/* Just light a fuse for how long player is safe */
+	    else {
 		if (off(player, NOFIRE)) {
 		    fuse(unhot, 0, PHASEDURATION, AFTER);
 		    msg("You feel a warm glow.");
@@ -629,11 +646,13 @@ int flags;
 		msg("You feel a brief touch of heat rash.");
 	}
 	else {
-	    if (blessed) {	/* Make player immune for the whole game */
-		extinguish(uncold);  /* If we have a fuse, put it out */
+	    if (is_potion)
+		know_items[TYP_POTION][P_COLDRESIST] = TRUE;
+	    if (blessed) {
+		extinguish(uncold);
 		msg("You feel a strong continuous cool breeze.");
 	    }
-	    else {	/* Just light a fuse for how long player is safe */
+	    else {
 		if (off(player, NOCOLD)) {
 		    fuse(uncold, 0, PHASEDURATION, AFTER);
 		    msg("You feel a cool breeze.");
@@ -668,6 +687,8 @@ int flags;
 	else {
 	    short duration = (blessed ? 3 : 1);
 
+	    if (is_potion)
+		know_items[TYP_POTION][P_HASOXYGEN] = TRUE;
 	    if (on(player, HASOXYGEN))
 		lengthen(unbreathe, duration*PHASEDURATION);
 	    else {
@@ -686,6 +707,8 @@ int flags;
 	else {
 	    short duration = (blessed ? 3 : 1);
 
+	    if (is_potion)
+		know_items[TYP_POTION][P_LEVITATION] = TRUE;
 	    if (on(player, CANFLY))
 		lengthen(unfly, duration*PHASEDURATION);
 	    else {
@@ -704,6 +727,8 @@ int flags;
 	else {
 	    short duration = (blessed ? 3 : 1) * HUHDURATION;
 
+	    if (is_potion)
+		know_items[TYP_POTION][P_REGENERATE] = TRUE;
 	    if (on(player, SUPEREAT))
 		lengthen(unsupereat, duration);
 	    else {

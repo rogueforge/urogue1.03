@@ -83,7 +83,7 @@ register bool drop;
 	    if (obj->o_count > 1)
 		sprintf(prbuf, "%d ", obj->o_count);
 	    else
-		if ((obj->o_flags&(ISZAPPED|CANRETURN|ISPOISON|ISSILVER)) ||
+		if ((obj->o_flags&(ISZAPPED|CANRETURN|ISPOISON|ISSILVER|ISTWOH)) ||
     		    ((obj->o_flags&(ISKNOW|ISZAPPED)) == (ISKNOW|ISZAPPED)))
 		    strcpy(prbuf, "A ");
 		else
@@ -100,6 +100,8 @@ register bool drop;
 	    pb = &prbuf[strlen(prbuf)];
 	    if (obj->o_flags & ISSILVER)
 		sprintf(pb, "silver ");
+	    if (obj->o_flags & ISTWOH)
+		sprintf(pb, "two-handed ");
 	    pb = &prbuf[strlen(prbuf)];
 	    if (obj->o_flags & ISKNOW)
 		sprintf(pb, "%s %s", num(obj->o_hplus, obj->o_dplus),
@@ -244,19 +246,6 @@ struct linked_list *item;
 	discard(obj);
 	obj = NULL;
     }
-    else if (levtype == POSTLEV) {
-	op->o_pos = hero;	/* same place as hero */
-	if (item == NULL)	/* if item wasn't sold */
-	    msg("Thanks for your donation to the fiend's flea market.");
-        if (op->o_type != ARTIFACT)
-	    fall(&player, obj,FALSE);
-	else {
-	    msg("You'll be sorry you ever got rid of that!");
-	    has_artifact &= ~(1 << op->o_which);
-	    discard(obj);
-	    obj = NULL;
-	}
-    }
     else {
 	/*
 	 * Link it into the level object list
@@ -266,7 +255,7 @@ struct linked_list *item;
 	op->o_pos = hero;
 	msg("Dropped %s.", inv_name(op, TRUE));
     }
-    if (op->o_type == ARTIFACT && levtype != POSTLEV)
+    if (op->o_type == ARTIFACT)
 	has_artifact &= ~(1 << op->o_which);
     updpack();
     return (TRUE);
@@ -280,12 +269,6 @@ register struct object *op;
 {
     if (op == NULL)
 	return TRUE;
-    if (levtype == POSTLEV) {
-	if ((op->o_flags & ISCURSED) && (op->o_flags & ISKNOW)) {
-	    msg("The trader does not accept your shoddy merchandise.");
-	    return(FALSE);
-	}
-    }
     if (op != cur_armor && op != cur_weapon &&
 	op != cur_ring[LEFT_1] && op != cur_ring[LEFT_2] &&
 	op != cur_ring[LEFT_3] && op != cur_ring[LEFT_4] &&

@@ -213,10 +213,9 @@ int flags;
 	    }
 	}
 	when S_IDENTIFY:
-	    /* 
-	     * if its blessed then identify everything in the pack
-	     */
-	    if (blessed) {
+	    if (cursed)
+		msg("You identify this scroll as an identify scroll");
+	    else if (blessed) {	/* identify everything in the pack */
 		msg("You feel more Knowledgeable!");
 		idenpack();
 	    }
@@ -224,12 +223,12 @@ int flags;
 		/*
 		 * Identify, let the rogue figure something out
 		 */
-		if (is_scroll && know_items[TYP_SCROLL][S_IDENTIFY] != TRUE)
+		if (is_scroll && know_items[TYP_SCROLL][S_IDENTIFY] != TRUE) {
 		    msg("This scroll is an identify scroll.");
+		    know_items[TYP_SCROLL][S_IDENTIFY] = TRUE;
+		}
 		whatis((struct linked_list *) NULL);
 	    }
-	    if (is_scroll)
-	        know_items[TYP_SCROLL][S_IDENTIFY] = TRUE;
 	when S_MAP:
 	    /*
 	     * Scroll of magic mapping.
@@ -239,8 +238,6 @@ int flags;
 		wclear(cw);
 		light(&hero);
 		status(TRUE);
-		if (is_scroll)
-		    know_items[TYP_SCROLL][S_MAP] = TRUE;
 		break;
 	    }
 	    if (is_scroll && know_items[TYP_SCROLL][S_MAP] != TRUE) {
@@ -319,34 +316,12 @@ int flags;
 		    mvwaddch(hw, pos.y, pos.x, GOLD);
 		}
 		overlay(hw, cw);
-		if (is_scroll) 
-		    know_items[TYP_SCROLL][S_GFIND] = TRUE;
 		break;
 	    }
 	    if (blessed)
 		turn_on(player, BLESSGOLD);
-	    if (lvl_obj != NULL) {
-		struct linked_list *gitem;
-		struct object *cur;
-		int gtotal = 0;
-
-		wclear(hw);
-		for (gitem = lvl_obj; gitem != NULL; gitem = next(gitem)) {
-		    cur = OBJPTR(gitem);
-		    if (cur->o_type == GOLD) {
-			gtotal += cur->o_count;
-			mvwaddch(hw, cur->o_pos.y, cur->o_pos.x, GOLD);
-		    }
-		}
-		if (gtotal) {
-		    if (is_scroll) 
-			know_items[TYP_SCROLL][S_GFIND] = TRUE;
-		    msg("You begin to feel greedy and you sense gold.");
-		    overlay(hw,cw);
-		    break;
-		}
-	    }
-	    msg("You begin to feel a pull downward.");
+	    if (gsense() && is_scroll)
+		know_items[TYP_SCROLL][S_GFIND] = TRUE;
 	when S_SELFTELEP:
 	    /*
 	     * Scroll of teleportation:
@@ -373,9 +348,9 @@ int flags;
 
 		cur_room = roomin(&hero);
 		rm = teleport();
+		if (is_scroll)
+		    know_items[TYP_SCROLL][S_SELFTELEP] = TRUE;
 	    }
-	    if (is_scroll)
-	        know_items[TYP_SCROLL][S_SELFTELEP] = TRUE;
 	    if (off(player, ISCLEAR)) {
 	        if (on(player, ISHUH))
 		    lengthen(unconfuse, rnd(4)+4);
@@ -437,7 +412,8 @@ int flags;
 		    nobj = OBJPTR(nitem);
 		    msg("Removed the curse from %s.",inv_name(nobj,TRUE));
 		    nobj->o_flags &= ~ISCURSED;
-	    	    know_items[TYP_SCROLL][S_REMOVECURSE] = TRUE;
+		    if (is_scroll)
+			know_items[TYP_SCROLL][S_REMOVECURSE] = TRUE;
 		}
 	    }
 	when S_PETRIFY:
@@ -515,15 +491,16 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 	{
 	    struct linked_list *ll;
 	    struct object *lb;
-	    if (is_scroll && know_items[TYP_SCROLL][S_PROTECT] == FALSE)
-	        msg("You are granted the power of protection.");
+	    if (is_scroll && know_items[TYP_SCROLL][S_PROTECT] == FALSE) {
+	        msg("You can protect something from rusting or theft.");
+		know_items[TYP_SCROLL][S_PROTECT] = TRUE;
+	    }
 	    if ((ll = get_item("protect",0)) != NULL) {
 		lb = OBJPTR(ll);
 		lb->o_flags |= ISPROT;
 		mpos = 0;
 		msg("Protected %s.", inv_name(lb,TRUE));
 	    }
-	    know_items[TYP_SCROLL][S_PROTECT] = TRUE;
 	}
 	when S_MAKEITEMEM:
 	    if (!is_scroll || rnd(luck + 10))
@@ -556,6 +533,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 	    if (is_scroll && know_items[TYP_SCROLL][S_ENCHANT] == FALSE) {
 		msg("You are granted the power of enchantment.");
 		msg("You may enchant anything(weapon,ring,armor,scroll,potion)");
+		know_items[TYP_SCROLL][S_ENCHANT] = TRUE;
 	    }
 	    if ((ll = get_item("enchant",0)) != NULL) {
 		lb = OBJPTR(ll);
@@ -665,7 +643,6 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		if (lb != NULL) 
 		    msg("Enchanted %s.", inv_name(lb,TRUE));
 	    }
-	    know_items[TYP_SCROLL][S_ENCHANT] = TRUE;
 	}
 	when S_NOTHING:
 	    msg("This scroll is blank.");
@@ -673,8 +650,10 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 	{
 	    struct linked_list *ll;
 	    struct object *lb;
-	    if (is_scroll && know_items[TYP_SCROLL][S_SILVER] == FALSE)
+	    if (is_scroll && know_items[TYP_SCROLL][S_SILVER] == FALSE) {
 	        msg("You are granted the power of magic hitting.");
+		know_items[TYP_SCROLL][S_SILVER] = TRUE;
+	    }
 	    if ((ll = get_item("annoint",WEAPON)) != NULL) {
 		lb = OBJPTR(ll);
 		if (blessed && !(lb->o_flags & ISSILVER)) {
@@ -698,13 +677,14 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		    msg("Your weapon has turned to silver.");
 		}
 	    }
-	    know_items[TYP_SCROLL][S_SILVER] = TRUE;
 	}
 	when S_OWNERSHIP: {
 	    struct linked_list *ll;
 	    struct object *lb;
-	    if (is_scroll && know_items[TYP_SCROLL][S_OWNERSHIP] == FALSE)
+	    if (is_scroll && know_items[TYP_SCROLL][S_OWNERSHIP] == FALSE) {
 	        msg("You are granted the power of ownership.");
+		know_items[TYP_SCROLL][S_OWNERSHIP] = TRUE;
+	    }
 	    if ((ll = get_item("claim",0)) != NULL) {
 		lb = OBJPTR(ll);
 		if (cursed && lb->o_flags & (ISOWNED | CANRETURN)) {
@@ -731,7 +711,6 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		    msg("The gods look upon you.");
 		}
 	    }
-	    know_items[TYP_SCROLL][S_OWNERSHIP] = TRUE;
 	}
 	when S_FOODDET:
 	    /*

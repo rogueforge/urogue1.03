@@ -199,8 +199,7 @@ rollwand()
 	/* Thieves (only) may not waken a monster */
 	if ((rnd(6) == 0) &&
         (player.t_ctype != C_THIEF || (rnd(30) >= pstats.s_dext))) {
-	    if (levtype != POSTLEV)
-	        wanderer();
+	    wanderer();
 	    kill_daemon(rollwand);
 	    fuse(swander, 0, WANDERTIME, BEFORE);
 	}
@@ -670,8 +669,11 @@ unsupereat()
 
 unshield()
 {
+    extern int shield_ac;
+
     turn_off(player, HASSHIELD);
-    pstats.s_arm += 2;
+    pstats.s_arm -= shield_ac;
+    shield_ac = 0;
     msg("Your skin feels normal.");
 }
 

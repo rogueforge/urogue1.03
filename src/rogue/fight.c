@@ -925,7 +925,7 @@ bool thrown;
 
 	if (attackee->t_stats.s_hpt <= 0) {
 	    killed(attacker, mon, MESSAGE, 
-		on(*attackee, ISFAMILIAR) ? POINTS : NOPOINTS);
+		on(*attacker, ISFAMILIAR) ? POINTS : NOPOINTS);
 	    return TRUE;
 	}
 
@@ -1633,10 +1633,11 @@ bool print_message, give_points;
     }
 
     if (give_points) {
-        if (killer != NULL) 
+        if (killer != NULL) {
 	    killer->t_stats.s_exp += tp->t_stats.s_exp;
-	if (on(*killer,ISFAMILIAR))
-	    pstats.s_exp += tp->t_stats.s_exp;
+	    if (on(*killer,ISFAMILIAR))
+		pstats.s_exp += tp->t_stats.s_exp;
+	}
 
 	/* Clerics and paladins get extra for smiting UNDEAD */
 	if ( is_player &&

@@ -182,7 +182,7 @@ struct monster monsters[] = {
 		{10,	20,	2,	8,	HPT("2d8"),
 		"1d8"}},
 {"aarakocra",
-		5,	TRUE,	TRUE,	'A',	"8-12",
+		5,	TRUE,	TRUE,	'a',	"8-12",
 		{CANFLY, CANWIELD, ISFLOCK, LOWFRIENDLY},
 		0, 0,
 		2,

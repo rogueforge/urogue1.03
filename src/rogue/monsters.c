@@ -25,6 +25,11 @@ bool familiar,print_message;
     register struct thing *tp;
     short monster;
 
+    if (familiar && !is_wearing(R_WIZARD) && off(player, CANSUMMON)) {
+	msg("Only spellcasters can summon familiars!");
+	return;
+    }
+
     if (type == 0)			/* Random monster modified by level */
 	 monster = roll(min(pstats.s_lvl, (nummonst - NUMSUMMON) / 8), 8);
     else monster = type;
@@ -491,7 +496,7 @@ wanderer()
     if (wizard)
 	msg("Started a wandering %s.", monsters[tp->t_index].m_name);
     else if (on(*tp, ISUNDEAD) && (player.t_ctype == C_CLERIC ||
-	     player.t_ctype == C_PALADIN))
+	     player.t_ctype == C_PALADIN || is_wearing(R_PIETY)))
 	msg("You sense a new ungodly monster %s.", loc);
     else if (on(player, CANHEAR) || (player.t_ctype == C_THIEF && rnd(20) == 0)) 
 	msg("You hear a new %s moving %s.", monsters[tp->t_index].m_name, loc);

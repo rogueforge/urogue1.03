@@ -22,16 +22,15 @@ whatis(what)
 struct linked_list *what;
 {
     register struct object *obj;
-    register struct linked_list *item;
     register int kludge;
+    register int print_message = FALSE;
 
     if (what == NULL) {		/* do we need to ask which one? */
-	if ((item = get_item("identify", 0)) == NULL)
-	    return;
+	print_message = TRUE;
+	while ((what = get_item("identify", 0)) == NULL)
+	    ;
     }
-    else
-	item = what;
-    obj = OBJPTR(item);
+    obj = OBJPTR(what);
     obj->o_flags |= ISKNOW;
     switch (obj->o_type) {
         when SCROLL:
@@ -54,7 +53,7 @@ struct linked_list *what;
 	    guess_items[kludge][obj->o_which] = NULL;
 	}
     }
-    if (what == NULL)
+    if (print_message)
 	msg(inv_name(obj, FALSE));
 }
 

@@ -188,7 +188,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
 		turn_off(player, BLESSMONS);
 	}
 	else if (player.t_ctype == C_CLERIC ||
-		 player.t_ctype == C_PALADIN)
+		 player.t_ctype == C_PALADIN || is_wearing(R_PIETY))
 	    undead_sense();
     }
 
@@ -222,6 +222,12 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	for (i = 0; i < MAXROOMS; i++)
 	    rooms[i].r_flags &= ~ISDARK;
     }
+
+    /* Amulet describes the level */
+    if (is_carrying(TR_AMULET)) {
+	level_eval();
+    }
+
     wmove(cw, hero.y, hero.x);
     waddch(cw, PLAYER);
     light(&hero);
@@ -229,7 +235,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
     /*
      * Summon familiar if player has one
      */
-    if (on(player,HASFAMILIAR) && on(player,CANSUMMON)) {
+    if (on(player,HASFAMILIAR)) {
         summon_monster((short) fam_type,FAMILIAR, MESSAGE);
 	if (fam_ptr != NULL) {	/* add old pack to new */
 	    tp = THINGPTR(fam_ptr);

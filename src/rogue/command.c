@@ -304,6 +304,7 @@ command()
 			when 't' : teleport();
 			when 'F' : msg("food left: %d\tfood level: %d", 
 						food_left, foodlev);
+			when 'M' : makemon();
 			when 's' : activity();
 			when 'e' : {
 			    wizard = FALSE;
@@ -398,7 +399,8 @@ command()
 
 			    /* and his suit of armor */
 			    if (cur_armor == NULL || 
-			      cur_armor->o_which != CRYSTAL_ARMOR) {
+			      !(cur_armor->o_which == CRYSTAL_ARMOR ||
+			        cur_armor->o_which == MITHRIL)) {
 				item = spec_item(ARMOR, CRYSTAL_ARMOR, 15, 0);
 				obj = OBJPTR(item);
 				obj->o_flags |= ISKNOW;
@@ -420,25 +422,14 @@ command()
 				}
 				add_pack(item, TRUE);
 			    }
-			    if (!is_wearing(R_LIGHT)) {
-				item = spec_item(RING, R_LIGHT, 0, 0);
+			    if (!is_wearing(R_PIETY)) {
+				item = spec_item(RING, R_PIETY, 0, 0);
 				obj = OBJPTR(item);
 				obj->o_flags |= ISKNOW;
-				know_items[TYP_RING][R_LIGHT] = TRUE;
-				if (guess_items[TYP_RING][R_LIGHT]) {
-				    free(guess_items[TYP_RING][R_LIGHT]);
-				    guess_items[TYP_RING][R_LIGHT] = NULL;
-				}
-				add_pack(item, TRUE);
-			    }
-			    if (!is_wearing(R_WIZARD)) {
-				item = spec_item(RING, R_WIZARD, 0, 0);
-				obj = OBJPTR(item);
-				obj->o_flags |= ISKNOW;
-				know_items[TYP_RING][R_WIZARD] = TRUE;
-				if (guess_items[TYP_RING][R_WIZARD]) {
-				    free(guess_items[TYP_RING][R_WIZARD]);
-				    guess_items[TYP_RING][R_WIZARD] = NULL;
+				know_items[TYP_RING][R_PIETY] = TRUE;
+				if (guess_items[TYP_RING][R_PIETY]) {
+				    free(guess_items[TYP_RING][R_PIETY]);
+				    guess_items[TYP_RING][R_PIETY] = NULL;
 				}
 				add_pack(item, TRUE);
 			    }
@@ -456,7 +447,7 @@ command()
 			    quaff(&player, P_SHERO, ISBLESSED);
 			    quaff(&player, P_CLEAR, ISBLESSED);
 			    quaff(&player, P_FIRERESIST, ISBLESSED);
-			    quaff(&player, P_SEEINVIS, ISBLESSED);
+			    quaff(&player, P_TRUESEE, ISBLESSED);
 			    quaff(&player, P_PHASE, ISBLESSED);
 			    purse += 50000;
 			    updpack();
@@ -486,9 +477,8 @@ command()
 	}
 	/*
 	 * If he ran into something to take, let him pick it up.
-	 * unless its a trading post
 	 */
-	if (take != 0 && levtype != POSTLEV)
+	if (take != 0)
 	    if (!moving)
 	        pick_up(take);
 	    else

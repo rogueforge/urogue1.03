@@ -87,7 +87,8 @@ init_player()
     bool special = rnd(100) < 20;
     struct linked_list *item;
     struct object *obj;
-    int which_armor, which_weapon, i, which_item;
+    int which_armor, which_weapon;
+    int other_weapon_flags = 0;
 
     pstats.s_lvl = 1 ;
     pstats.s_exp = 0L ;
@@ -188,47 +189,51 @@ init_player()
     pstats.s_carry = totalenc();
     pack = NULL ;
     switch (player.t_ctype) {	/* now outfit pack */
-	when C_FIGHTER:
-	    purse = roll(50,60);;
+	when C_PALADIN:
+	    purse = roll(20,60);
 	    which_armor = CHAIN_MAIL;
-	    which_weapon = TWO_SWORD;
+	    which_weapon = LONG_SWORD;
+	when C_FIGHTER:
+	    purse = roll(50,60);
+	    which_armor = SCALE_MAIL;
+	    which_weapon = BROAD_SWORD;
 	when C_RANGER:
-	    purse = roll(50,60);;
-	    which_armor = RING_MAIL;
-	    which_weapon = TWO_SWORD;
-	when C_CLERIC:
-	    purse = roll(30,80);;
+	    purse = roll(50,60);
 	    which_armor = PADDED_ARMOR;
-	    which_weapon = QUARTERSTAFF;
-	when C_MAGICIAN: {
-	    purse = roll(20,60);;
-	    which_armor = HEAVY_LEATHER;
-	    which_weapon = QUARTERSTAFF;
-	}
-	when C_ILLUSION:
-	    purse = roll(20,60);;
-	    which_armor = SOFT_LEATHER;
-	    which_weapon = QUARTERSTAFF;
+	    which_weapon = LONG_SPEAR;
+	    other_weapon_flags |= ISOWNED | CANRETURN;
+	when C_CLERIC:
+	    purse = roll(30,80);
+	    which_armor = RING_MAIL;
+	    which_weapon = MORNINGSTAR;
 	when C_DRUID:
-	    purse = roll(30,80);;
-	    which_armor = SOFT_LEATHER;
-	    which_weapon = QUARTERSTAFF;
+	    purse = roll(30,80);
+	    which_armor = STUDDED_LEATHER;
+	    which_weapon = LIGHT_MACE;
 	when C_THIEF:
-	    purse = roll(40,80);;
+	    purse = roll(40,80);
 	    which_armor = HEAVY_LEATHER;
 	    which_weapon = CUTLASS;
 	when C_ASSASIN:
-	    purse = roll(20,80);;
-	    which_armor = SOFT_LEATHER;
+	    purse = roll(20,80);
+	    which_armor = CUIRBOLILLI;
 	    which_weapon = SABRE;
+	    other_weapon_flags |= ISPOISON;
 	when C_NINJA:
 	    purse = roll(20,80);
+	    which_armor = CUIRBOLILLI;
+	    which_weapon = CRYSKNIFE;
+	    other_weapon_flags |= ISPOISON;
+	    item = spec_item(WEAPON, SHIRIKEN, 1, 1);
+	    obj = OBJPTR(item);
+	    obj->o_count = 1;
+	    obj->o_flags |= ISKNOW | ISPOISON | ISOWNED | CANRETURN;
+	    add_pack(item, TRUE);
+	when C_MAGICIAN:
+	case C_ILLUSION:
+	    purse = roll(20,60);
 	    which_armor = SOFT_LEATHER;
-	    which_weapon = SABRE;
-	when C_PALADIN:
-	    purse = roll(20,60);;
-	    which_armor = PLATE_MAIL;
-	    which_weapon = LONG_SWORD;
+	    which_weapon = SINGLESTICK;
     }
     /*
      * Add this stuff to the rogue's pack.
@@ -236,6 +241,8 @@ init_player()
     item = spec_item(WEAPON, which_weapon, 1, 1);
     obj = OBJPTR(item);
     obj->o_flags |= ISKNOW;
+    obj->o_flags |= other_weapon_flags;
+    obj->o_count = 1;
     add_pack(item, TRUE);
     cur_weapon = obj;
 
