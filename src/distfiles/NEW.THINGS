@@ -1507,5 +1507,7 @@
 16)	Tinkered with trader.c.
 17)	fixed experience point bug in fight.c
 	above by Cark Hommel
+18)	fixed up add_line() off-by-one error in display calculation
+	abive by Henry Chai
 
 -------	End of File ------

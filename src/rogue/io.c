@@ -320,7 +320,8 @@ char *fmt, *arg;
             msg(fmt, arg);
         line_cnt++;
     } else {
-        if (line_cnt >= LINES - 1 || fmt == NULL) {
+        /* chai: was if (line_cnt >= LINES - 1 || fmt == NULL) { */
+        if (line_cnt >= LINES - 2 || fmt == NULL) {
             if (fmt == NULL && !newpage && inv_type == INV_OVER) {
                 tw = subwin(hw, line_cnt + 1, COLS, 0, 0);
 /*                overwrite(hw, tw);*/
