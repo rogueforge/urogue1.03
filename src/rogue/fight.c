@@ -1289,7 +1289,7 @@ register char *ee;
 	when 5: s = " barely nick";
 	when 6: s = " scratch";
 	when 7: s = " gouge a chunk out of";
-	when 8: s = " severly wound";
+	when 8: s = " severely wound";
 	when 9: s = " counted coup on";
 	when 10: s = " drew blood from";
 	when 11: s = " nearly decapitate";
@@ -1590,8 +1590,6 @@ bool print_message, give_points;
     bool is_player = (killer == (&player));
 
     monst_dead = TRUE;	/* flag monster as gone for do_chase() */
-    if (is_player)
-	fighting = FALSE;
 
     if (on(*tp, WASSUMMONED)) {
 	extinguish(unsummon);
@@ -1650,6 +1648,14 @@ bool print_message, give_points;
     }
     /* Take care of any residual effects of the monster */
     check_residue(tp);
+
+    if (is_player) {
+	fighting = FALSE;
+	if (on(*tp, ISFRIENDLY)) {
+	    msg("You feel a slight chill run up and down your spine.");
+	    luck++;
+	}
+    }
 
     if (give_points) {
         if (killer != NULL) 

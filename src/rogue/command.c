@@ -467,7 +467,7 @@ command()
 			    count = 0;
 			    after = FALSE;
 			otherwise :
-			    msg("Illegal command '%s'.", unctrl(ch));
+			    msg("Illegal wizard command '%s'.", unctrl(ch));
 			    count = 0;
 		    	}
 		    }
@@ -620,7 +620,7 @@ bad_cleric:
 		death_cause = D_GODWRATH;
 	    when C_MAGICIAN:
 	    case C_ILLUSION:
-		msg("You short out your mana on the unfamiliar %s.",
+		msg("You short out your manna on the unfamiliar %s.",
 		    (cur_armor!=NULL ? "armor" : "weapon") );
 		death_cause = D_SPELLFUMBLE;
 	    when C_THIEF:
@@ -832,9 +832,8 @@ identify()
     register char ch, *str;
 
     msg("What do you want identified? ");
-    ch = readchar();
     mpos = 0;
-    if (ch == ESCAPE) {
+    if ((ch = readchar()) == ESCAPE) {
 	msg("");
 	return;
     }
@@ -842,8 +841,8 @@ identify()
 	id_monst(ch);
 	return;
     }
-    else switch(ch) {
-	case '|':
+    switch(ch) {
+	when '|':
 	case '-':
 	    str = "wall of a room";
 	when GOLD:	str = "gold";
@@ -877,7 +876,7 @@ identify()
 	when STICK:	str = "wand or staff";
 	otherwise:	str = "unknown character";
     }
-    msg("'%s' : %s", unctrl(ch), str);
+    msg("'%s'; %s", unctrl(ch), str);
 }
 
 /*

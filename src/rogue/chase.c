@@ -370,7 +370,7 @@ register bool flee;
 	if (good_monster(*tp)) {
 	    shoot_dir = find_shoot(tp, TRUE); /* find a mean monster to shoot */
 	    if (wizard && shoot_dir)
-		msg("Found monster to shoot at %d,%d.", 
+		msg("Found monster to attack towards (%d,%d).", 
 			shoot_dir->x,shoot_dir->y);
 	}
 	else 

@@ -402,7 +402,7 @@ total_winner()
     if (player.t_ctype == C_FIGHTER)
 	addstr("the fighters guild and appoints you Lord Protector\n");
     else if (player.t_ctype == C_ASSASIN)
-	addstr("the assasins guild and appoints you Master Murderer\n");
+	addstr("the assassins guild and appoints you Master Murderer\n");
     else if (player.t_ctype == C_NINJA)
 	addstr("the ninja guild and appoints you Shogun\n");
     else if (player.t_ctype == C_ILLUSION)

@@ -330,7 +330,7 @@ char *s;
 rnd(range)
 register int range;
 {
-	return(range == 0 ? 0 : (lrand48() & 0x7fffffff) % range);
+	return(range <= 0 ? 0 : (lrand48() & 0x7fffffff) % range);
 }
 
 /*

@@ -22,7 +22,7 @@ wear()
 	addmsg("You are already wearing some");
 	if (!terse)
 	    addmsg(".  You'll have to take it off first");
-	addmsg("!");
+	addmsg(".");
 	endmsg();
 	after = FALSE;
 	return;
@@ -160,7 +160,7 @@ bool print_message;
     case C_MONSTER:
 	    break;
     otherwise:				/* Unknown class */
-	debug("unknown class %d.", class_type);
+	debug("Unknown class %d.", class_type);
 	break;
     }
 

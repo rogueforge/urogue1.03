@@ -49,9 +49,11 @@ prayer()
 	}
 	else msg("Here goes...");
     }
-    msg("You are surrounded by orange smoke...");	/* from adventure(6) */
+    msg("You are surrounded by orange smoke...");
     pstats.s_hpt   = max_stats.s_hpt;
     pstats.s_power = max_stats.s_power;
+    if (rnd(3) == 0)
+	luck--;
 
     if (is_wearing(R_PIETY) || (rnd(luck)==0 &&
 	(player.t_ctype==C_DRUID || player.t_ctype==C_CLERIC ||

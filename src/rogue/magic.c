@@ -427,8 +427,8 @@ found_one:
 
     spell_roll = rnd(100);
     
-    debug("%s cast '%s' fumble %%%d (rolled %d) ",
-	    monsters[caster->t_index].m_name, cast_name,
+    debug("%s(%d) cast '%s' fumble %%%d (rolled %d) ",
+	    monsters[caster->t_index].m_name, curp->s_power, cast_name,
 	    fumble_chance, spell_roll);
     caster->t_rest_hpt	= caster->t_rest_pow	= 0;
     if (!is_player) {			/* Stop running. */

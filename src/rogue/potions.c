@@ -546,7 +546,7 @@ int flags;
 	else if (off(player, ISINVIS))
 	    lengthen(undisguise, blessed ? GONETIME*3 : GONETIME);
 	else
-	    msg("You feel an itchy feeling under your skin.");
+	    msg("You have an itchy feeling under your skin.");
     when P_FIRERESIST:
 	if (cursed) {
 	    if (!is_wearing(R_FIRERESIST))

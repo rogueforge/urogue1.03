@@ -627,7 +627,7 @@ listen()
     for (item = mlist; item != NULL; item = next(item)) {
 	tp = THINGPTR(item);
 	if (DISTANCE(hero.y, hero.x, tp->t_pos.y, tp->t_pos.x) < 81
- 	    && rnd(70) < (thief_bonus + 3*pstats.s_dext + 6*pstats.s_lvl)) {
+ 	    && rnd(70) < (thief_bonus + 4*pstats.s_dext + 6*pstats.s_lvl)) {
  	    msg("You hear a%s %s nearby.", 
 		vowelstr(monsters[tp->t_index].m_name),
 		monsters[tp->t_index].m_name);
@@ -692,7 +692,7 @@ feel_message()
     when 17: charp = "different";
     when 18: charp = "a touch of ague";
     when 19: charp = "a migrane coming on";
-    when 20: charp = "excedrin headache #666";
+    when 20: charp = "Excedrin headache #666";
     when 21: charp = "a disturbance in the force";
     when 22: charp = "like someone dropped a house on you";
     when 23: charp = "as if every nerve in your body is on fire";

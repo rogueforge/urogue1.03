@@ -168,9 +168,9 @@ int size;
     register struct linked_list *item;
 
     if ((item = (struct linked_list *) new(sizeof *item)) == NULL)
-	msg("Ran out of memory for header after %d items", total);
+	msg("Ran out of memory for header after %d items.", total);
     if ((item->l_data = new(size)) == NULL)
-	msg("Ran out of memory for data after %d items", total);
+	msg("Ran out of memory for data after %d items.", total);
     item->l_next = item->l_prev = NULL;
     return item;
 }

@@ -456,7 +456,7 @@ struct object *tr;
 	when 64:
 		msg("You feel a peculiar pull downwards.");
 	when 65:
-		msg("You have astrange urge to go down.");
+		msg("You have a strange urge to go down.");
 	when 66:
 		msg("You feel a pull upwards.");
 	when 67:

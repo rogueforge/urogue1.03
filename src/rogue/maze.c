@@ -65,8 +65,8 @@ do_maze()
 	obj->o_pos = tp;
 	if (rnd(100) < 5) {			/* 5% for treasure maze level */
 	    treas = TRUE;
-	    least = 6;
-	    debug("treasure maze");
+	    least = 20;
+	    debug("Treasure maze.");
 	}
 	else {					/* normal maze level */
 	    least = 1;

@@ -1431,4 +1431,12 @@
 1.03 Alpha, Aug 13, 86
 1)	fix up keypad code to allow daemons to run after each turn
 
+1.03 Alpha, Aug 14, 86
+1)	praying has 1 in 3 chance of improving luck
+2)	killing a friendly monster is bad for the hero
+3)	check for negative parameters to rnd()
+4)	treasure mazes contain more items
+5)	hearing monsters is more likely
+6)	tidied up debug and regular messages somewhat
+
 -------	End of File ------

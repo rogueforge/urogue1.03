@@ -401,7 +401,7 @@ bool print_message;
 
     if (itemweight(obj) > 18 * pstats.s_str) {
 	if (wieldee == &player && print_message==TRUE)
-	    msg("That is too heavy for you to swing!");
+	    msg("That is too heavy for you to swing effectively!");
 	ret_val = FALSE;
 	return(ret_val);
     }
@@ -410,11 +410,11 @@ bool print_message;
 	switch(class_type) {
 	when C_MAGICIAN:
 	case C_ILLUSION:
-	    msg("You cannot cast spells while wielding that!");
+	    msg("You'll find it hard to cast spells while wielding that!");
 	when C_THIEF:
 	case C_ASSASIN:
 	case C_NINJA:
-	    msg("Don't expect to be backstab anyone while wielding that!");
+	    msg("Don't expect to backstab anyone while wielding that!");
 	when C_CLERIC:
 	case C_DRUID:
 	case C_PALADIN:

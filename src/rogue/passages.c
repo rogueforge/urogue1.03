@@ -189,7 +189,7 @@ int r1, r2;
 	turn_spot = rnd(distance-1) + 1;
     }
     else
-	debug("error in connection tables");
+	debug("Error in connection tables.");
     /*
      * Draw in the doors on either side of the passage or just put #'s
      * if the rooms are gone.

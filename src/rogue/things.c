@@ -563,20 +563,19 @@ pick_one(magic, nitems)
 register struct magic_item *magic;
 int nitems;
 {
-    register struct magic_item *end;
     register int i;
-    register struct magic_item *start;
+    register struct magic_item *end;
+    register struct magic_item *start = magic;
 
-    start = magic;
-    for (end = &magic[nitems], i = rnd(1000); magic < end; magic++) {
+    for (end = &magic[nitems], i = rnd(1000); magic < end; magic++)
 	if (i <= magic->mi_prob)
 	    break;
-    }
     if (magic == end) {
 	if (wizard) {
-	    msg("bad pick_one: %d from %d items", i, nitems);
+	    add_line("Bad pick_one: %d from %d items", i, nitems);
 	    for (magic = start; magic < end; magic++)
-		msg("%s: %d%%", magic->mi_name, magic->mi_prob);
+		add_line("%s: %d%%", magic->mi_name, magic->mi_prob);
+	    end_line();
 	}
 	magic = start;
     }

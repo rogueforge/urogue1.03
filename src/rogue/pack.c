@@ -209,8 +209,6 @@ char *message;
       check_level();
     }
   }
-  debug("Object flags %x, picked up type %c, which %d.", 
-	obj->o_flags, obj->o_type, obj->o_which);
   updpack(FALSE);
   return(TRUE);
 }
@@ -260,7 +258,6 @@ register char type;		/* character for type, or NULL to prompt */
 pick_up(ch)
      char ch;
 {
-  debug("picking up %c", ch);
   switch(ch)
     {
     default:
@@ -321,7 +318,6 @@ get_object(container, purpose, type, bff_p)
     {
       msg("What do you want to %s (* for list)?", purpose);
       response = readchar();
-      debug("get_object: type=%c response=%c", type, response);
       ESCAPE_EXIT(response);
       if (response == '*')
 	{
@@ -345,9 +341,8 @@ get_object(container, purpose, type, bff_p)
 	  ESCAPE_EXIT(response);
 	  sel_id = response;
 	}
-      debug("get_object: sel_type=%c, sel_id=%c", sel_type, sel_id);
       if (NULL == (obj_p = scan_bag(container, sel_type, unprint_id(sel_id))))
-	msg("couldn't find %c%c", sel_type, sel_id);
+	msg("Couldn't find %c%c", sel_type, sel_id);
     }
   return(obj_p);
 }
