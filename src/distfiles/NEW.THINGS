@@ -1516,4 +1516,8 @@
 3)	fix declarations of arrays of string pointers for Sun compiler
 4)	initialize pluses and minuses of stuff in trading posts
 
+1.03 Alpha, Oct 12, 86
+1)	fixed display of objects in hero's pack at end of game
+2)	fix being able to pick up more objects than 52 of a type
+
 -------	End of File ------

@@ -535,7 +535,7 @@ char *howso;
 	cnt = 1;
 	clear();
 	mvprintw(0, 0, "Contents of your pack %s:\n",howso);
-	ch = 'a';
+	ch = 0;
 	oldpurse = purse;
 	purse = 0;
 	for (item = pack; item != NULL; item = next(item)) {
@@ -546,7 +546,7 @@ char *howso;
 		if (obj->o_type == ARTIFACT && obj->o_which == TR_PURSE)
 			bag = obj->art_stats.t_art;
 		iname = inv_name(obj, FALSE);
-		mvprintw(cnt, 0, "%c) %s\n",ch,iname);
+		mvprintw(cnt, 0, "%d) %s\n",ch,iname);
 		ch += 1;
 		if (++cnt > LINES - 5 && next(item) != NULL) {
 			cnt = 1;
@@ -562,7 +562,7 @@ char *howso;
 		wait_for(' ');
 		clear();
 		cnt = 1;
-		ch = 'a';
+		ch = 0;
 		mvprintw(0, 0, "Contents of the Magic Purse of Yendor %s:\n",
 			howso);
 		for (item = bag; item != NULL; item = next(item)) {
@@ -570,7 +570,7 @@ char *howso;
 			worth = get_worth(obj);
 			whatis(item);
 			purse += worth;
-			mvprintw(cnt, 0, "%c) %s\n", ch, inv_name(obj, FALSE));
+			mvprintw(cnt, 0, "%d) %s\n", ch, inv_name(obj, FALSE));
 			ch += 1;
 			if (++cnt > LINES - 5 && next(item) != NULL) {
 				cnt = 1;

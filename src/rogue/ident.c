@@ -138,5 +138,5 @@ register char print_id;
 
 max_print()
 {
-    return(sizeof(print_letters));
+    return(sizeof(print_letters) - 2);	/* 1 for blank and 1 for EOS string */
 }
