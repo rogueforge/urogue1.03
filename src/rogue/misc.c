@@ -329,7 +329,7 @@ eat()
 	no_command = HOLDTIME;
     }
     hungry_state = F_OK;
-    updpack(TRUE);
+    updpack();
     if (obj == cur_weapon)
 	cur_weapon = NULL;
 }
@@ -368,7 +368,7 @@ bool both, lost;
     if (ptr->s_str < 0)
 	ptr->s_str = 0;
 
-    updpack(TRUE);
+    updpack();
 }
 
 /*
@@ -701,4 +701,42 @@ feel_message()
 	charp = "ill";
     }
     msg("You feel %s.", charp);
+}
+
+/*
+ * int_wis_bonus - Spell point adjustment for changing levels
+ */
+int_wis_bonus()
+{
+    register int ret_val = -2;
+    register int casters_stat;
+
+    switch (player.t_ctype) {
+	when C_PALADIN:
+	case C_CLERIC:
+	    casters_stat = pstats.s_wisdom;
+	when C_RANGER:
+	case C_DRUID:
+	    casters_stat = pstats.s_wisdom;
+	when C_MAGICIAN:
+	    casters_stat = pstats.s_intel;
+	when C_ILLUSION:
+	    casters_stat = pstats.s_intel;
+	otherwise:
+	    if (is_wearing(R_WIZARD))
+		casters_stat = pstats.s_intel;
+	    else if (is_wearing(R_PIETY))
+		casters_stat = pstats.s_wisdom;
+	    else
+		casters_stat = (rnd(2) ? pstats.s_wisdom : pstats.s_intel);
+    }
+
+    if (casters_stat > 12)
+	ret_val = casters_stat - 12;
+    else if (casters_stat > 6)
+	ret_val = 0;
+    else if (casters_stat > 3)
+	ret_val = -1;
+
+    return(ret_val);
 }

@@ -12,26 +12,40 @@
  * updpack:
  *	Update his pack weight and adjust fooduse accordingly
  */
-updpack(getmax)
-int getmax;
+updpack()
 {
 
-	reg int topcarry, curcarry;
+	reg int pack_level;			/* 0 empty, 5 full */
+	reg int curcarry = packweight();	/* get pack weight */
 
-	if (getmax)
-	    pstats.s_carry = totalenc();	/* get total encumb */
-	curcarry = packweight();		/* get pack weight */
-	topcarry = pstats.s_carry / 5;		/* 20% of total carry */
-	if(curcarry > 4 * topcarry) {
-	    if(rnd(100) < 80)
-		foodlev = 3;			/* > 80% of pack */
-	} 
-	else if(curcarry > 3 * topcarry) {
-	    if(rnd(100) < 60)
-		foodlev = 2;			/* > 60% of pack */
-	} else
-	    foodlev = 1;			/* <= 60% of pack */
+	pstats.s_carry = totalenc();		/* update max encumb */
+	if (is_carrying(TR_PURSE))
+	    pstats.s_carry += 1000;
+
+	foodlev = 0;
+	pack_level = ((curcarry + rnd(5) * 5) / pstats.s_carry) - 1;
+	switch ((curcarry * 5) / pstats.s_carry) { /* % of total capacity */
+	    case 5:				/* 100 % */
+		foodlev++;
+	    case 4:				/* 80 % */
+		if(rnd(100) < 80)
+		    foodlev++;
+	    case 3:				/* 60 % */
+		if(rnd(100) < 60)
+		    foodlev++;
+	    case 2:				/* 40 % */
+		if(rnd(100) < 40)
+		    foodlev++;
+	    case 1:				/* 20 % */
+		if(rnd(100) < 20)
+		    foodlev++;
+	    case 0:				/* 0 % */
+		foodlev++;
+	}
 	pstats.s_pack = curcarry;		/* update pack weight */
+
+	if (is_carrying(TR_PURSE))		/* makes pack lighter */
+	    foodlev--;
 }
 
 
@@ -50,7 +64,7 @@ packweight()
 	    obj = OBJPTR(pc);
 	    weight += itemweight(obj) * obj->o_count;
 	}
-	if(weight < 0)		/* in case of artifacts and stuff */
+	if(weight < 0)		/* caused by artifacts or blessed items */
 	     weight = 0;
 
 	return(weight);
@@ -76,7 +90,6 @@ reg struct object *wh;
 		 */
 		ac = armors[wh->o_which].a_class - wh->o_ac;
 		weight = ((weight*5) - (weight*ac)) / 5;
-		if (weight < 0) weight = 0;
 	    when WEAPON:
 		if ((wh->o_hplus + wh->o_dplus) > 0)
 			weight /= 2;
@@ -85,6 +98,8 @@ reg struct object *wh;
 		weight += weight / 5;	/* 20% more for cursed */
 	else if(wh->o_flags & ISBLESSED)
 		weight -= weight / 5;	/* 20% less for blessed */
+	if (weight < 0)
+		weight = 0;
 	return(weight);
 }
 
@@ -93,7 +108,7 @@ reg struct object *wh;
  * playenc:
  *	Get hero's carrying ability above norm
  *	  50 units per point of STR over 8
- *	 150 units per plus on R_CARRYING
+ *	 300 units per plus on R_CARRYING
  *	1000 units for TR_PURSE
  */
 playenc()
@@ -101,9 +116,7 @@ playenc()
 	register int ret_val = (pstats.s_str - 8) * 50;
 
 	if(is_wearing(R_CARRYING))
-	    ret_val += (ring_value(R_CARRYING) * 150);
-	if (is_carrying(TR_PURSE))
-	    ret_val += 1000;
+	    ret_val += (ring_value(R_CARRYING) * 300);
 	return(ret_val);
 }
 
@@ -167,12 +180,14 @@ wghtchk()
 /*
  * hitweight:
  *	Gets the fighting ability according to current weight
- * 	This returns a  +1 hit for light pack weight
+ * 	This returns a  +2 hit for very light pack weight
+ * 			+1 hit for light pack weight
  * 			 0 hit for medium pack weight
  *			-1 hit for heavy pack weight
+ *			-2 hit for very heavy pack weight
  */
 
 hitweight()
 {
-	return(2 - foodlev);
+	return(3 - foodlev);
 }

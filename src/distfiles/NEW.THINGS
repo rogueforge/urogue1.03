@@ -1447,4 +1447,37 @@
 5)	fix up passing pointer to incant()
 	above by Mike Laman
 
+1.03 Alpha, Sep 12, 86
+1)	Removed Friendly Fiend as a monster
+2)	Seperated out True Sight from See Invisible
+3)	Total rework of trader.c.  Posts appear every 15 levels
+4)	Combined X_guess and X_know into guess_items and know_items
+5)	Phial will confuse *all* monsters on a level
+6)	Reworked pack.c to fix food usage
+7)	Decreased tripping and falling down stairs
+8)	Twiddled call()
+9)	R_PIETY and R_WIZARDRY now regen pow up to your max_power * ring_plus
+10)	Speeded up MU hpt and figher POW regeneration
+11)	Fixed up R_REGEN and other doctor things
+12)	Other daemons.c twiddles
+13)	Made P_SHIELD 2 give you +3 or +5 to AC
+14)	int_wis_bonus() mimics con_bonus for POW
+15)	Assasins and Ninjas get bonus EP for backstabbing
+16)	Fighters get bonus EP for stunning even if monster dies
+17)	rewrote get_play.c, init_player() to decrease code size
+18)	commented out debug messages in ident.c
+19)	only weapon and armor when outfitting pack
+20)	Spiffier and sorted spells in magic.c
+21)	Put limits on P_GAINABIL, P_RAISE
+22)	Increased prices for magic.  Weapons, armor still to come
+23)	FRIENDLY monsters are not INVIS
+24)	Reworked CANREFLECT vs gazing monsters
+25)	create_lucifer().  Future expansion possible
+26)	Rangers detect food.  MUs detect magic.  Clerics detect undead
+27)	Fixed Phial level lighting messages.
+28)	Remove potions. scrolls from pack after referencing them in code
+29)	Make most rings have +/- stuff
+30)	deleted create_obj()
+	above by Carl Hommel
+
 -------	End of File ------

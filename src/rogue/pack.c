@@ -188,18 +188,6 @@ char *message;
       msg("(%c%c) %s.",obj->o_type, print_letters[get_ident(obj)],
 	  inv_name(obj, !terse));
     }
-  if (obj->o_flags & ISPOST)
-    switch(obj->o_type) {
-      when POTION:
-        p_know[obj->o_which] = TRUE;
-      when STICK:
-        ws_know[obj->o_which] = TRUE;
-      when SCROLL:
-        s_know[obj->o_which] = TRUE;
-      when RING:
-        r_know[obj->o_which] = TRUE;
-    }
-  obj->o_flags &= ~ISPOST;
   if (obj->o_type == ARTIFACT) {
     has_artifact |= (1 << obj->o_which);
     picked_artifact |= (1 << obj->o_which);
@@ -209,7 +197,7 @@ char *message;
       check_level();
     }
   }
-  updpack(FALSE);
+  updpack();
   return(TRUE);
 }
 
@@ -409,7 +397,7 @@ register struct object *obj_p;
 {
   cur_null(obj_p);		/* check for current stuff */
   pop_bag(&pack, obj_p);
-  updpack(FALSE);
+  updpack();
   return(TRUE);			/* tell caller an item has been removed */
 }
 /*

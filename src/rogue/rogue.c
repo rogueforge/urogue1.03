@@ -41,8 +41,6 @@ int prversion;				/* Print version info */
 bool char_type = C_NOTSET;		/* what type of character is player */
 int foodlev = 1;			/* how fast he eats food */
 int ntraps;				/* Number of traps on this level */
-int trader = 0;				/* no. of purchases */
-int curprice = -1;			/* current price of item */
 int seed;				/* Random number seed */
 int dnum;				/* Dungeon number */
 int max_level;				/* Deepest player has gone */

@@ -25,6 +25,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
     extinguish(suffocate);
     hold_count = 0;
     trap_tries = 0;
+    no_food++;
 
     if (level > max_level)
 	max_level = level;
@@ -62,15 +63,17 @@ LEVTYPE	ltype;		/* designates type of level to create */
     switch(ltype) {
     when THRONE:
 	do_throne();			/* do monster throne stuff */
-    when POSTLEV:
-	do_post();			/* do post stuff */
     when MAZELEV:
 	do_maze();
-	no_food++;
-    otherwise:
+    when POSTLEV:
+    default:
+	if (level == 0 || (level % 15) == 0) {
+	    do_post();			/* do post stuff */
+	    level++;
+	    levtype = ltype = NORMLEV;
+	}
 	do_rooms();			/* Draw rooms */
 	do_passages();			/* Draw passages */
-	no_food++;
     }
 
     /*
@@ -83,58 +86,13 @@ LEVTYPE	ltype;		/* designates type of level to create */
     } until (mvinch(stairs.y, stairs.x) == FLOOR || cnt++ > 5000);
     addch(STAIRS);
 
-    if (ltype == POSTLEV) {
-	item = new_item(sizeof (struct thing));		/* Friendly Fiend */
-	new_monster(item, nummonst+2, &stairs, MAXSTATS);
-    }
-    else put_things(ltype);			/* Place objects (if any) */
+    put_things(ltype);				/* Place objects (if any) */
+
+    if (has_artifact && level == 1)
+	create_lucifer(&stairs);
 
     /*
-     * special surprise on the way back up
-     * create Lucifer with more than the usual god abilities
-     */
-    if (has_artifact && level == 1) {
-	register struct thing *tp;
-	item = new_item(sizeof (struct thing));
-	new_monster(item, nummonst+1, &stairs, MAXSTATS);
-	tp = THINGPTR(item);
-	turn_on(*tp, CANINWALL);
-	turn_on(*tp, CANHUH);
-	turn_on(*tp, CANBLINK);
-	turn_on(*tp, CANSNORE);
-	turn_on(*tp, CANDISEASE);
-	turn_on(*tp, NOCOLD);
-	turn_on(*tp, TOUCHFEAR);
-	turn_on(*tp, BMAGICHIT);
-	turn_on(*tp, NOFIRE);
-	turn_on(*tp, NOBOLT);
-	turn_on(*tp, CANBLIND);
-	turn_on(*tp, CANINFEST);
-	turn_on(*tp, CANSMELL);
-	turn_on(*tp, CANPARALYZE);
-	turn_on(*tp, CANSTINK);
-	turn_on(*tp, CANCHILL);
-	turn_on(*tp, CANFRIGHTEN);
-	turn_on(*tp, CANHOLD);
-	turn_on(*tp, CANBRANDOM);
-    }
-
-    /*
-     * maybe add a doorway to a trading post 
-     */
-    if (level > 15 && rnd(11) == 7 && ltype == NORMLEV) {
-	cnt = 0;
-	do {
-	    rm = rnd_room();
-	    if (rooms[rm].r_flags & ISTREAS)
-		continue;
-	    rnd_pos(&rooms[rm], &stairs);
-	} until (mvinch(stairs.y, stairs.x) == FLOOR || cnt++ > 5000);
-	addch(POST);
-    }
-
-    /*
-     * Place the traps (except for trading post)
+     * Place the traps
      */
     ntraps = 0;	/* No traps yet */
     if (levtype == NORMLEV) {
@@ -201,7 +159,6 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	     DISTANCE(hero.y, hero.x, stairs.y, stairs.x) > 16);
     oldrp = &rooms[rm];		/* Set the current room */
     player.t_oldpos = player.t_pos;	/* Set the current position */
-    light(&hero);
 
     if (levtype != POSTLEV && levtype != THRONE) {
 	if (on(player, BLESSMAP) && rnd(5) == 0) {
@@ -209,28 +166,30 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSMAP);
 	}
-	if (on(player, BLESSGOLD) && rnd(5) == 0) {
+	if (player.t_ctype == C_THIEF || on(player, BLESSGOLD) && rnd(5) == 0) {
 	    read_scroll(&player, S_GFIND, ISNORMAL);
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSGOLD);
 	}
-	else if (player.t_ctype == C_THIEF)
-		gsense();
-	if (on(player, BLESSFOOD) && rnd(5) == 0) {
+	if (player.t_ctype == C_RANGER || on(player, BLESSFOOD) && rnd(5) == 0) {
 	    read_scroll(&player, S_FOODDET, ISNORMAL);
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSFOOD);
 	}
-	if (on(player, BLESSMAGIC) && rnd(5) == 0) {
+	if (player.t_ctype == C_MAGICIAN || player.t_ctype == C_ILLUSION ||
+	    on(player, BLESSMAGIC) && rnd(5) == 0) {
 	    quaff(&player, P_TREASDET, ISNORMAL);
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSMAGIC);
 	}
-	if (on(player, BLESSMONS) && rnd(5) == 0) {
+	if (player.t_ctype == C_DRUID || on(player, BLESSMONS) && rnd(5) == 0) {
 	    quaff(&player, P_MONSTDET, ISNORMAL);
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSMONS);
 	}
+	else if (player.t_ctype == C_CLERIC ||
+		 player.t_ctype == C_PALADIN)
+	    undead_sense();
     }
 
     if (is_wearing(R_ADORNMENT) || 
@@ -249,8 +208,24 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	    msg("An uneasy feeling comes over you.");
     }
 
+    /* Palantir shows all */
+    if (is_carrying(TR_PALANTIR)) {
+	msg("The Palantir reveals all!");
+	overlay(stdscr,cw);			/* Wizard mode 'f' command */
+	overlay(mw,cw);				/* followed by 'm' command */
+    }
+
+    /* Phial lights your way */
+    if (is_carrying(TR_PHIAL)) {
+	if (!is_carrying(TR_PALANTIR))
+	    msg("The Phial banishes the darkness!");
+	for (i = 0; i < MAXROOMS; i++)
+	    rooms[i].r_flags &= ~ISDARK;
+    }
     wmove(cw, hero.y, hero.x);
     waddch(cw, PLAYER);
+    light(&hero);
+
     /*
      * Summon familiar if player has one
      */
@@ -269,19 +244,6 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	}
 	else
 	    free_list(fpack);
-    }
-
-    /* Phial lights your way */
-    if (is_carrying(TR_PHIAL)) {
-	msg("The Phial banishes the darkness!");
-	read_scroll(&player, S_LIGHT, ISBLESSED);
-    }
-
-    /* Palantir shows all */
-    if (is_carrying(TR_PALANTIR)) {
-	msg("The Palantir reveals all!");
-	overlay(stdscr,cw);			/* Wizard mode 'f' command */
-	overlay(mw,cw);				/* followed by 'm' command */
     }
 
     status(TRUE);
@@ -510,4 +472,38 @@ do_throne()
     level = save_level + roll(2,3);		/* send the hero down */
     aggravate();
     throne_monster = 0;
+}
+
+/*
+ * create_lucifer:
+ *	special surprise on the way back up
+ *	create Lucifer with more than the usual god abilities
+ */
+
+create_lucifer(stairs)
+coord *stairs;
+{
+    register struct linked_list *item = new_item(sizeof (struct thing));
+    register struct thing *tp = THINGPTR(item);
+
+    new_monster(item, nummonst+1, stairs, MAXSTATS);
+    turn_on(*tp, CANINWALL);
+    turn_on(*tp, CANHUH);
+    turn_on(*tp, CANBLINK);
+    turn_on(*tp, CANSNORE);
+    turn_on(*tp, CANDISEASE);
+    turn_on(*tp, NOCOLD);
+    turn_on(*tp, TOUCHFEAR);
+    turn_on(*tp, BMAGICHIT);
+    turn_on(*tp, NOFIRE);
+    turn_on(*tp, NOBOLT);
+    turn_on(*tp, CANBLIND);
+    turn_on(*tp, CANINFEST);
+    turn_on(*tp, CANSMELL);
+    turn_on(*tp, CANPARALYZE);
+    turn_on(*tp, CANSTINK);
+    turn_on(*tp, CANCHILL);
+    turn_on(*tp, CANFRIGHTEN);
+    turn_on(*tp, CANHOLD);
+    turn_on(*tp, CANBRANDOM);
 }

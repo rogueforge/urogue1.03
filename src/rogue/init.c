@@ -84,7 +84,7 @@ static char *metal[] = {
 
 init_player()
 {
-    bool special = rnd(11) ;
+    bool special = rnd(100) < 20;
     struct linked_list *item;
     struct object *obj;
     int which_armor, which_weapon, i, which_item;
@@ -104,76 +104,71 @@ init_player()
 	pstats.s_power = 5 + rnd(5);
 	pstats.s_hpt = 15 + rnd(5);
 
-	/* Now for the special ability */
-	switch (char_type) {
+	switch (char_type) {	/* Class-specific abilities */
 	    when C_FIGHTER:
-		pstats.s_str = 18;
+		pstats.s_str = 17;
 		pstats.s_const += rnd(4) + 1;
+		if (special) {
+		    pstats.s_str += rnd(3);
+		    pstats.s_dext += rnd(4);
+		}
+		pstats.s_const = max(pstats.s_const, 16);
+	    when C_PALADIN:
+		pstats.s_charisma = 17;
+		if (special) {
+		    pstats.s_charisma += rnd(3);
+		    pstats.s_wisdom += rnd(4);
+		    pstats.s_str += rnd(5);
+		}
+		pstats.s_str = max(pstats.s_str, 16);
+		pstats.s_wisdom = max(pstats.s_wisdom, 16);
+	    when C_RANGER:
+		if (special) {
+		    pstats.s_wisdom += rnd(4);
+		    pstats.s_intel += rnd(4);
+		    pstats.s_str += rnd(5);
+		}
+		pstats.s_str = max(pstats.s_str, 16);
+		pstats.s_wisdom = max(pstats.s_wisdom, 16);
+		pstats.s_const = max(pstats.s_const, 14);
 	    when C_MAGICIAN:
-		pstats.s_intel = (special == 4) ? 18 : 16 ;
+		pstats.s_intel = (special) ? 18 : 16 ;
 		pstats.s_power += 5 + rnd(10);
 	    when C_ILLUSION:
-    		pstats.s_intel = (special == 4) ? 18 : 16 ;
-    		pstats.s_dext = (special == 4) ? 18 : 14;
+    		pstats.s_intel = (special) ? 18 : 16 ;
+    		pstats.s_dext = (special) ? 18 : 14;
 		pstats.s_power += 5 + rnd(10);
 	    when C_CLERIC:
-		pstats.s_wisdom = (special == 4) ? 18 : 16 ;
+		pstats.s_wisdom = (special) ? 18 : 16 ;
 		pstats.s_str += rnd(4);
 		pstats.s_power += 5 + rnd(10);
 	    when C_DRUID:
-		if(special == 4) {
+		if (special) {
 		    pstats.s_wisdom += rnd(5);
 		    pstats.s_charisma += rnd(4);
 		}
 		pstats.s_str += rnd(4);
 		pstats.s_power += 5 + rnd(10);
-		if(pstats.s_wisdom < 16)
-		    pstats.s_wisdom = 16;
+		pstats.s_wisdom = max(pstats.s_wisdom, 16);
 	    when C_THIEF:
 		pstats.s_dext = 18;
+		if (special)
+		    pstats.s_const += rnd(4) + 1;
 	    when C_ASSASIN:
-		pstats.s_dext = (special == 4) ? 18 : 16 ;
-		pstats.s_intel = (special == 4) ? 18 : 16;
+		pstats.s_dext = (special) ? 18 : 16 ;
+		pstats.s_intel = (special) ? 18 : 16;
 	    when C_NINJA:
-		if(special == 4) {
+		if (special) {
 		    pstats.s_dext += rnd(5);
 		    pstats.s_str += rnd(4);
 		    pstats.s_intel += rnd(3);
 		    pstats.s_wisdom += rnd(3);
 		}
-		if(pstats.s_dext < 16)
-		    pstats.s_dext = 16;
-		if(pstats.s_str < 15)
-		    pstats.s_str = 15;
-		if(pstats.s_wisdom < 15)
-		    pstats.s_wisdom = 15;
-		if(pstats.s_const < 11)
-		    pstats.s_const = 11;
-		if(pstats.s_charisma < 11)
-		    pstats.s_charisma = 11;
-	    when C_PALADIN:
-		pstats.s_charisma = 17;
-		if(special == 4) {
-		    pstats.s_charisma += rnd(3);
-		    pstats.s_wisdom += rnd(4);
-		    pstats.s_str += rnd(5);
-		}
-		if(pstats.s_str < 16)
-		    pstats.s_str = 16;
-		if(pstats.s_wisdom < 16)
-		    pstats.s_wisdom = 16;
-	    when C_RANGER:
-		if(special == 4) {
-		    pstats.s_wisdom += rnd(4);
-		    pstats.s_intel += rnd(4);
-		    pstats.s_str += rnd(5);
-		}
-		if(pstats.s_str < 16)
-		    pstats.s_str = 16;
-		if(pstats.s_wisdom <16)
-		    pstats.s_wisdom = 16;
-		if(pstats.s_const < 14)
-		    pstats.s_const = 14;
+		pstats.s_dext = max(pstats.s_dext, 16);
+		pstats.s_str = max(pstats.s_str, 15);
+		pstats.s_wisdom = max(pstats.s_wisdom, 15);
+		pstats.s_const = max(pstats.s_const, 15);
+		pstats.s_charisma = max(pstats.s_charisma, 11);
 	}
 	puta_player();
     }
@@ -201,90 +196,23 @@ init_player()
 	    purse = roll(50,60);;
 	    which_armor = RING_MAIL;
 	    which_weapon = TWO_SWORD;
-	    item = spec_item(WEAPON, BOW, 1, 1);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW;
-	    add_pack(item, TRUE);
-	    item = spec_item(WEAPON, SILVERARROW, 1, 1);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW | ISOWNED | CANRETURN;
-	    obj->o_count = 1;
-	    add_pack(item, TRUE);
-	    item = spec_item(WEAPON, FLAMEARROW, 1, 1);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW | ISOWNED | CANRETURN;
-	    obj->o_count = 1;
-	    add_pack(item, TRUE);
 	when C_CLERIC:
 	    purse = roll(30,80);;
 	    which_armor = PADDED_ARMOR;
 	    which_weapon = QUARTERSTAFF;
-	    which_item = P_HEALING;
-	    p_know[which_item] = TRUE;
-	    item = spec_item(POTION, which_item, 0, 0);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW;
-	    add_pack(item, TRUE);
 	when C_MAGICIAN: {
 	    purse = roll(20,60);;
 	    which_armor = HEAVY_LEATHER;
 	    which_weapon = QUARTERSTAFF;
-	    which_item = P_SEEINVIS;
-	    p_know[which_item] = TRUE;
-	    item = spec_item(POTION, which_item, 0, 0);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW;
-	    add_pack(item, TRUE);
-	    for (i = 1; i < 4; i++) {
-		which_item = rnd(maxscrolls);
-		s_know[which_item] = TRUE;
-		item = spec_item(SCROLL, which_item, 0, 0);
-		obj = OBJPTR(item);
-		obj->o_flags |= ISKNOW;
-		add_pack(item, TRUE);
-	    }
 	}
 	when C_ILLUSION:
 	    purse = roll(20,60);;
 	    which_armor = SOFT_LEATHER;
 	    which_weapon = QUARTERSTAFF;
-	    which_item = P_DISGUISE;
-	    p_know[which_item] = TRUE;
-	    item = spec_item(POTION, which_item, 0, 0);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW;
-	    add_pack(item, TRUE);
-	    which_item = S_REFLECT;
-	    s_know[which_item] = TRUE;
-	    item = spec_item(SCROLL, which_item, 0, 0);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW;
-	    add_pack(item, TRUE);
-	    which_item = WS_MISSILE;
-	    ws_know[which_item] = TRUE;
-	    item = spec_item(STICK, which_item, 0, 0);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW;
-	    fix_stick(obj);
-	    add_pack(item, TRUE);
 	when C_DRUID:
 	    purse = roll(30,80);;
 	    which_armor = SOFT_LEATHER;
 	    which_weapon = QUARTERSTAFF;
-	    which_item = WS_POLYMORPH;
-	    ws_know[which_item] = TRUE;
-	    item = spec_item(STICK, which_item, 0, 0);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW;
-	    fix_stick(obj);
-	    add_pack(item, TRUE);
-	    which_item = WS_CONFMON;
-	    ws_know[which_item] = TRUE;
-	    item = spec_item(STICK, which_item, 0, 0);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW;
-	    fix_stick(obj);
-	    add_pack(item, TRUE);
 	when C_THIEF:
 	    purse = roll(40,80);;
 	    which_armor = HEAVY_LEATHER;
@@ -293,19 +221,10 @@ init_player()
 	    purse = roll(20,80);;
 	    which_armor = SOFT_LEATHER;
 	    which_weapon = SABRE;
-	    item = spec_item(WEAPON, DAGGER, 1, 1);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW | ISPOISON;
-	    add_pack(item, TRUE);
 	when C_NINJA:
 	    purse = roll(20,80);
 	    which_armor = SOFT_LEATHER;
 	    which_weapon = SABRE;
-	    item = spec_item(WEAPON, SHIRIKEN, 1, 1);
-	    obj = OBJPTR(item);
-	    obj->o_flags |= ISKNOW | ISPOISON;
-	    obj->o_count += roll(10, 6);
-	    add_pack(item, TRUE);
 	when C_PALADIN:
 	    purse = roll(20,60);;
 	    which_armor = PLATE_MAIL;
@@ -398,13 +317,13 @@ init_colors()
     register char *str ;
 
     for (i = 0 ; i < maxpotions ; i++) {
-	do
+	do {
 	    str = rainbow[rnd(NCOLORS)] ;
-	until (isupper(*str)) ;
+	} until (isupper(*str)) ;
 	*str = tolower(*str) ;
 	p_colors[i] = str ;
-	p_know[i] = FALSE ;
-	p_guess[i] = NULL ;
+	know_items[TYP_POTION][i] = FALSE ;
+	guess_items[TYP_POTION][i] = NULL ;
 	if (i > 0)
 		p_magic[i].mi_prob += p_magic[i-1].mi_prob ;
     }
@@ -436,8 +355,8 @@ init_names()
 	}
 	*--cp = '\0' ;
 	s_names[i] = (char *) new(strlen(prbuf)+1) ;
-	s_know[i] = FALSE ;
-	s_guess[i] = NULL ;
+	know_items[TYP_SCROLL][i] = FALSE ;
+	guess_items[TYP_SCROLL][i] = NULL ;
 	strcpy(s_names[i], prbuf) ;
 	if (i > 0)
 		s_magic[i].mi_prob += s_magic[i-1].mi_prob ;
@@ -456,13 +375,13 @@ init_stones()
     register char *str ;
 
     for (i = 0 ; i < maxrings ; i++) {
-	do
+	do {
 	    str = stones[rnd(NSTONES)] ;
-	until (isupper(*str)) ;
+	} until (isupper(*str)) ;
 	*str = tolower(*str) ;
 	r_stones[i] = str ;
-	r_know[i] = FALSE ;
-	r_guess[i] = NULL ;
+	know_items[TYP_RING][i] = FALSE ;
+	guess_items[TYP_RING][i] = NULL ;
 	if (i > 0)
 		r_magic[i].mi_prob += r_magic[i-1].mi_prob ;
     }
@@ -480,7 +399,7 @@ init_materials()
     register char *str ;
 
     for (i = 0 ; i < maxsticks ; i++) {
-	do
+	do {
 	    if (rnd(100) > 50) {
 		str = metal[rnd(NMETAL)] ;
 		if (isupper(*str))
@@ -491,11 +410,11 @@ init_materials()
 		if (isupper(*str))
 			ws_type[i] = "staff" ;
 	    }
-	until (isupper(*str)) ;
+	} until (isupper(*str)) ;
 	*str = tolower(*str) ;
 	ws_made[i] = str ;
-	ws_know[i] = FALSE ;
-	ws_guess[i] = NULL ;
+	know_items[TYP_STICK][i] = FALSE ;
+	guess_items[TYP_STICK][i] = NULL ;
 	if (i > 0)
 		ws_magic[i].mi_prob += ws_magic[i-1].mi_prob ;
     }

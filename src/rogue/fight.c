@@ -836,7 +836,7 @@ bool thrown;
 		    if (rnd(2))
 			turn_on(*mp, ISFLEE);
                     turn_on(*mp, ISINVIS);
-		    updpack(FALSE);
+		    updpack();
 		}
 	    }
 	}
@@ -1051,7 +1051,7 @@ check_level()
     nsides = 16 - nsides;
     add = 0;
     for (j = 0; j < num_jumped; j++)
-	add += roll(1,nsides);
+	add += max(1, roll(1,nsides) + int_wis_bonus());
     max_stats.s_power += add;
     pstats.s_power += add;
     learn_new_spells();
@@ -1218,6 +1218,8 @@ struct object *cur_weapon;
 		damage *= (pstats.s_lvl/4 + 1);
 		msg("You backstabbed the %s %d times!",
 		    monsters[def_er->t_index].m_name, (pstats.s_lvl/4)+1);
+		if (player.t_ctype == C_NINJA || player.t_ctype == C_ASSASIN)
+		    pstats.s_exp += def_er->t_stats.s_exp / 2;
 	    }
 
 	    def->s_hpt -= damage;	/* Do the damage */
@@ -1232,11 +1234,14 @@ struct object *cur_weapon;
 
 	    /* stun monsters when taking more than 1/3 their max hpts */
 	    if (is_player && !hurl && !did_hit &&
-		player.t_ctype == C_FIGHTER && def->s_hpt > 0 &&
+		player.t_ctype == C_FIGHTER &&
 		damage > def_er->maxstats.s_hpt / 3) {
-		msg("The %s has been stunned!",
-		    monsters[def_er->t_index].m_name);
-		def_er->t_no_move += rnd(4) + 1;
+		if (def->s_hpt > 0) {
+		    msg("The %s has been stunned! HP=%d",
+			monsters[def_er->t_index].m_name, def->s_hpt);
+		    def_er->t_no_move += rnd(4) + 1;
+		}
+		pstats.s_exp += def_er->t_stats.s_exp / 4;
 	    }
 
 	    did_hit = TRUE;
@@ -1615,38 +1620,8 @@ bool print_message, give_points;
 	turn_off(player,HASFAMILIAR);
 	fam_ptr = NULL;
 	msg("An incredible wave of sadness sweeps over you.");
+	/* There should be some penalty here... */
     }
-    else if (is_player && tp->t_index == nummonst+2) {
-			/* killed Friendly Fiend */
-	register struct linked_list *list;
-	register struct object *obj;
-
-	levtype = NORMLEV;		/* hero can take objects now */
-	trader = 4 * MAXPURCH;
-	luck += 4;
-	msg("The gods become very angry at you.");
-	for (list = pack; list != NULL; list = next(list)) {
-	    obj = OBJPTR(list);
-	    if (rnd(3) == 0) {
-		if (obj->o_flags & ISBLESSED)
-		    obj->o_flags &= ~ISBLESSED;
-		else
-		    obj->o_flags |= ISCURSED;
-		obj->o_flags &= ~(ISSILVER & ISPROT & ISZAPPED & ISVORPED
-		    & ISPOISON & CANRETURN & ISOWNED);
-		obj->o_flags |= ISLOST;
-		obj->o_hplus = 0;
-		obj->o_dplus = 0;
-		if (obj->o_type == RING)
-		    obj->o_ac = 0;
-		else if (obj->o_type == ARMOR)
-		    obj->o_ac = armors[obj->o_which].a_class + 1;
-		else if (obj->o_type == STICK)
-		    obj->o_charges = 0;
-	    }
-	}
-    }
-    /* Take care of any residual effects of the monster */
     check_residue(tp);
 
     if (is_player) {

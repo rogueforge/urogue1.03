@@ -41,12 +41,8 @@ register struct object *obj_p;
     register struct object *tmp_obj_p;
     register struct linked_list *new_place_p = NULL;
 
-    debug("getting ident for %X, type=%c", obj_p, obj_p->o_type);
-
-    if (identifier(obj_p) != NULL) {
-	debug("found ident: %d", identifier(obj_p));
+    if (identifier(obj_p) != NULL)
 	return(identifier(obj_p));
-    }
 
     /*
      * no identifier - must allocate one 
@@ -68,7 +64,6 @@ register struct object *obj_p;
      * The proper id is in new_id, and the place to put it is right after
      * new_place_p.
      */
-    debug("allocating ident: %d", new_id);
     list_p = (struct linked_list *) new(sizeof(*list_p));
     _attach_after(&ident_list, new_place_p, list_p);
     identifier(obj_p) = new_id;
@@ -109,8 +104,6 @@ free_ident(obj_p)
 register struct object *obj_p;
 {
     register linked_list *list_p;
-
-    debug("freeing ident for %X, type=%c", obj_p, obj_p->o_type);
 
     for (list_p = ident_list; list_p != NULL; list_p = next(list_p)) {
 	if (obj_p == OBJPTR(list_p)) {

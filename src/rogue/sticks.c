@@ -170,7 +170,7 @@ int flags;
 	when WS_LIGHT:
 	    /* Reddy Kilowat wand.  Light up the room */
 	    if (blue_light(flags) && is_stick)
-		if (is_stick) ws_know[WS_LIGHT] = TRUE;
+		if (is_stick) know_items[TYP_STICK][WS_LIGHT] = TRUE;
 	when WS_DRAIN:
 	    /*
 	     * Take away 1/2 of hero's hit points, then take it away
@@ -211,7 +211,7 @@ int flags;
 		    nothing_message(flags);
 		    break;
 		}
-		else if (is_stick) ws_know[which] = TRUE;
+		else if (is_stick) know_items[TYP_STICK][which] = TRUE;
 
 		/* Unhold player */
 		if (on(*tp, DIDHOLD)) {
@@ -334,7 +334,7 @@ int flags;
 	    int nsides = 4;
 	    char ch;
 
-	    if (is_stick) ws_know[which] = TRUE;
+	    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 
 	    /* Magic Missiles *always* hit, no saving throw */
 	    bolt.o_type = '*';
@@ -369,7 +369,7 @@ int flags;
 	    register char ch;
 	    struct object strike; /* don't want to change sticks attributes */
 
-	    if (is_stick) ws_know[which] = TRUE;
+	    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 	    bolt.o_type = '=';
 	    do_motion(&bolt, delta.y, delta.x, &player);
 	    ch = winat(bolt.o_pos.y, bolt.o_pos.x);
@@ -403,13 +403,13 @@ int flags;
 		    else turn_off(*tp, ISSLOW);
 		}
 		else if (blessed) {
-		    if (is_stick) ws_know[which] = TRUE;
+		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		    turn_off(*tp, ISRUN);
 		    turn_on(*tp, ISHELD);
 		    return;
 		}
 		else {
-		    if (is_stick) ws_know[which] = TRUE;
+		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		    if (off(*tp, ISHASTE))
 			 turn_on(*tp, ISSLOW);
 		    else turn_off(*tp, ISHASTE);
@@ -424,9 +424,9 @@ int flags;
 	 * if it does a fix_stick() on all drained wands
 	 */
 	when WS_CHARGE:
-	    if (ws_know[WS_CHARGE] != TRUE && is_stick) {
+	    if (know_items[TYP_STICK][WS_CHARGE] != TRUE && is_stick) {
 		msg("This is a wand of charging.");
-		ws_know[which] = TRUE;
+		know_items[TYP_STICK][which] = TRUE;
 	    }
 	    if ((nitem = get_item("charge", STICK)) != NULL) {
 		nobj = OBJPTR(nitem);
@@ -449,7 +449,7 @@ int flags;
 	    int ndice = 3 + pstats.s_lvl;
 	    int nsides = 6;
 
-	    if (is_stick) ws_know[which] = TRUE;
+	    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 	    if (cursed)
 		nsides /= 2;
 	    else if (blessed)
@@ -474,7 +474,7 @@ int flags;
 	    reg struct linked_list *ll;
 	    reg struct thing *lt;
 
-	    if (is_stick) ws_know[which] = TRUE;
+	    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 	    y1 = hero.y;
 	    x1 = hero.x;
 	    do {
@@ -521,7 +521,7 @@ int flags;
 		if (save_throw(VS_MAGIC - (blessed ? 5 : (cursed?-5:0)), tp))
 		    nothing_message(flags);
 		else {
-		    if (is_stick) ws_know[which] = TRUE;
+		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		    switch (which) {
 		    when WS_CONFMON:
 			msg("The %s looks bewildered.", mname);
@@ -554,7 +554,7 @@ int flags;
 		    runto(&delta, &hero);
 		}
 		else {
-		    if (is_stick) ws_know[which] = TRUE;
+		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		    mons_hpt = min(mons_hpt + hpt_gain, tp->maxstats.s_hpt);
 		    msg("The %s appears less wounded!", mname);
 		}
@@ -597,7 +597,7 @@ int flags;
 		    runto(&delta, &hero);
 		}
 		else {		/* if its a UNIQUE it might still live */
-		    if (is_stick) ws_know[which] = TRUE;
+		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		    if (on(*tp, ISUNIQUE) &&
 			save_throw(VS_MAGIC - (blessed ? -5 : 0), tp)) {
 			tp->t_stats.s_hpt = tp->t_stats.s_hpt / 2 - 1;
@@ -660,7 +660,7 @@ int flags;
 	    }
 	    else {
 		if (got_one) {
-		    if (is_stick) ws_know[which] = TRUE;
+		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		    if (blessed) {
 			turn_off(*tp, ISINVIS);
 			turn_off(*tp, ISSHADOW);
@@ -681,7 +681,7 @@ int flags;
 	    register struct object *obj, *op;    
 	    register struct trap *trp;
 
-	    if (is_stick) ws_know[which] = TRUE;
+	    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 	    item = spec_item(WEAPON, GRENADE, 0, 0);
 	    obj = OBJPTR(item);
 	    obj->o_count = 1;
@@ -746,7 +746,7 @@ int flags;
 	when WS_WEB: {
 	    char ch;
 
-	    if (is_stick) ws_know[which] = TRUE;
+	    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 	    bolt.o_type = '#';
 	    do_motion(&bolt, delta.y, delta.x, &player);
 	    ch = winat(bolt.o_pos.y, bolt.o_pos.x);
@@ -779,14 +779,14 @@ int flags;
 		if (which == WS_KNOCK) {
 		    mvaddch(zap_loc.y, zap_loc.x, DOOR);
 		    msg("A secret door stands revealed before you!");
-		    if (is_stick) ws_know[which] = TRUE;
+		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		}
 		else goto nothing_doing;
 	    when DOOR:
 		if (which == WS_CLOSE) {
 		    mvaddch(zap_loc.y, zap_loc.x, DOOR);
 		    msg("You block the door off.");
-		    if (is_stick) ws_know[which] = TRUE;
+		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		}
 		else goto nothing_doing;
 	    otherwise:

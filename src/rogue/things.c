@@ -34,10 +34,10 @@ register bool drop;
 			obj->o_flags & CANRETURN ? "claimed " : "", 
 			blesscurse(obj->o_flags));
 	    pb = &prbuf[strlen(prbuf)];
-	    if (s_know[obj->o_which] || (obj->o_flags & ISPOST))
+	    if (know_items[TYP_SCROLL][obj->o_which])
 		sprintf(pb, "of %s", s_magic[obj->o_which].mi_name);
-	    else if (s_guess[obj->o_which])
-		sprintf(pb, "called %s", s_guess[obj->o_which]);
+	    else if (guess_items[TYP_SCROLL][obj->o_which])
+		sprintf(pb, "called %s", guess_items[TYP_SCROLL][obj->o_which]);
 	    else
 		sprintf(pb, "titled '%s'", s_names[obj->o_which]);
         when POTION:
@@ -51,13 +51,11 @@ register bool drop;
 			obj->o_flags & CANRETURN ? "claimed " : "", 
 			blesscurse(obj->o_flags));
 	    pb = &prbuf[strlen(prbuf)];
-	    if (p_know[obj->o_which])
+	    if (know_items[TYP_POTION][obj->o_which])
 		sprintf(pb, "of %s(%s)", p_magic[obj->o_which].mi_name,
 		    p_colors[obj->o_which]);
-	    else if (obj->o_flags & ISPOST)
-		sprintf(pb, "of %s", p_magic[obj->o_which].mi_name);
-	    else if (p_guess[obj->o_which])
-		sprintf(pb, "called %s(%s)", p_guess[obj->o_which],
+	    else if (guess_items[TYP_POTION][obj->o_which])
+		sprintf(pb, "called %s(%s)", guess_items[TYP_POTION][obj->o_which],
 		    p_colors[obj->o_which]);
 	    else {
 		if (obj->o_count == 1)
@@ -103,7 +101,7 @@ register bool drop;
 	    if (obj->o_flags & ISSILVER)
 		sprintf(pb, "silver ");
 	    pb = &prbuf[strlen(prbuf)];
-	    if ((obj->o_flags & ISKNOW) || (obj->o_flags & ISPOST))
+	    if (obj->o_flags & ISKNOW)
 		sprintf(pb, "%s %s", num(obj->o_hplus, obj->o_dplus),
 		    weaps[obj->o_which].w_name);
 	    else
@@ -111,7 +109,7 @@ register bool drop;
 	    if (obj->o_count > 1)
 		strcat(prbuf, "s");
 	when ARMOR:
-	    if ((obj->o_flags & ISKNOW) || (obj->o_flags & ISPOST))
+	    if (obj->o_flags & ISKNOW)
 		sprintf(prbuf, "%s%s %s",
 		    obj->o_flags & CANRETURN ? "claimed " : "", 
 		    num(armors[obj->o_which].a_class - obj->o_ac, 0),
@@ -129,14 +127,11 @@ register bool drop;
 		obj->o_flags & CANRETURN ? "claimed " : "", 
 		blesscurse(obj->o_flags), ws_type[obj->o_which]);
 	    pb = &prbuf[strlen(prbuf)];
-	    if (ws_know[obj->o_which])
+	    if (know_items[TYP_STICK][obj->o_which])
 		sprintf(pb, "of %s%s(%s)", ws_magic[obj->o_which].mi_name,
 		    charge_str(obj), ws_made[obj->o_which]);
-	    else if (obj->o_flags & ISPOST)
-		sprintf(pb, "of %s%s", ws_magic[obj->o_which].mi_name,
-		    charge_str(obj));
-	    else if (ws_guess[obj->o_which])
-		sprintf(pb, "called %s(%s)", ws_guess[obj->o_which],
+	    else if (guess_items[TYP_STICK][obj->o_which])
+		sprintf(pb, "called %s(%s)", guess_items[TYP_STICK][obj->o_which],
 		    ws_made[obj->o_which]);
 	    else
 		sprintf(&prbuf[2], "%s%s %s", 
@@ -144,18 +139,14 @@ register bool drop;
 		    ws_made[obj->o_which],
 		    ws_type[obj->o_which]);
         when RING:
-	    if (r_know[obj->o_which])
+	    if (know_items[TYP_RING][obj->o_which])
 		sprintf(prbuf, "A%s%s ring of %s(%s)", 
 		    obj->o_flags & CANRETURN ? " claimed" : "", ring_num(obj),
 		    r_magic[obj->o_which].mi_name, r_stones[obj->o_which]);
-	    else if (obj->o_flags & ISPOST)
-		sprintf(prbuf, "A%s%s ring of %s", 
-		    obj->o_flags & CANRETURN ? " claimed" : "", ring_num(obj),
-		    r_magic[obj->o_which].mi_name);
-	    else if (r_guess[obj->o_which])
+	    else if (guess_items[TYP_RING][obj->o_which])
 		sprintf(prbuf, "A %sring called %s(%s)",
 		    obj->o_flags & CANRETURN ? "claimed " : "",
-		    r_guess[obj->o_which], r_stones[obj->o_which]);
+		    guess_items[TYP_RING][obj->o_which], r_stones[obj->o_which]);
 	    else
 		sprintf(prbuf, "A%s %s ring", 
 		    obj->o_flags & CANRETURN ? "claimed " : 
@@ -277,7 +268,7 @@ struct linked_list *item;
     }
     if (op->o_type == ARTIFACT && levtype != POSTLEV)
 	has_artifact &= ~(1 << op->o_which);
-    updpack(FALSE);
+    updpack();
     return (TRUE);
 }
 
@@ -356,10 +347,11 @@ register struct object *op;
 struct linked_list *
 new_thing()
 {
+    register int j, k;
     register struct linked_list *item;
     register struct object *cur;
-    register int j, k;
-    short blesschance, cursechance;
+    short blesschance = rnd(100);
+    short cursechance = rnd(100);
 
     item = new_item(sizeof *cur);
     cur = OBJPTR(item);
@@ -375,10 +367,8 @@ new_thing()
      * Decide what kind of object it will be
      * If we haven't had food for a while, let it be food.
      */
-    blesschance = rnd(100);
-    cursechance = rnd(100);
-    switch (no_food > 3 ? 2 : pick_one(things, numthings)) {
-	when 0:
+    switch (no_food > 3 ? TYP_FOOD : pick_one(things, numthings)) {
+	when TYP_POTION:
 	    cur->o_type = POTION;
 	    cur->o_which = pick_one(p_magic, maxpotions);
 	    cur->o_weight = things[TYP_POTION].mi_wght;
@@ -386,7 +376,7 @@ new_thing()
 		cur->o_flags |= ISCURSED;
 	    else if (blesschance < p_magic[cur->o_which].mi_bless)
 		cur->o_flags |= ISBLESSED;
-	when 1:
+	when TYP_SCROLL:
 	    cur->o_type = SCROLL;
 	    cur->o_which = pick_one(s_magic, maxscrolls);
 	    cur->o_weight = things[TYP_SCROLL].mi_wght;
@@ -394,13 +384,13 @@ new_thing()
 		cur->o_flags |= ISCURSED;
 	    else if (blesschance < s_magic[cur->o_which].mi_bless)
 		cur->o_flags |= ISBLESSED;
-	when 2:
+	when TYP_FOOD:
 	    no_food = 0;
 	    cur->o_type = FOOD;
 	    cur->o_which = pick_one(fd_data, maxfoods);
 	    cur->o_weight = 2;
 	    cur->o_count += extras();
-	when 3:
+	when TYP_WEAPON:
 	    cur->o_type = WEAPON;
 	    cur->o_which = rnd(maxweapons);
 	    init_weapon(cur, cur->o_which);
@@ -417,7 +407,7 @@ new_thing()
 		cur->o_hplus += good;
 		cur->o_dplus += good;
 	    }
-	when 4:
+	when TYP_ARMOR:
 	    cur->o_type = ARMOR;
 	    for (j = 0; j < maxarmors; j++)
 		if (blesschance < armors[j].a_prob)
@@ -437,7 +427,7 @@ new_thing()
 	    if (j == MITHRIL)
 		cur->o_flags |= ISPROT;
 	    cur->o_weight = armors[j].a_wght;
-	when 5:
+	when TYP_RING:
 	    cur->o_type = RING;
 	    cur->o_which = pick_one(r_magic, maxrings);
 	    cur->o_weight = things[TYP_RING].mi_wght;
@@ -460,6 +450,9 @@ new_thing()
 		when R_RESURRECT:
 		case R_TELCONTROL:
 		case R_VREGEN:
+		case R_REGEN:
+		case R_PIETY:
+		case R_WIZARD:
 		    cur->o_ac = 0;
 		    if (cur->o_flags & ISCURSED)
 			cur->o_ac = -1;
@@ -469,8 +462,10 @@ new_thing()
 		    if (cur->o_flags & ISCURSED) cur->o_ac = -1;
 		    else if (cur->o_flags & ISBLESSED) cur->o_ac = 2;
 		    else cur->o_ac = 1;
+		otherwise:
+		    cur->o_ac = 0;
 	    }
-	when 6:
+	when TYP_STICK:
 	    cur->o_type = STICK;
 	    cur->o_which = pick_one(ws_magic, maxsticks);
 	    fix_stick(cur);

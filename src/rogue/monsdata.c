@@ -2722,12 +2722,5 @@ struct monster monsters[] = {
 		225,
 		{45,	1465000,	100,	-13, 	HPT("18d60+700"),
 		"3d8/3d8/3d8"}},
-{"shopkeeper (Friendly Fiend)", 
-		100, TRUE, TRUE, 'F', "40-60",
-		{ISUNIQUE, CANSUMMON, CANBARGAIN, ISFRIENDLY},
-		"valar (Tulkas the Valiant)", 1,
-		110,
-		{40,	120000,	75,	9, 	HPT("18d24+100"),
-		"3d8/3d8/3d8"}},
 };
 int nummonst = NUMMONST;

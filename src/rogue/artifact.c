@@ -625,18 +625,8 @@ struct object *tr;
     when 0:
 	read_scroll(&player, S_SELFTELEP, ISCURSED);
     when 1:
-	/* not quaff(&player, P_SEEINVIS, ISCURSED) because of R_SEEINVIS */
-	if (on(player, ISBLIND)) {
-	    msg("The gloom around you thickens.");
-	    lengthen(sight, 2*SEEDURATION);
-	}
-	else {
-	    msg("A mantle of darkness falls around you.");
-	    fuse(sight, 0, 2*SEEDURATION, AFTER);
-	    turn_on(player, ISBLIND);
-	}
-	turn_on(player, PERMBLIND);	/* Untouched by P_SEEINVIS */
-	look(FALSE);
+	quaff(&player, P_TRUESEE, ISCURSED);
+	quaff(&player, P_TRUESEE, ISCURSED);
     when 2:
 	new_level(THRONE);
     when 3:
@@ -783,7 +773,7 @@ do_phial()
     }
     if (which < 0 || which > 1) {
 	add_line( "[a] total healing");
-	add_line( "[b] monster confusion");
+	add_line( "[b] total monster confusion");
 	end_line();
 	msg("");
 	msg("Which power do you wish to use? ");
@@ -805,9 +795,16 @@ do_phial()
 	when 0:
 	    pstats.s_hpt   = max_stats.s_hpt   += rnd(pstats.s_lvl) + 1;
 	    pstats.s_power = max_stats.s_power += rnd(pstats.s_lvl) + 1;
-	when 1:
-		if (get_dir()) 
-		    do_zap(&player, TRUE, WS_CONFMON, ISBLESSED);
+	when 1: {
+		register struct linked_list *mi;
+		register struct thing *tp;
+
+		for (mi = mlist; mi != NULL; mi = next(mi)) {
+		    tp = THINGPTR(mi);
+		    if (off(*tp, ISUNIQUE) || !save_throw(*tp, VS_MAGIC))
+			turn_on(*tp, ISHUH);
+		}
+	}
 	otherwise:
 		msg("What a strange thing to do!!");
     }
@@ -1094,7 +1091,7 @@ do_bag(obj)
 		}
 	    }
 	when 3: 
-	    quaff(&player, P_SEEINVIS, ISNORMAL);
+	    quaff(&player, P_TRUESEE, ISBLESSED);
 	otherwise:
 	    msg("What a strange thing to do!!");
 	}

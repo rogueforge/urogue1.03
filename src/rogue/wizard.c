@@ -23,6 +23,7 @@ struct linked_list *what;
 {
     register struct object *obj;
     register struct linked_list *item;
+    register int kludge;
 
     if (what == NULL) {		/* do we need to ask which one? */
 	if ((item = get_item("identify", 0)) == NULL)
@@ -34,268 +35,27 @@ struct linked_list *what;
     obj->o_flags |= ISKNOW;
     switch (obj->o_type) {
         when SCROLL:
-	    s_know[obj->o_which] = TRUE;
-	    if (s_guess[obj->o_which]) {
-		free(s_guess[obj->o_which]);
-		s_guess[obj->o_which] = NULL;
-	    }
+	    kludge = TYP_SCROLL;
         when POTION:
-	    p_know[obj->o_which] = TRUE;
-	    if (p_guess[obj->o_which]) {
-		free(p_guess[obj->o_which]);
-		p_guess[obj->o_which] = NULL;
-	    }
+	    kludge = TYP_POTION;
 	when STICK:
-	    ws_know[obj->o_which] = TRUE;
-	    if (ws_guess[obj->o_which]) {
-		free(ws_guess[obj->o_which]);
-		ws_guess[obj->o_which] = NULL;
-	    }
-        when WEAPON:
-        case ARMOR:
-        when RING:
-	    r_know[obj->o_which] = TRUE;
-	    if (r_guess[obj->o_which]) {
-		free(r_guess[obj->o_which]);
-		r_guess[obj->o_which] = NULL;
-	    }
+	    kludge = TYP_STICK;
+	when RING:
+	    kludge = TYP_RING;
+	when WEAPON:
+	case ARMOR:
+	default:
+	    kludge = -1;
+    }
+    if (kludge != -1) {
+	know_items[kludge][obj->o_which] = TRUE;
+	if (guess_items[kludge][obj->o_which]) {
+	    free(guess_items[kludge][obj->o_which]);
+	    guess_items[kludge][obj->o_which] = NULL;
+	}
     }
     if (what == NULL)
 	msg(inv_name(obj, FALSE));
-}
-
-/*
- * create_obj:
- *	Create any object.
- */
-create_obj(which_item, which_type, flags)
-int flags;
-int which_item, which_type;
-{
-    reg struct linked_list *item;
-    reg struct object *obj;
-    reg int wh;
-    reg char ch, newitem, newtype, whc, msz, *pt;
-    WINDOW *thiswin;
-    int tsize;
-    int pres_item = 1;
-    bool cursed  = flags & ISCURSED;
-
-    thiswin = cw;
-    if (which_item == 0) {
-	bool nogood = TRUE;
-	char buf[2*LINELEN];
-	thiswin = hw;
-	msg("What do you want to create (* for list)? ");
-	do {
-	    ch = readchar();
-	    if (ch == '*') {
-		sprintf(buf,"ITEM\tKEY");
-		add_line(buf);
-		sprintf(buf,"%s\t %c", things[TYP_RING].mi_name,RING);
-		add_line(buf);
-		sprintf(buf,"%s\t %c", things[TYP_STICK].mi_name,STICK);
-		add_line(buf);
-		sprintf(buf,"%s\t %c", things[TYP_POTION].mi_name,POTION);
-		add_line(buf);
-		sprintf(buf,"%s\t %c", things[TYP_SCROLL].mi_name,SCROLL);
-		add_line(buf);
-		sprintf(buf,"%s\t %c", things[TYP_ARMOR].mi_name,ARMOR);
-		add_line(buf);
-		sprintf(buf,"%s\t %c", things[TYP_WEAPON].mi_name,WEAPON);
-		add_line(buf);
-		sprintf(buf,"%s\t %c",things[TYP_FOOD].mi_name,FOOD);
-		add_line(buf);
-		if (wizard) {
-		    sprintf(buf,"%s %c", things[TYP_ARTIFACT].mi_name, ARTIFACT);
-		    add_line(buf);
-		    sprintf(buf,"monster\t m");
-		    add_line(buf);
-		}
-		end_line();
-		msg("");
-		msg("What do you want to create (* for list) ? ");
-	    }
-	    if(ch == ESCAPE) 
-		return;
-	    switch (ch) {
-	    when RING:
-	    case STICK:	
-	    case POTION:
-	    case SCROLL:	
-	    case ARMOR:	
-	    case WEAPON:
-	    case FOOD:
-		nogood = FALSE;
-	    when 'm':
-	    case ARTIFACT:
-		if (wizard)
-		    nogood = FALSE;
-	    otherwise:
-		nogood = TRUE;
-	    }
-	} while (nogood == TRUE);
-	newitem = ch;
-    }
-    else newitem = which_item;
-
-    pt = "those";
-    msz = 0;
-    switch(newitem) {
-    	when 'm':
-	    makemon();		/* make monster and be done with it */
-	    return;
-	when GOLD:
-	    pt = "gold";
-	when POTION:	whc = TYP_POTION;	tsize = msz = maxpotions;
-	when SCROLL:	whc = TYP_SCROLL;	tsize = msz = maxscrolls;
-	when FOOD:	whc = TYP_FOOD;		tsize = msz = maxfoods;
-	when WEAPON:	whc = TYP_WEAPON;	tsize = msz = maxweapons;
-	when ARMOR:	whc = TYP_ARMOR;	tsize = msz = maxarmors;
-	when RING:	whc = TYP_RING;		tsize = msz = maxrings;
-	when STICK:	whc = TYP_STICK;	tsize = msz = maxsticks;
-	when ARTIFACT:	whc = TYP_ARTIFACT;	tsize = msz = maxartifact;
-	otherwise:
-	    if (thiswin == hw)
-		restscr(cw);
-	    mpos = 0;
-	    msg("Even wizards can't create %s !!",pt);
-	    return;
-    }
-    if(msz == 1)		/* if only one type of item */
-	ch = 1;
-    else if (which_type == 0) {
-	struct magic_item *wmi;
-	struct init_artifact *war;
-	char wmn;
-	char buf[2*LINELEN];
-	int ii;
-	char numstr[20];
-
-	mpos = 0;
-	wmi = NULL;
-	war = NULL;
-	wmn = 0;
-	switch(newitem) {
-	    when POTION:	wmi = p_magic;
-	    when SCROLL:	wmi = s_magic;
-	    when RING:		wmi = r_magic;
-	    when STICK:		wmi = ws_magic;
-	    when FOOD:		wmi = fd_data;
-	    when ARTIFACT:	war = arts;
-	    when WEAPON:	wmn = 1;
-	    when ARMOR:		wmn = 2;
-	}
-	thiswin = hw;
-	for (ii = 0 ; ii < msz && pres_item <= tsize; ii++) {
-	    sprintf(buf,"%d) ", pres_item);
-	    if (wmi != NULL) {
-		strcat(buf, wmi->mi_name);
-		wmi++;
-	    }
-	    else if (war != NULL) {
-		strcat(buf, war->ar_name);
-		war++;
-	    }
-	    else if(wmn == 1)
-		strcat(buf, weaps[pres_item - 1].w_name);
-	    else if(wmn == 2)
-		strcat(buf, armors[pres_item - 1].a_name);
-	    add_line(buf);
-	    pres_item++;
-	}
-	end_line();
-	msg("");
-	msg("Which %s? ",things[whc].mi_name);
-	do {
-	    ch = get_str(numstr, cw);
-	    if (ch == QUIT || ch == ESCAPE) {
-	        msg("");
-	        return;
-	    }
-	    newtype = atoi(numstr) - 1;
-	    if (newtype < 0 || newtype >= tsize) {
-		msg("Please enter a number in the displayed range: ");
-	    }
-	} until (newtype >= 0 && newtype < tsize);
-    }
-    else newtype = which_type;
-    item = new_item(sizeof *obj);	/* get some memory */
-    obj = OBJPTR(item);
-    if (newitem == ARTIFACT) {
-	new_artifact(newtype, obj);
-	if (add_pack(item, FALSE) == FALSE) {
-	    obj->o_pos = hero;
-	    fall(&player, item, TRUE);
-	}
-	return;
-    }
-    obj->o_type = newitem;		/* store the new items */
-    obj->o_mark[0] = '\0';
-    obj->o_which = newtype;
-    obj->o_group = 0;
-    obj->o_count = 1;
-    obj->o_flags = 0;
-    obj->o_dplus = obj->o_hplus = 0;
-    obj->o_weight = 0;
-    wh = obj->o_which;
-    mpos = 0;
-    if (wizard)					/* wizard gets to choose */
-	 whc = getbless();
-    else whc = (cursed ? -1 : 1) * rnd(4);
-    if (whc < 0)
-	obj->o_flags |= ISCURSED;
-    else if (whc > 0 && obj->o_type != WEAPON && obj->o_type != ARMOR)
-	obj->o_flags |= ISBLESSED;
-    obj->o_flags |= ISKNOW;
-
-    switch (obj->o_type) {
-    when WEAPON:
-	init_weapon(obj, wh);
-	obj->o_hplus += whc;
-	obj->o_dplus += whc;
-    when ARMOR:
-	obj->o_weight = armors[wh].a_wght;
-	obj->o_ac = armors[wh].a_class - whc;
-    when RING:
-	r_know[wh] = TRUE;
-	obj->o_ac = whc;
-	obj->o_weight = things[TYP_RING].mi_wght;
-    when STICK:
-	ws_know[wh] = TRUE;
-	fix_stick(obj);
-    when SCROLL:
-	obj->o_weight = things[TYP_SCROLL].mi_wght;
-	s_know[wh] = TRUE;
-    when POTION:
-	obj->o_weight = things[TYP_POTION].mi_wght;
-	p_know[wh] = TRUE;
-    }
-    mpos = 0;
-    if (add_pack(item, FALSE) == FALSE) {
-	obj->o_pos = hero;
-	fall(&player, item, TRUE);
-    }
-}
-
-/*
- * getbless:
- *	Get a blessing for a wizards object
- */
-getbless()
-{
-    register char reply;
-
-    msg("Blessing? (+,-,n)");
-    reply = readchar();
-    switch (reply) {
-    when '+':
-	return (3);
-    when '-':
-	return (-3);
-    otherwise:
-	return (0);
-    }
 }
 
 /*

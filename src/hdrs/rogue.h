@@ -21,7 +21,7 @@
 #define	MAXTRPTRY	16	/* max attempts/level allowed for setting traps */
 #define	MAXPURCH	8	/* max purchases per trading post visit */
 
-#define	NUMMONST	(sizeof(monsters) / sizeof(struct monster) - 3)
+#define	NUMMONST	(sizeof(monsters) / sizeof(struct monster) - 2)
 #define	NUMSUMMON	48	/* number of creatures that can summon hero */
 #define	NLEVMONS	4	/* number of new monsters per level */
 
@@ -391,6 +391,7 @@
 #define	HIGHCAST	0x50000800
 #define	WASSUMMONED	0x50001000
 #define	HASSUMMONED	0x50002000
+#define	CANTRUESEE	0x50004000
 
 /* Masks for choosing the right flag */
 #define	FLAGMASK	0xf0000000
@@ -401,11 +402,13 @@
 /* All magic spells duplicate a potion, scroll, or stick effect */
 #define	TYP_POTION	0
 #define	TYP_SCROLL	1
-#define	TYP_FOOD	2
-#define	TYP_WEAPON	3
-#define	TYP_ARMOR	4
-#define	TYP_RING	5
-#define	TYP_STICK	6
+#define	TYP_RING	2
+#define	TYP_STICK	3
+#define	MAXMAGICTYPES	4	/* max number of items in magic class */
+#define	MAXMAGICITEMS	50	/* max number of items in magic class */
+#define	TYP_FOOD	4
+#define	TYP_WEAPON	5
+#define	TYP_ARMOR	6
 #define	TYP_ARTIFACT	7
 #define	NUMTHINGS	(sizeof(things) / sizeof(struct magic_item))
 
@@ -452,6 +455,7 @@
 #define	P_LEVITATION	18
 #define	P_REGENERATE	19
 #define	P_SHIELD	20
+#define	P_TRUESEE	21
 #define	MAXPOTIONS	(sizeof(p_magic) / sizeof(struct magic_item))
 
 /*
@@ -550,6 +554,7 @@
 #define	R_WIZARD	28
 #define	R_PIETY		29
 #define	R_TELCONTROL	30
+#define	R_TRUESEE	31
 #define	MAXRINGS	(sizeof(r_magic) / sizeof(struct magic_item))
 
 /*
@@ -946,7 +951,7 @@ struct object *wield_weap();
 
 char *malloc(), *getenv(), *tr_name(), *new(), *sprintf();
 char *vowelstr(), *inv_name(), *strcpy(), *strcat(), *sbrk(), *brk();
-char *ctime(), *num(), *ring_num(), *blesscurse(), *typ_name();
+char *ctime(), *num(), *ring_num(), *blesscurse();
 #if !defined(unctrl)
 char *unctrl();
 #endif
@@ -965,7 +970,8 @@ int	auto_save(), quit(), endit(), nohaste(), res_strength(), doctor(),
 	unelectrify(), unshero(), unbhero(), unxray(),
 	undisguise(), shero(), listen(), unsummon(), ungaze(),
 	uncold(), unhot(), unbreathe(), unfly(), unregen(), itemweight(), 
-	mon_mon_attack(), checkout(), unsupereat(), unshield(), unmshield();
+	mon_mon_attack(), checkout(), unsupereat(), unshield(), unmshield(),
+	untruesee();
 
 bool	blue_light(), can_blink(), shoot_bolt(), add_pack(),
 	straight_shot(), maze_view(), is_carrying(), possessed(),
@@ -1014,15 +1020,12 @@ extern struct magic_item ws_magic[];	/* Names and chances for sticks */
 extern struct magic_item fd_data[];	/* Names and chances for food */
 extern struct real_pass rpass;		/* For protection's sake! */
 extern char *cnames[][15];		/* Character level names */
-extern char curpurch[];			/* name of item ready to buy */
 extern char PLAYER;			/* what the player looks like */
 extern int resurrect;			/* resurrection counter */
 extern bool char_type;			/* what type of character is player */
 extern int foodlev;			/* how fast he eats food */
 extern int see_dist;			/* how far he can see^2 */
 extern int level;			/* What level rogue is on */
-extern int trader;			/* number of purchases */
-extern int curprice;			/* price of an item */
 extern int purse;			/* How much gold the rogue has */
 extern int mpos;			/* Where cursor is on top line */
 extern int ntraps;			/* Number of traps on this level */
@@ -1067,10 +1070,7 @@ extern char *release;			/* Release number of rogue */
 extern char whoami[];			/* Name of player */
 extern char fruit[];			/* Favorite fruit */
 extern char msgbuf[10][2*BUFSIZ];	/* message buffer */
-extern char *s_guess[];			/* Players guess at what scroll is */
-extern char *p_guess[];			/* Players guess at what potion is */
-extern char *r_guess[];			/* Players guess at what ring is */
-extern char *ws_guess[];		/* Players guess at what wand is */
+extern char *guess_items[MAXMAGICTYPES][MAXMAGICITEMS]; /* Players guess at what magic is */
 extern char *ws_type[];			/* Is it a wand or a staff */
 extern char file_name[];		/* Save file name */
 extern char score_file[];		/* Score file name */
@@ -1096,10 +1096,7 @@ extern bool waswizard;			/* Was a wizard sometime */
 extern bool canwizard;			/* Will be permitted to do this */
 extern bool askme;			/* Ask about unidentified things */
 extern bool moving;			/* move using 'm' command */
-extern bool s_know[];			/* Does he know what a scroll does */
-extern bool p_know[];			/* Does he know what a potion does */
-extern bool r_know[];			/* Does he know what a ring does */
-extern bool ws_know[];			/* Does he know what a stick does */
+extern bool know_items[MAXMAGICTYPES][MAXMAGICITEMS]; /* Does he know what a magic item does */
 extern bool in_shell;			/* True if executing a shell */
 extern bool monst_dead;			/* Indicates if monster got killed */
 extern coord delta;			/* Change indicated to get_dir() */

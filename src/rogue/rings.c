@@ -64,13 +64,20 @@ ring_on()
 	    pstats.s_intel += obj->o_ac;
 	when R_ADDWISDOM:
 	    pstats.s_wisdom += obj->o_ac;
-	when R_FREEDOM: {
+	when R_FREEDOM:
 	    turn_off(player, ISHELD);
 	    hold_count = 0;
+	when R_TRUESEE:
+	    if (off(player, PERMBLIND)) {
+		turn_on(player, CANTRUESEE);
+		msg("You become more aware of your surroundings.");
+		sight();
+		light(&hero);
+		mvwaddch(cw, hero.y, hero.x, PLAYER);
 	    }
 	when R_SEEINVIS:
 	    if (off(player, PERMBLIND)) {
-		turn_on(player, CANSEE);
+		turn_on(player, CANTRUESEE);
 		msg("Your eyes begin to tingle.");
 		sight();
 		light(&hero);
@@ -79,7 +86,7 @@ ring_on()
 	when R_AGGR:
 	    aggravate();
 	when R_CARRYING:
-	    updpack(FALSE);
+	    updpack();
 	when R_LEVITATION:
 	    msg("You begin to float in the air!");
 	when R_LIGHT: {
@@ -90,19 +97,19 @@ ring_on()
 	    }
     }
     status(FALSE);
-    if (r_know[obj->o_which] && r_guess[obj->o_which]) {
-	free(r_guess[obj->o_which]);
-	r_guess[obj->o_which] = NULL;
+    if (know_items[TYP_RING][obj->o_which] && guess_items[TYP_RING][obj->o_which]) {
+	free(guess_items[TYP_RING][obj->o_which]);
+	guess_items[TYP_RING][obj->o_which] = NULL;
     }
-    else if (!r_know[obj->o_which] && 
+    else if (!know_items[TYP_RING][obj->o_which] && 
 	     askme && 
 	     (obj->o_flags & ISKNOW) == NULL &&
-	     r_guess[obj->o_which] == NULL) {
+	     guess_items[TYP_RING][obj->o_which] == NULL) {
 	mpos = 0;
 	msg(terse ? "Call it: " : "What do you want to call it? ");
 	if (get_str(buf, cw) == NORM) {
-	    r_guess[obj->o_which] = new((unsigned int) strlen(buf) + 1);
-	    strcpy(r_guess[obj->o_which], buf);
+	    guess_items[TYP_RING][obj->o_which] = new((unsigned int) strlen(buf) + 1);
+	    strcpy(guess_items[TYP_RING][obj->o_which], buf);
 	}
 	msg("");
     }
@@ -138,7 +145,7 @@ ring_off()
 	    msg("You float gently to the ground.");
 	msg("Was wearing %s.", inv_name(obj, TRUE));
     }
-    updpack(FALSE);
+    updpack();
 }
 
 /*
@@ -194,6 +201,9 @@ register struct object *obj;
 	case R_VREGEN:
 	case R_RESURRECT:
 	case R_TELCONTROL:
+	case R_REGEN:
+	case R_PIETY:
+	case R_WIZARD:
 	    buf[0] = ' ';
 	    strcpy(&buf[1], num(obj->o_ac, 0));
 	when R_DIGEST:

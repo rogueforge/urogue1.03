@@ -8,169 +8,370 @@
 
 #include <ctype.h>
 #include "rogue.h"
-#define  o_tradevalue  art_stats.ar_flags
+
+static int effective_purse;		/* Paladins have a 10% tithe */
+static int num_transactions;
+static int cur_worth;			/* How much the shop item costs */
 
 /*
  * do_post:
- *	Put a trading post room and stuff on the screen
+ *	Buy and sell things in a trading post
  */
 do_post()
 {
-	coord tp;
-	reg int i, worth;
-	reg struct room *rp;
-	reg struct object *op;
-	reg struct linked_list *ll;
+	bool bad_letter = FALSE;
 
-	for (rp = rooms; rp < &rooms[MAXROOMS]; rp++) {
-	    rp->r_nexits = 0;			/* no exits */
-	    rp->r_flags = ISGONE;		/* kill all rooms */
-	}
-	rp = &rooms[0];				/* point to only room */
-	rp->r_flags = 0;			/* this room NOT gone */
-	rp->r_max.x = 40;
-	rp->r_max.y = 10;			/* 10 * 40 room */
-	rp->r_pos.x = (COLS - rp->r_max.x) / 2;	/* center horizontal */
-	rp->r_pos.y = 3;			/* 2nd line */
-	draw_room(rp);				/* draw the only room */
-	if (level > 0)
-	    i = roll(4,10);			/* 4 to 40 items */
-	else
-	    i = roll(20,8);			/* 20 to 160 items at startup */
-	for (; i > 0 ; i--) {			/* place all the items */
-	    ll = new_thing();			/* get something */
-	    attach(lvl_obj, ll);
-	    op = OBJPTR(ll);
-	    switch(luck) {
-		when 0: break;
-		when 1:
-			if (rnd(3) == 0) {
-			    op->o_flags |= ISCURSED;
-			    op->o_flags &= ~ISBLESSED;
-			}
-		otherwise:
-			if (rnd(luck)) {
-			    op->o_flags |= ISCURSED;
-			    op->o_flags &= ~ISBLESSED;
-			}
+	effective_purse = ((player.t_ctype == C_PALADIN) ?
+		(9 * purse / 10) : purse);
+	num_transactions = 0;
+	cur_worth = 0;
+
+	for (;;) {
+	    wclear(hw);
+	    if (!open_market())
+		return;
+
+	    wstandout(hw);
+	    mvwaddstr(hw, 0, COLS/2 - 30,
+		"Welcome to Friendly Fiend's Flea Market");
+	    wstandend(hw);
+	    wclrtoeol(hw);
+	    trans_line();	/* hw,LINES-2,0,"You have xxx transactions left"); */
+	    if (bad_letter) {
+		bad_letter = FALSE;
+		wstandout(hw);
+		mvwaddstr(hw, 7, 0,
+    "Type 'i' or 'I' to inventory, 'l' to leave, 'b' to buy, or 's' to sell");
+		wstandend(hw);
 	    }
-	    op->o_flags |= (ISPOST | ISKNOW);	/* object in trading post */
-	    do {
-		rnd_pos(rp,&tp);
-	    } until (mvinch(tp.y, tp.x) == FLOOR);
-	    op->o_pos = tp;
-	    worth = get_worth(op);
-	    if (worth <= 0 && luck > 0)
-		worth = rnd(luck * 100) + 50;
-	    else if (worth < 25)
-		worth = 25;
-	    worth *= (level == 0 ? 1 : luck + 3);	/* slightly expensive */
-	    worth = (worth/2) + (roll(6,worth)/6);	/* and randomized */
-	    op->o_tradevalue = worth;
-	    mvaddch(tp.y,tp.x,op->o_type);
+	    mvwaddstr(hw, 6, 0, "Do you wish to buy, sell, inventory, or leave?");
+	    touchwin(hw);
+	    wrefresh(hw);
+
+	    switch (readchar()) {
+		when 'b':
+		    mvwaddstr(hw, 7, 0,
+			"Lets go into the buying section of the store...");
+		    touchwin(hw);
+		    wrefresh(hw);
+		    buy_it('\0', ISNORMAL);
+		when 's':
+		    mvwaddstr(hw, 7, 0,
+			"Lets go into the selling section of the store...");
+		    touchwin(hw);
+		    wrefresh(hw);
+		    sell_it();
+		when 'i':
+		    inventory(pack, '*');
+		when 'I':
+		    inventory(pack, 0);
+		when 'l':
+		    wclear(hw);
+		    wrefresh(hw);
+		    return;
+		otherwise:
+		    bad_letter = TRUE;
+	    }
 	}
-	trader = 0;
-	wmove(cw,13,0);
-	waddstr(cw,"Welcome to Friendly Fiend's Flea Market\n\r");
-	waddstr(cw,"=======================================\n\r");
-	waddstr(cw,"$: Prices object that you stand upon.\n\r");
-	waddstr(cw,"#: Buys the object that you stand upon.\n\r");
-	waddstr(cw,"%: Trades in something in your pack for gold.\n\r");
-	trans_line();
 }
 
-/*
- * price_it:
- *	Price the object that the hero stands on
- */
-price_it()
+buy_it(itemtype, flags)
+char itemtype;
+int flags;
 {
-	static char *bargain[] = {
-	    "great bargain",
-	    "quality product",
-	    "exceptional find",
-	    "unbeatable value",
-	    "rare beauty",
-	    "superior product",
-	    "steal",
-	};
+	reg int i;
+	bool blessed = flags & ISBLESSED;
+	bool cursed = flags & ISCURSED;
+	bool is_spell = flags & SCR_MAGIC;
+	int array_size;			/* # of items within type */
+	int which_type;			/* Which type to buy */
+	int which_one;			/* Which one within type */
+	int plus_or_minus = 0;		/* for magic items */
+	struct magic_item *magic_array = NULL;
 	reg struct linked_list *item;
 	reg struct object *obj;
-	reg int worth;
-	reg char *str;
-	reg int which;
+	char buf[2*LINELEN];
 
-	if (!open_market())		/* after buying hours */
-	    return FALSE;
-	if ((item = find_obj(hero.y,hero.x)) == NULL)
-	    return FALSE;
-	obj = OBJPTR(item);
-	worth = obj->o_tradevalue;
-	if (worth < 0) {
-	    msg("That's not for sale.");
-	    return FALSE;
-	}
-	str = typ_name(obj);
-	which = rnd(7);
-	msg("You are standing on %s.", str);
-	msg("It's a%s %s for only %d pieces of gold.",
-		vowelstr(bargain[which]), bargain[which], worth);
-	curprice = worth;		/* save price */
-	strcpy(curpurch,str);		/* save item */
-	return TRUE;
-}
-
-/*
- * buy_it:
- *	Buy the item on which the hero stands
- */
-buy_it()
-{
-	register int wh;
-	register int effective_purse = ( (player.t_ctype==C_PALADIN) ?
-		(9 * purse/10) : purse);
-
-	if (effective_purse <= 0) {
-	    msg("You have no money.");
-	    return;
-	}
-	if (curprice < 0) {		/* if not yet priced */
-	    wh = price_it();
-	    if (!wh)			/* nothing to price */
-		return;
-	    msg("Do you want to buy it? ");
-	    do {
-		wh = readchar();
-		if (isupper(wh))
-		    wh = tolower(wh);
-		if (wh == ESCAPE || wh == 'n') {
-		    msg("");
+buy_more:
+	do {
+	    array_size = 0;
+	    if (itemtype == '\0') {
+		mpos = 0;
+		mvwaddstr(hw, 11, 0,
+	"WHAT\tTYPE\n! Potion\n? Scroll\n= Ring\n/ Stick\n] Armor\n) Weapon\n: Food");
+		if (wizard)
+		    mvwaddstr(hw, 19, 0, ", Artifact");
+		mvwaddstr(hw, 9, 0, "What type of item do you want? ");
+		touchwin(hw);
+		wrefresh(hw);
+		itemtype = readchar();
+	    }
+	    switch (itemtype) {
+		when POTION:
+		    which_type = TYP_POTION;
+		    array_size = maxpotions;
+		    magic_array = p_magic;
+		when SCROLL:
+		    which_type = TYP_SCROLL;
+		    array_size = maxscrolls;
+		    magic_array = s_magic;
+		when FOOD:
+		    which_type = TYP_FOOD;
+		    array_size = maxfoods;
+		    magic_array = fd_data;
+		when WEAPON:
+		    which_type = TYP_WEAPON;
+		    array_size = maxweapons;
+		when ARMOR:
+		    which_type = TYP_ARMOR;
+		    array_size = maxarmors;
+		when RING:
+		    which_type = TYP_RING;
+		    array_size = maxrings;
+		    magic_array = r_magic;
+		when STICK:
+		    which_type = TYP_STICK;
+		    array_size = maxsticks;
+		    magic_array = ws_magic;
+		when ARTIFACT:
+		    if (!wizard) {
+			itemtype = '\0';
+			continue;
+		    }
+		    which_type = TYP_ARTIFACT;
+		    array_size = maxartifact;
+		when ESCAPE:
 		    return;
+		otherwise:
+		    wstandout(hw);
+		    mvwaddstr(hw, 10, 0, "We don't stock any of those.");
+		    wstandend(hw);
+		    itemtype = '\0';
+		    continue;
+	    }
+	} while (array_size == 0);
+
+	which_one = array_size;
+	do {
+	    reg struct magic_item *m_item;
+
+	    mpos = 0;
+	    sprintf(buf, "Which kind of %s do you wish to have (* for list)? ",
+		things[which_type].mi_name);
+	    mvwaddstr(hw, 9, 0, buf);
+	    touchwin(hw);
+	    wrefresh(hw);
+	    buf[0] = '\0';
+	    switch (get_str(buf, hw)) {
+		when QUIT:
+		case ESCAPE:
+		    itemtype = '\0';
+		    goto buy_more;
+	    }
+	    if (buf[0] == '*') {	/* print list */
+		add_line(" ID  BASECOST NAME");
+		switch (which_type) {
+		    when TYP_RING:
+		    case TYP_POTION:
+		    case TYP_STICK:
+		    case TYP_SCROLL:
+		    case TYP_FOOD:
+			for (i = 0, m_item = magic_array; i < array_size;
+								i++, m_item++)
+			    if (!is_spell && m_item->mi_worth > 0) {
+				sprintf(buf, "%3d) %8d %s", i,
+					m_item->mi_worth, m_item->mi_name);
+				add_line(buf);
+			    }
+		    when TYP_ARMOR:
+			for (i = 0; i < array_size; i++)
+			    if (!is_spell && armors[i].a_worth > 0) {
+				sprintf(buf, "%3d) %8d %s", i,
+					armors[i].a_worth, armors[i].a_name);
+				add_line(buf);
+			    }
+		    when TYP_WEAPON:
+			for (i = 0; i < array_size; i++)
+			    if (!is_spell && weaps[i].w_worth > 0) {
+				sprintf(buf, "%3d) %8d %s", i,
+					weaps[i].w_worth, weaps[i].w_name);
+				add_line(buf);
+			    }
+		    when TYP_ARTIFACT:
+			for (i = 0; i < array_size; i++) {
+			    sprintf(buf, "%3d) %8d %s", i,
+				    arts[i].ar_worth, arts[i].ar_name);
+			    add_line(buf);
+			}
+		    otherwise:
+			add_line("What a strange type.");
 		}
-	    } until(wh == 'y');
+		end_line();
+		touchwin(hw);
+		wrefresh(hw);
+		continue;
+	    }
+	    if (isdigit(buf[0]))
+		which_one = atoi(buf);
+	    else
+		switch (which_type) {
+		    when TYP_RING:
+		    case TYP_POTION:
+		    case TYP_STICK:
+		    case TYP_SCROLL:
+		    case TYP_FOOD:
+			for (i = 0, m_item = magic_array; i < array_size;
+								i++, m_item++)
+			    if (strcmp(buf, m_item->mi_name) == 0)
+				which_one = i;
+		    when TYP_ARMOR:
+			for (i = 0; i < array_size; i++)
+			    if (strcmp(buf, armors[i].a_name) == 0)
+				which_one = i;
+		    when TYP_WEAPON:
+			for (i = 0; i < array_size; i++)
+			    if (strcmp(buf, weaps[i].w_name) == 0)
+				which_one = i;
+		    when TYP_ARTIFACT:
+			for (i = 0; i < array_size; i++)
+			    if (strcmp(buf, arts[i].ar_name) == 0)
+				which_one = i;
+		    otherwise:
+			msg("What a strange type.");
+		}
+	    if (which_one < 0 || which_one >= array_size) {
+		wstandout(hw);
+		mvwaddstr(hw, 10, 0, "Type the name or an ID number.");
+		wstandend(hw);
+	    }
+	} while (which_one < 0 || which_one >= array_size);
+
+	item = new_item(sizeof *obj);
+	obj = OBJPTR(item);
+	if (which_type == TYP_ARTIFACT) {
+	    new_artifact(which_one, obj);
+	    add_pack(item, TRUE);
+	    itemtype = '\0';
+	    goto buy_more;
 	}
-	mpos = 0;
-	if (curprice > effective_purse) {
-	    msg("You can't afford to buy that %s!",curpurch);
-	    return;
+	obj->o_type = itemtype;
+	obj->o_which = which_one;
+	obj->o_mark[0] = '\0';
+	obj->o_group = 0;
+	obj->o_count = 1;
+	obj->o_weight = 0;
+	obj->o_dplus = obj->o_hplus = 0;
+
+	if (!is_spell) {
+	    plus_or_minus = -100;
+	    do {
+		mvwaddstr(hw, 10, 0,
+	"Do you want the cursed, blessed, or normal version? (c, b, n) [n]");
+		touchwin(hw);
+		wrefresh(hw);
+		switch (readchar()) {
+		    when ESCAPE:
+			discard(item);
+			itemtype = '\0';
+			goto buy_more;
+		    when 'c':
+			cursed = TRUE;
+			plus_or_minus = 0;
+		    when 'b':
+			blessed = TRUE;
+			plus_or_minus = 0;
+		    when 'n':
+		    case ' ':
+			plus_or_minus = 0;
+		    otherwise:
+			wstandout(hw);
+			mvwaddstr(hw, 11, 0,
+		"Type 'c' for cursed, 'b' for blessed, or 'n' for normal");
+			wstandend(hw);
+		}
+	    } while (plus_or_minus == -100);
 	}
-	/*
-	 * See if the hero has done all his transacting
-	 */
-	if (!open_market())
-	    return;
+	/* else used blessed, cursed from flags parameter */
+
+	if (which_type == TYP_WEAPON)
+	    init_weapon(obj, which_one);
+
+	obj->o_flags |= ISKNOW;
+	if (cursed) {
+	    plus_or_minus = -(rnd(2) + 1);
+	    obj->o_flags |= ISCURSED;
+	}
+	else if (blessed) {
+	    plus_or_minus = (rnd(3) + 1);
+	    obj->o_flags |= ISBLESSED;
+	}
+	else {
+	    plus_or_minus = 0;
+	    obj->o_flags |= ISNORMAL;
+	}
+
+	switch (which_type) {
+	    when TYP_WEAPON:
+		obj->o_hplus += plus_or_minus;
+		obj->o_dplus += plus_or_minus;
+	    when TYP_ARMOR:
+		obj->o_weight = armors[which_one].a_wght;
+		obj->o_ac = armors[which_one].a_class - plus_or_minus;
+	    when TYP_STICK:
+		fix_stick(obj);
+	    when TYP_RING:
+		obj->o_ac = plus_or_minus;
+	    case TYP_SCROLL:
+	    case TYP_POTION:
+		obj->o_weight = things[which_type].mi_wght;
+	    when TYP_FOOD:
+	    otherwise:
+		msg("That's a strange thing to try to own.");
+		itemtype = '\0';
+		goto buy_more;
+	}
+
+	cur_worth = get_worth(obj) * (luck + level / 15 + 1);
+	describe_it(obj);
+	if (cur_worth > effective_purse) {
+	    wstandout(hw);
+	    mvwaddstr(hw, 12, 0, "Unfortunately, you can't afford it.");
+	    wstandend(hw);
+	    wclrtoeol(hw);
+	    touchwin(hw);
+	    wrefresh(hw);
+	    itemtype = '\0';
+	    goto buy_more;
+	}
+
+	mvwaddstr(hw, 12, 0, "Do you want it? [y] ");
+	wclrtoeol(hw);
+	touchwin(hw);
+	wrefresh(hw);
+	switch (readchar()) {
+	    when ESCAPE:
+	    case 'n':
+		msg("");
+		itemtype = '\0';
+		goto buy_more;
+	}
+
 	/*
 	 * The hero bought the item here
 	 */
 	mpos = 0;
-	wh = add_pack((struct linked_list *) NULL, FALSE);	/* try to put it in his pack */
-	if (wh) {			/* he could get it */
-	    purse -= curprice;		/* take his money */
-	    effective_purse -= curprice;
-	    ++trader;			/* another transaction */
+	if (add_pack(item, TRUE) && !is_spell) {
+	    purse -= cur_worth;		/* take his money */
+	    effective_purse -= cur_worth;
+	    ++num_transactions;
 	    trans_line();		/* show remaining deals */
-	    curprice = -1;		/* reset stuff */
-	    curpurch[0] = NULL;
+	    switch (which_type) {
+		when TYP_RING:
+		case TYP_STICK:
+		case TYP_SCROLL:
+		case TYP_POTION:
+		    know_items[which_type][which_one] = TRUE;
+	    }
 	}
 }
 
@@ -180,50 +381,99 @@ buy_it()
  */
 sell_it()
 {
-	reg struct linked_list *item;
 	reg struct object *obj;
-	reg int wo, ch;
+	reg struct linked_list *item;
+	char buf[2*LINELEN];
 
-	if (!open_market())		/* after selling hours */
-	    return;
-
-	if ((item = get_item("sell",0)) == NULL)
+	if ((item = get_item("sell", 0)) == NULL)
 	    return;
 	obj = OBJPTR(item);
-	wo = get_worth(obj);
-	if (wo <= 0) {
+	msg("");
+	touchwin(hw);
+	wrefresh(hw);
+
+	if ((obj->o_type == ARTIFACT) || (cur_worth = get_worth(obj)) == 0) {
 	    mpos = 0;
 	    msg("We don't buy those.");
-	    if (is_wearing(R_ADORNMENT) && rnd(7) < 3)
-		msg("How about that %s ring instead?", 
-			r_stones[R_ADORNMENT]);
+	    if (is_wearing(R_ADORNMENT) && rnd(10) < 4)
+		msg("How about that %s ring instead?", r_stones[R_ADORNMENT]);
 	    return;
 	}
-	if (wo < 25)
-	    wo = 25;
-	msg("It's %s worth %d pieces of gold.",typ_name(obj), wo);
-	msg("Do you want to sell it? ");
-	do {
-	    ch = readchar();
-	    if (isupper(ch))
-		ch = tolower(ch);
-	    if (ch == ESCAPE || ch == 'n') {
+	describe_it(obj);
+	mvwaddstr(hw, 12, 0, "Do you want to sell it? [n] ");
+	touchwin(hw);
+	wrefresh(hw);
+	switch (readchar()) {
+	    case 'y':
+		break;
+	    otherwise:
 		msg("");
-		if (is_wearing(R_ADORNMENT) && rnd(7) < 3)
-		    msg("How about that %s ring instead?", 
+		if (is_wearing(R_ADORNMENT))
+		    msg("How about that %s ring instead?",
 			r_stones[R_ADORNMENT]);
 		return;
-	    }
-	} until (ch == 'y');
-	mpos = 0;
-	if (obj->o_type != ARTIFACT)
-	    obj->o_tradevalue = wo;
-	if (drop(item) == TRUE) {		/* drop this item */	
-	    purse += wo;			/* give him his money */
-	    ++trader;				/* another transaction */
-	    msg("Sold %s.",inv_name(obj,TRUE));
-	    trans_line();			/* show remaining deals */
 	}
+
+	rem_pack(obj);
+	discard(item);
+	purse += cur_worth;		/* give him his money */
+	++num_transactions;
+	effective_purse += cur_worth;
+	sprintf(buf, "Sold %s.  Hit space to continue.", inv_name(obj, TRUE));
+	mvwaddstr(hw, 13, 0, buf);
+	touchwin(hw);
+	wrefresh(hw);
+	wait_for(' ');
+}
+
+/*
+ * describe_it:
+ *	Laud or condemn the object
+ */
+describe_it(obj)
+reg struct object *obj;
+{
+	static char *cursed_d[] = {
+	    "worthless hunk of junk",
+	    "shoddy piece of trash",
+	    "piece of rusty garbage",
+	    "example of terrible workmanship",
+	    "cheap hack"
+	};
+	static char *normal_d[] = {
+	    "journeyman's piece",
+	    "fine deal",
+	    "great bargain",
+	    "good find",
+	    "real value",
+	    "piece of honest workmanship",
+	    "steal",
+	    "purchase worth making",
+	    "inexpensive product"
+	};
+	static char *blessed_d[] = {
+	    "magnificant masterpiece",
+	    "quality product",
+	    "exceptional find",
+	    "unbeatable value",
+	    "rare beauty",
+	    "superior product",
+	    "well-crafted item"
+	};
+	reg char *charp;
+	char buf[2*LINELEN];
+
+	if (obj->o_flags & ISBLESSED)
+	    charp = blessed_d[rnd(sizeof(blessed_d) / sizeof(char *))];
+	else if (obj->o_flags & ISCURSED)
+	    charp = cursed_d[rnd(sizeof(cursed_d) / sizeof(char *))];
+	else
+	    charp = normal_d[rnd(sizeof(normal_d) / sizeof(char *))];
+
+	sprintf(buf, "It's a%s %s worth %d pieces of gold.",
+		vowelstr(charp), charp, cur_worth);
+	mvwaddstr(hw, 11, 0, buf);
+	wclrtoeol(hw);
 }
 
 /*
@@ -232,46 +482,14 @@ sell_it()
  */
 open_market()
 {
-	register int maxtrans;
+	register int maxtrans = is_wearing(R_ADORNMENT) ? MAXPURCH + 4 : MAXPURCH;
 
-	maxtrans = is_wearing(R_ADORNMENT) ? MAXPURCH + 4 : MAXPURCH;
-	if (wizard || trader < maxtrans || (level == 0 && purse > 0))
+	if (wizard || num_transactions < maxtrans || (level == 0))
 	    return TRUE;
 	else {
 	    msg("The market is closed. The stairs are that-a-way.");
 	    return FALSE;
 	}
-}
-
-/*
- * typ_name:
- * 	Return the name for this type of object
- */
-char *
-typ_name(obj)
-reg struct object *obj;
-{
-	static char buff[2*LINELEN];
-	reg int wh;
-
-	switch (obj->o_type) {
-		case POTION:  wh = TYP_POTION;
-		when SCROLL:  wh = TYP_SCROLL;
-		when STICK:   wh = TYP_STICK;
-		when RING:    wh = TYP_RING;
-		when ARMOR:   wh = TYP_ARMOR;
-		when WEAPON:  wh = TYP_WEAPON;
-		when ARTIFACT:  wh = TYP_ARTIFACT;
-		when FOOD:    wh = TYP_FOOD;
-		otherwise:    wh = -1;
-	}
-	if (wh < 0)
-		strcpy(buff,"unknown");
-	else if (level == 0)
-		return inv_name(obj, TRUE);
-	else
-		strcpy(buff,things[wh].mi_name);
-	return buff;
 }
 
 /*
@@ -351,18 +569,18 @@ reg struct object *obj;
  */
 trans_line()
 {
+	char buf[2*LINELEN];
 	reg int adorned = is_wearing(R_ADORNMENT);
 
 	if (level == 0 && purse > 0)
-	    sprintf(prbuf, "You still have %d pieces of gold left.", purse);
+	    sprintf(buf, "You still have %d pieces of gold left.", purse);
 	else if (purse == 0)
-	    sprintf(prbuf, "You have no money right now.");
+	    sprintf(buf, "You have no money left.");
 	else if (!wizard)
-	    sprintf(prbuf,"You have %d transactions remaining.",
-		max(0,(adorned ? MAXPURCH + 4 : MAXPURCH) - trader));
+	    sprintf(buf, "You have %d transactions and %d gold pieces remaining.",
+		max(0, (adorned ? MAXPURCH + 4 : MAXPURCH) - num_transactions),
+		effective_purse);
 	else
-	    sprintf(prbuf,
-		"You have infinite transactions remaining oh great wizard.");
-	mvwaddstr(cw,LINES - 3,0,prbuf);
-	wclrtoeol(cw);
+	    sprintf(buf, "You have infinite transactions remaining.");
+	mvwaddstr(hw, LINES - 2, 0, buf);
 }

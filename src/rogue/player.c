@@ -218,7 +218,7 @@ gsense()
 	    }
 	}
 	if (gtotal) {
-	    s_know[S_GFIND] = TRUE;
+	    know_items[TYP_SCROLL][S_GFIND] = TRUE;
 	    msg("You sense gold!");
 	    overlay(hw,cw);
 	    return;
@@ -408,5 +408,32 @@ affect()
 
 annoy:
    if (off(*tp, WASTURNED)) runto(&new_pos, &hero);
+}
+
+/*
+ * undead_sense:
+ *	cleric or paladin finding the ungodly
+ */
+
+undead_sense()
+{
+    register struct linked_list *item;
+    register struct thing *tp;
+    bool show = FALSE;
+
+    wclear(hw);
+    for (item = mlist; item != NULL; item = next(item)) {
+	tp = THINGPTR(item);
+	if (on(*tp, ISUNDEAD)) {
+	    mvwaddch(hw, tp->t_pos.y, tp->t_pos.x, '#');
+	    show = TRUE;
+	}
+    }
+    if (show) {
+	msg("You feel the presense of the ungodly.");
+	overlay(hw,cw);
+	wrefresh(cw);
+	wclear(hw);
+    }
 }
 

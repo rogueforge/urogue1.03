@@ -9,12 +9,14 @@
 #include "death.h"
 #include <ctype.h>
 
-/* fumble_table() return values */
-#define CAST_CURSED 1		/* cast cursed version of spell */
-#define CAST_NOT 2		/* do not cast any spell */
-#define CAST_OK 3		/* go ahead, cast the spell */
-#define CAST_DEAD 4		/* caster died during fumble */
+/* for printing out messages */
+#define CAST_NORMAL	0x000	/* cast normal version */
+#define CAST_CURSED	0x001	/* cast cursed version */
+#define CAST_BLESSED	0x002	/* cast blessed version */
+#define CAST_CROWN	0x010	/* crown helped out */
+#define CAST_SEPTRE	0x020	/* septre helped out */
 
+#define MAX_SPELLS	100	/* Max # sorted_spells */
 #define MIN_FUMBLE_CHANCE	5
 #define MAX_FUMBLE_CHANCE	95
 
@@ -31,9 +33,9 @@ struct spells *pick_monster_spell();
 
 /*
  * Cost for each level of spells
- * level:	     0  1  2   3   4   5   7    7
+ * level:	     0  1   2   3   4   5    6    7    8
  */
-int spell_cost[] = { 1, 3, 5, 11, 17, 29, 53, 101, 1000, 10000};
+int spell_cost[] = { 1, 5, 17, 29, 53, 91, 159, 247, 396};
 
 /*
  * Spells that a monster can cast
@@ -88,70 +90,71 @@ struct spells monst_spells[] = {
  * Special classes know their spells one level lower, and blessed one above
  */
 struct spells player_spells[] = {
-	{ 0,	S_SUMFAMILIAR,	SCR_MAGIC	|SP_ALL},
+	{ 1,	WS_KNOCK,	ZAP_MAGIC	|ISKNOW},
+	{ 1,	S_SUMFAMILIAR,	SCR_MAGIC	|ISKNOW},
+	{ 1,	S_GFIND,	SCR_MAGIC	|ISKNOW},
+	{ 1,	P_MONSTDET,	POT_MAGIC	|ISKNOW|SP_DRUID},
+	{ 1,	P_TREASDET,	POT_MAGIC	|ISKNOW|SP_MAGIC},
+	{ 1,	S_FOODDET,	SCR_MAGIC	|ISKNOW|SP_CLERIC},
+	{ 1,	S_LIGHT,	SCR_MAGIC	|ISKNOW|SP_ILLUSION},
 
-	{ 1,	P_MONSTDET,	POT_MAGIC	},
-	{ 1,	S_GFIND,	SCR_MAGIC	},
-	{ 1,	P_TREASDET,	POT_MAGIC	|ISKNOW},
-	{ 1,	S_FOODDET,	SCR_MAGIC	|ISKNOW},
-	{ 1,	S_LIGHT,	SCR_MAGIC	|SP_ILLUSION},
-
-	{ 2,	S_IDENTIFY,	SCR_MAGIC	|ISKNOW},
 	{ 2,	WS_CLOSE,	ZAP_MAGIC	|ISKNOW},
-	{ 2,	WS_MISSILE,	ZAP_MAGIC	|ISKNOW|SP_MAGIC},
-	{ 2,	P_SHIELD,	POT_MAGIC	|SP_MAGIC},
-	{ 2,	P_SMELL,	POT_MAGIC	|SP_WIZARD|SP_DRUID},
-	{ 2,	P_COLDRESIST,	POT_MAGIC	|SP_WIZARD|SP_DRUID},
-	{ 2,	P_HEAR,		POT_MAGIC	|SP_ILLUSION|SP_CLERIC},
-	{ 2,	S_CONFUSE,	SCR_MAGIC	|SP_ILLUSION},
-	{ 2,	WS_HIT,		ZAP_MAGIC	|SP_PRAYER},
+	{ 2,	S_IDENTIFY,	SCR_MAGIC	|ISKNOW},
+	{ 2,	WS_HIT,		ZAP_MAGIC	|ISKNOW|SP_PRAYER},
+	{ 2,	P_SHIELD,	POT_MAGIC	|ISKNOW|SP_MAGIC},
+	{ 2,	P_COLDRESIST,	POT_MAGIC	|SP_WIZARD},
+	{ 2,	P_SEEINVIS,	POT_MAGIC	|SP_ILLUSION},
+	{ 2,	S_CONFUSE,	SCR_MAGIC	|SP_CLERIC},
+	{ 2,	P_SMELL,	POT_MAGIC	|SP_DRUID},
+	{ 2,	WS_MISSILE,	ZAP_MAGIC	|SP_MAGIC},
+	{ 2,	P_HEAR,		POT_MAGIC	},
 
-	{ 3,	WS_KNOCK,	ZAP_MAGIC	|ISKNOW},
-	{ 3,	P_RESTORE,	POT_MAGIC	|ISKNOW|SP_PRAYER},
-	{ 3,	P_CLEAR,	POT_MAGIC	|ISKNOW|SP_PRAYER},
-	{ 3,	S_REMOVECURSE,	SCR_MAGIC	|ISKNOW|SP_PRAYER},
+	{ 3,	P_CLEAR,	POT_MAGIC	|ISKNOW},
+	{ 3,	P_HEALING,	POT_MAGIC	|ISKNOW|SP_PRAYER},
+	{ 3,	S_CURING,	SCR_MAGIC	|ISKNOW|SP_PRAYER},
 	{ 3,	WS_MONSTELEP,	ZAP_MAGIC	|SP_MAGIC},
 	{ 3,	WS_CANCEL,	ZAP_MAGIC	|SP_WIZARD},
-	{ 3,	P_FIRERESIST,	POT_MAGIC	|SP_WIZARD|SP_DRUID},
 	{ 3,	S_SELFTELEP,	SCR_MAGIC	|SP_WIZARD},
-	{ 3,	P_SEEINVIS,	POT_MAGIC	|SP_ILLUSION},
+	{ 3,	P_FIRERESIST,	POT_MAGIC	|SP_WIZARD|SP_DRUID},
 	{ 3,	S_MAP,		SCR_MAGIC	|SP_ILLUSION|SP_DRUID},
+	{ 3,	S_REMOVECURSE,	SCR_MAGIC	|SP_PRAYER},
 	{ 3,	S_HOLD,		SCR_MAGIC	|SP_CLERIC},
 	{ 3,	S_SLEEP,	SCR_MAGIC	|SP_DRUID},
 	{ 3,	P_HASOXYGEN,	POT_MAGIC	|SP_DRUID},
 	{ 3,	WS_XENOHEALING,	ZAP_MAGIC	|SP_DRUID},
-	{ 3,	P_HEALING,	POT_MAGIC	|SP_PRAYER},
+	{ 3,	P_RESTORE,	POT_MAGIC	},
 
 	{ 4,	S_MSHIELD,	SCR_MAGIC	|ISKNOW|SP_ILLUSION},
-	{ 4,	S_PROTECT,	SCR_MAGIC	|SP_MAGIC},
 	{ 4,	P_INVIS,	POT_MAGIC	|SP_ILLUSION},
-	{ 4,	S_ELECTRIFY,	SCR_MAGIC	|SP_ILLUSION},
 	{ 4,	S_REFLECT,	SCR_MAGIC	|SP_ILLUSION},
-	{ 4,	P_REGENERATE,	POT_MAGIC	|SP_PRAYER},
-	{ 4,	WS_DRAIN,	ZAP_MAGIC	|SP_PRAYER},
-	{ 4,	S_CURING,	SCR_MAGIC	|SP_PRAYER},
+	{ 4,	P_TRUESEE,	POT_MAGIC	|SP_ILLUSION},
+	{ 4,	P_REGENERATE,	POT_MAGIC	|SP_CLERIC},
+	{ 4,	WS_DRAIN,	ZAP_MAGIC	|SP_CLERIC},
 	{ 4,	P_HASTE,	POT_MAGIC	|SP_ILLUSION|SP_CLERIC},
 	{ 4,	P_LEVITATION,	POT_MAGIC	|SP_WIZARD|SP_DRUID},
 	{ 4,	WS_WEB,		ZAP_MAGIC	|SP_MAGIC},
 	{ 4,	P_PHASE,	POT_MAGIC	},
 
-	{ 5,	P_GAINABIL,	POT_MAGIC	|ISKNOW|SP_PRAYER},
-	{ 5,	S_SCARE,	SCR_MAGIC|_TWO_	|SP_PRAYER},
-	{ 5,	S_SILVER,	SCR_MAGIC	|SP_PRAYER},
+	{ 5,	P_SHERO,	POT_MAGIC	|ISKNOW},
 	{ 5,	S_PETRIFY,	SCR_MAGIC	|SP_MAGIC},
-	{ 5,	P_SHERO,	POT_MAGIC	|ISKNOW|SP_MAGIC},
+	{ 5,	S_SCARE,	SCR_MAGIC|_TWO_	|SP_PRAYER},
 	{ 5,	WS_COLD,	ZAP_MAGIC	|SP_DRUID},
 	{ 5,	WS_FIRE,	ZAP_MAGIC	|SP_CLERIC},
 	{ 5,	WS_ELECT,	ZAP_MAGIC	|SP_WIZARD},
+	{ 5,	WS_ANTIMATTER,	ZAP_MAGIC	|SP_ILLUSION},
+	{ 5,	S_ELECTRIFY,	SCR_MAGIC	|SP_ILLUSION},
 
 	{ 6,	WS_DISINTEGRATE,ZAP_MAGIC	|ISKNOW},
-	{ 6,	P_RAISELEVEL,	POT_MAGIC	|ISKNOW|SP_CLERIC},
 	{ 6,	S_OWNERSHIP,	SCR_MAGIC	|SP_ALL},
+
+	{ 7,	S_ENCHANT,	SCR_MAGIC	|SP_MAGIC},
+
+	/* Too powerful
+	{ 6,	P_GAINABIL,	POT_MAGIC	|SP_PRAYER},
+	{ 6,	P_RAISELEVEL,	POT_MAGIC	|SP_CLERIC},
 	{ 6,	S_GENOCIDE,	SCR_MAGIC	|SP_DRUID},
-	{ 6,	S_ENCHANT,	SCR_MAGIC	|SP_MAGIC},
 	{ 6,	S_MAKEITEMEM,	SCR_MAGIC	|SP_WIZARD},
-	{ 6,	WS_CHARGE,	ZAP_MAGIC	|SP_WIZARD},
-	{ 6,	WS_ANTIMATTER,	ZAP_MAGIC	|SP_ILLUSION},
+	*/
 
 	{ -1,	-1,		-1		},
 };
@@ -173,7 +176,9 @@ coord shoot_dir;
     int casting_cost;				/* from spell_cost[] */
     int spell_roll;				/* sucess/fail 1D100 die roll */
     int fumble_chance;				/* Spell fumble chance */
+    int num_fumbles = 0;			/* for fumble_spell() */
     int bless_or_curse = ISNORMAL;		/* blessed or cursed? */
+    int message_flags = CAST_NORMAL;		/* which message to print out */
 
     struct stats *curp = &(caster->t_stats);
     struct stats *maxp = &(caster->maxstats);
@@ -188,10 +193,8 @@ coord shoot_dir;
     char buf[2*LINELEN];
 
     if (casters_points <= 0) {
-	if (is_player) {
+	if (is_player)
 	    msg("You don't have any spell points.");
-	    after = FALSE;
-	}
 	return;
     }
 
@@ -242,63 +245,58 @@ coord shoot_dir;
     /* Bug - What about when WIS == INT? */
     spell_type = (casters_stat == curp->s_intel) ? "spell" : "prayer";
 
-    if (!is_player) {
-	if ( (sp = pick_monster_spell(caster)) == NULL)
-	    return;
-    }
+    if (!is_player && (sp = pick_monster_spell(caster)) == NULL)
+	return;
     else {
 	int num_spells = -1;			/* num of spells cheap enough */
-	int num_blessed = -1;
-	struct spells *castable[100];
-	struct spells blessed_spells[50];
+	int sort_spells();			/* for qsort() */
+	static struct spells sorted_spells[MAX_SPELLS];
 
-	castable[0] = castable[1] = NULL;
+	sorted_spells[0].sp_cost = -1;
 
 	for (sp=player_spells; sp->sp_level != -1; sp++) {
 	    if (sp->sp_flags & casters_class) {	/* Does class know spell? */
-		int spell_level = sp->sp_level - 1;
-		int rnd_number = rnd(2*spell_level) - spell_level;
+		int rnd_number = rnd(2*sp->sp_level) - sp->sp_level;
 
 		/* Knows normal spell one level below others */
-		casting_cost = spell_cost[spell_level] + rnd_number;
+		casting_cost = spell_cost[sp->sp_level - 1] + rnd_number;
 		if (casters_points >= casting_cost) {
-		    castable[++num_spells] = sp;
-		    sp->sp_cost = casting_cost;
+		    sorted_spells[++num_spells] = *sp;
+		    sorted_spells[num_spells].sp_cost = casting_cost;
+		    sorted_spells[num_spells].sp_level = sp->sp_level - 1;
 		}
 
 		/* Knows blessed spell one level above others */
-		spell_level = sp->sp_level + 1;
-		rnd_number = rnd(2*spell_level) - spell_level;
-		casting_cost = spell_cost[spell_level] + rnd_number;
+		casting_cost = spell_cost[sp->sp_level + 1] + rnd_number;
 		if (casters_points >= casting_cost) {
-		    sp->sp_cost = casting_cost;
-		    blessed_spells[++num_blessed] = *sp;
-		    blessed_spells[num_blessed].sp_level += 2;
-		    blessed_spells[num_blessed].sp_flags |= ISBLESSED;
+		    sorted_spells[++num_spells] = *sp;
+		    sorted_spells[num_spells].sp_level = sp->sp_level + 1;
+		    sorted_spells[num_spells].sp_cost = casting_cost;
+		    sorted_spells[num_spells].sp_flags |= ISBLESSED;
 		}
 	    }
 	    /*
 	     * If class doesn't know spell, see if its a ISKNOW
 	     */
-	    else if (sp->sp_flags & ISKNOW ||
-		(is_wearing(R_WIZARD) && rnd(2)) ||
-		(is_wearing(R_PIETY) && rnd(2)) ) {
-		int spell_level = sp->sp_level;
-		int rnd_number = rnd(2*spell_level) - spell_level;
-		casting_cost = spell_cost[spell_level] + rnd_number;
+	    else if (sp->sp_flags & ISKNOW) {
+		int rnd_number = rnd(4*sp->sp_level) - sp->sp_level;
+
+		casting_cost = spell_cost[sp->sp_level] + rnd_number;
 		if (casters_points >= casting_cost) {
-		    castable[++num_spells] = sp;
-		    sp->sp_cost = casting_cost;
+		    sorted_spells[++num_spells] = *sp;
+		    sorted_spells[num_spells].sp_cost = casting_cost;
 		}
 	    }
 	    /* else this spell is unknown */
 	}
 
-	/* castable[] and blessed_spells point to all cheap enough spells */
-	if (castable[1] == NULL) {
+	if (sorted_spells[0].sp_cost == -1) {
 	    msg("You don't have enough %s points.", spell_type);
 	    after = FALSE;
+	    return;
 	}
+	qsort(sorted_spells, num_spells + 1, sizeof(struct spells),
+	    sort_spells);
 
 	do {					/* Prompt for spells */
 	    struct spells *which_spell = NULL;
@@ -309,22 +307,15 @@ coord shoot_dir;
 
 	    switch (get_str(buf, cw)) {
 	    when NORM:
-	    when QUIT:				/* ESC */
-		after = FALSE;
+	    when QUIT:				/* ESC - lose turn */
 		return;
 	    otherwise:
 		continue;
 	    }
 	    if (buf[0] == '*') {		/* print list */
 		add_line("Cost  Abbreviation	Full Name");
-		for (i=0; i<=num_blessed; i++) {
-		    sp = &blessed_spells[i];
-		    sprintf(buf, "[%3d] %-12s\t%s",
-			sp->sp_cost, spell_abrev(sp), spell_name(sp));
-		    add_line(buf);
-		}
 		for (i=0; i<=num_spells; i++) {
-		    sp = castable[i];
+		    sp = &sorted_spells[i];
 		    sprintf(buf, "[%3d] %-12s\t%s",
 			sp->sp_cost, spell_abrev(sp), spell_name(sp));
 		    add_line(buf);
@@ -334,51 +325,26 @@ coord shoot_dir;
 		continue;
 	    }
 	    if (isupper( (int) buf[0])) {	/* Uppercase Abbreviation */
-		for (i=0; i<=num_blessed; i++) {
-		    sp = &blessed_spells[i];
-		    if ((strcmp(spell_abrev(sp), buf) == 0)) {
-			debug("matched #%d: '%s'.", i, spell_name(sp));
-			which_spell = sp;
-			goto found_one;
-		    }
-		}
 		for (i=0; i<=num_spells; i++) {
-		    sp = castable[i];
+		    sp = &sorted_spells[i];
 		    if ((strcmp(spell_abrev(sp), buf) == 0)) {
-			debug("matched #%d: '%s'.", i, spell_name(sp));
 			which_spell = sp;
-			goto found_one;
+			break;
 		    }
 		}
 	    }
 	    else {				/* Full Spell Name */
-		for (i=0; i<=num_blessed; i++) {
-		    sp = &blessed_spells[i];
-		    if ((strcmp(spell_name(sp), buf) == 0)) {
-			debug("matched #%d: '%s'.", i, spell_name(sp));
-			which_spell = sp;
-			goto found_one;
-		    }
-		}
 		for (i=0; i<=num_spells; i++) {
-		    sp = castable[i];
+		    sp = &sorted_spells[i];
 		    if ((strcmp(spell_name(sp), buf) == 0)) {
-			debug("matched #%d: '%s'.", i, spell_name(sp));
 			which_spell = sp;
-			goto found_one;
+			break;
 		    }
 		}
 	    }
-found_one:
 	    sp = which_spell;
 	}
 	while (sp == NULL);
-
-	/*
-	 * Safely cast detects in Trading Posts
-	 */ 
-	if (levtype == POSTLEV && sp->sp_level != 1)
-	    aggravate();
     }
     /*
      * Common monster and player code
@@ -438,44 +404,38 @@ found_one:
 
     /* The Crown of Might insures that your spells never fumble */
     if (spell_roll < fumble_chance) {
-	if (is_player && is_carrying(TR_CROWN))
-	    msg("The Crown guides your %s.", spell_type);
+	if (is_carrying(TR_CROWN))
+	    message_flags |= CAST_CROWN;
 	else {
-	    if (is_player)
-		msg("You botched your '%s' %s.", cast_name, spell_type);
-	    else debug("Monster fumble '%s' spell.", cast_name);
+	    message_flags |= CAST_CURSED;
 
 	    curp->s_power -= min(curp->s_power, (2*sp->sp_cost) ); /* 2x cost */
-	    switch(fumble_spell(caster, sp, fumble_chance - spell_roll)) {
-	    when CAST_CURSED:
+	    num_fumbles = rnd(((fumble_chance - spell_roll)/10) + 1) +
+			    rnd(sp->sp_level) + rnd(curp->s_lvl);
+	    num_fumbles = min(10, max(0, num_fumbles));
+
+	    if (num_fumbles >= 6 && rnd(1) == 0)
 		bless_or_curse = ISCURSED;
-	    when CAST_NOT:
+	    else if (num_fumbles < 4) {
 		if (is_player)
 		    msg("Your %s fails.", spell_type);
-		return;
-	    when CAST_OK:
-		/* Bad things already happened in fumble_spell() */
-		break;
-	    when CAST_DEAD:
 		return;
 	    }
 	}
     }
     else if (spell_roll > MAX_FUMBLE_CHANCE) {
 	if (is_player) {
-	    msg("Your '%s' %s goes superbly.", cast_name, spell_type);
-	    pstats.s_exp += 3 * sp->sp_cost;
+	    message_flags |= CAST_BLESSED;
+	    pstats.s_exp += 3 * sp->sp_cost * curp->s_lvl;
 	    check_level();
 	}
 	maxp->s_power += sp->sp_cost;
 	bless_or_curse = ISBLESSED;
     }
     else {
-	if (is_player) {
-	    msg("You sucessfully cast your '%s' %s.", cast_name, spell_type);
-	    /* Spellcasters get bonus for sucessful spells */
+	if (is_player) {	/* extra exp for sucessful spells */
 	    if (player.t_ctype==C_MAGICIAN || player.t_ctype==C_ILLUSION) {
-		pstats.s_exp += sp->sp_cost;
+		pstats.s_exp += sp->sp_cost * curp->s_lvl;
 		check_level();
 	    }
 
@@ -484,9 +444,9 @@ found_one:
 	curp->s_power -= sp->sp_cost;
    }
 
-    /* The Septre of Might blesses all your spells */
+    /* The Sceptre of Might blesses all your spells */
     if (is_player && (bless_or_curse&ISBLESSED == 0) && is_carrying(TR_SCEPTRE)) {
-	msg("The Septre sanctifies your %s.", spell_type);
+	message_flags |= CAST_SEPTRE;
 	bless_or_curse = ISBLESSED;
     }
 
@@ -510,6 +470,26 @@ found_one:
 	do_zap(caster, TRUE, sp->sp_which, bless_or_curse);
     otherwise:
 	msg("What a strange %s!", spell_type);
+    }
+
+    /*
+     * Print messages and take fumbles *after* spell has gone off.
+     * This makes ENCHANT, etc more dangerous
+     */
+    if (is_player) {
+	if (message_flags & CAST_SEPTRE)
+	    msg("The Sceptre enhanced your %s.", spell_type);
+	if (message_flags & CAST_CROWN)
+	    msg("The Crown wordlessly corrected your %s.", spell_type);
+	switch (message_flags & 01) {
+	when CAST_CURSED:
+	    msg("You botched your '%s' %s.", cast_name, spell_type);
+	    fumble_spell(caster, num_fumbles);
+	when CAST_NORMAL:
+	    msg("You sucessfully cast your '%s' %s.", cast_name, spell_type);
+	when CAST_BLESSED:
+	    msg("Your '%s' %s went superbly.", cast_name, spell_type);
+	}
     }
 }
 
@@ -568,27 +548,22 @@ struct spells *sp;
 /*
  * fumble_spell - he blew it.  Make him pay
  */
-fumble_spell(caster, sp, spell_roll)
+fumble_spell(caster, num_fumbles)
 register struct thing *caster;		/* the fumblee */
-register struct spells *sp;		/* the botched spell */
-int spell_roll;				/* high means you fumbled real bad */
+int num_fumbles;			/* high means you fumbled real bad */
 {
     register struct stats *curp = &(caster->t_stats);
     register struct stats *maxp = &(caster->maxstats);
-    int ret_val = CAST_OK;
     bool is_player = (caster == &player);
-    int num_fumbles;
 
-    
-    num_fumbles = rnd((spell_roll/10) + 1) + rnd(sp->sp_level) + rnd(curp->s_lvl);
-    num_fumbles = min(10, max(0, num_fumbles));
-    debug("taking %d fumbles.", num_fumbles);
+    debug("Taking %d fumbles.", num_fumbles);
 
     switch(num_fumbles) {
     case 10:
 	/* Lose ability */
 	if (rnd(5) == 0)
 	    quaff(caster, P_GAINABIL, ISCURSED);
+	break;
     case 9:
 	/* Lose max spell points */
 	if (rnd(4) == 0) {
@@ -596,11 +571,13 @@ int spell_roll;				/* high means you fumbled real bad */
 	    if (maxp->s_power <= 5)
 		maxp->s_power = 5;
 	}
+	break;
     case 8:
 	/* Lose all current spell points */
 	if (rnd(3) == 0)
 	     curp->s_power = 0;
 	else curp->s_power /= 2;
+	break;
     case 7:
 	/* Freeze */
 	if (rnd(2) == 0) {
@@ -608,40 +585,41 @@ int spell_roll;				/* high means you fumbled real bad */
 		 no_command++;
 	    else caster->t_no_move++;
 	}
+	break;
     case 6:
+	break;
 	/* Cast a cursed spell - see below */
     case 5:
 	/* Become dazed and confused */
 	if (rnd(5) == 0)
 	    quaff(caster, P_CLEAR, ISCURSED);
+	break;
     case 4:
 	/* Lose hit points */
 	if (is_player)
 	    feel_message();
-	if ((curp->s_hpt -= rnd(2*sp->sp_level)) <= 0) {
+	if ((curp->s_hpt -= rnd(10)) <= 0) {
 	    if (is_player)
 		 death(D_SPELLFUMBLE);
 	    else killed(caster, find_mons(caster->t_pos.y, caster->t_pos.x),
 			NOMESSAGE, NOPOINTS);
-	    return(CAST_DEAD);
+	    return;
 	}
+	break;
     case 3:
+	break;
 	/* Spell fails */
-	ret_val = CAST_NOT;
     case 2:
 	/* Freeze */
 	if (is_player)
 	     no_command++;
 	else caster->t_no_move++;
+	break;
     default:
     case 1:
-	/* Take double spell points - handed in incant() */
+	/* Take double spell points - handled in incant() */
 	break;
     }
-    if (num_fumbles>=6 && rnd(1)==0)
-	ret_val = CAST_CURSED;
-
-    return(ret_val);
 }
 
 /*
@@ -656,11 +634,11 @@ learn_new_spells()
     for (sp=player_spells; sp->sp_level != -1; sp++) {
 	switch (sp->sp_flags & TYP_MAGIC_MASK) {
 	when POT_MAGIC:
-	    know_spell = p_know[sp->sp_which];
+	    know_spell = know_items[TYP_POTION][sp->sp_which];
 	when SCR_MAGIC:
-	    know_spell = s_know[sp->sp_which];
+	    know_spell = know_items[TYP_SCROLL][sp->sp_which];
 	when ZAP_MAGIC:
-	    know_spell = ws_know[sp->sp_which];
+	    know_spell = know_items[TYP_STICK][sp->sp_which];
 	}
 	if (know_spell) {
 	    if ((sp->sp_flags & ISKNOW) == FALSE)
@@ -763,4 +741,18 @@ struct thing *caster;
     }
 
     return(NULL);
+}
+
+/*
+ * sort_spells - called by qsort()
+ */
+sort_spells(sp1, sp2)
+struct spells *sp1, *sp2;
+{
+    int diff = sp1->sp_cost - sp2->sp_cost;
+
+    if (diff != 0)
+	return(diff);
+    else
+	return(strcmp(spell_name(sp1), spell_name(sp1)));
 }

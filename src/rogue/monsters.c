@@ -490,6 +490,9 @@ wanderer()
 
     if (wizard)
 	msg("Started a wandering %s.", monsters[tp->t_index].m_name);
+    else if (on(*tp, ISUNDEAD) && (player.t_ctype == C_CLERIC ||
+	     player.t_ctype == C_PALADIN))
+	msg("You sense a new ungodly monster %s.", loc);
     else if (on(player, CANHEAR) || (player.t_ctype == C_THIEF && rnd(20) == 0)) 
 	msg("You hear a new %s moving %s.", monsters[tp->t_index].m_name, loc);
     else if (on(player, CANSCENT) || (player.t_ctype == C_THIEF && rnd(20) == 0)) 
@@ -520,6 +523,8 @@ int y, x;
 	tp->t_dest = &hero;
 	turn_on(*tp, ISRUN);
 	turn_off(*tp, ISDISGUISE);
+	turn_off(*tp, ISINVIS);
+	turn_off(*tp, CANSURPRISE);
 	return(it);
     }
 
@@ -564,70 +569,75 @@ int y, x;
 	turn_off(*tp, ISDISGUISE);
     }
 
-    /* Handle monsters that can gaze */
-    if (on(*tp, ISRUN) && 	/* Monster is not asleep */
-	cansee(tp->t_pos.y, tp->t_pos.x)) {	/* Player can see monster */
+    /*
+     * Handle gaze attacks
+     */
+    if (on(*tp, ISRUN) &&
+	cansee(tp->t_pos.y, tp->t_pos.x) &&
+	off(player, ISINVIS)) {
 	/*
 	 * Confusion
 	 */
 	if (on(*tp, CANHUH)) {
 	    if (on(player, CANREFLECT)) {
-		msg("You reflect the gaze of the %s.", mname);
-		msg("The %s is confused !!!", mname);
-		turn_on(*tp, ISHUH);
-	    } else 
-	    if (!save(VS_MAGIC)) {
-		if (off(player, ISCLEAR) && off(player, ISINVIS)) {
-		    if (on(player, ISHUH))
-			lengthen(unconfuse, rnd(20)+HUHDURATION);
-		    else {
-			fuse(unconfuse, 0, rnd(20)+HUHDURATION, AFTER);
-			msg("The %s's gaze has confused you.",mname);
-			turn_on(player, ISHUH);
-		    }
+		msg("You reflect the bewildering stare of the %s.", mname);
+		if (save_throw(tp, VS_MAGIC)) {
+		    msg("The %s is confused!", mname);
+		    turn_on(*tp, ISHUH);
 		}
-		else if (on(player, ISINVIS))
-		    msg("The %s's gaze has no effect.", mname);
-		else 
-		    msg("You feel dizzy for a moment, but it quickly passes.");
+		else
+		    msg("The %s staggers for a moment.", mname);
+	    } else 
+	    if (save(VS_MAGIC)) {
+		msg("You feel dizzy for a moment, but it quickly passes.");
+		if (rnd(100) < 67)
+		    turn_off(*tp, CANHUH);
 	    }
-	    else if (rnd(100) < 67)
-		turn_off(*tp, CANHUH); /* Once you save, maybe that's it */
+	    else if (off(player, ISCLEAR)) {
+		if (off(player, ISHUH)) {
+		    fuse(unconfuse, 0, rnd(20)+HUHDURATION, AFTER);
+		    msg("The %s's gaze has confused you.",mname);
+		    turn_on(player, ISHUH);
+		}
+		else
+		    lengthen(unconfuse, rnd(20)+HUHDURATION);
+	    }
 	}
 
 	/* Sleep */
-        if (on(*tp, CANSNORE)) 
-
-	if (on(player, CANREFLECT)) {
-	    msg("You reflect the gaze of the %s", mname);
-	    msg("The %s falls asleep !!!", mname);
-	    tp->t_no_move += SLEEPTIME;
-	} else
-	if (no_command == 0 && !save(VS_PARALYZATION)) {
- 	    if (on(player, ISINVIS))
-		msg("The gaze of the %s has no effect.", mname);
-	    else if (is_wearing(R_ALERT))
-		msg("You feel slightly drowsy for a moment.");
-	    else {
-		msg("The %s's gaze puts you to sleep.", mname);
-		no_command = SLEEPTIME;
-		if (rnd(100) < 50) turn_off(*tp, CANSNORE);
+        if (on(*tp, CANSNORE)) {
+	    if (on(player, CANREFLECT)) {
+		msg("You reflect the lethargic glance of the %s", mname);
+		if (save_throw(tp, VS_PARALYZATION)) {
+		    msg("The %s falls asleep!", mname);
+		    tp->t_no_move += SLEEPTIME;
+		}
+	    } else
+	    if (no_command == 0 && !save(VS_PARALYZATION)) {
+		if (is_wearing(R_ALERT))
+		    msg("You feel slightly drowsy for a moment.");
+		else {
+		    msg("The %s's gaze puts you to sleep.", mname);
+		    no_command = SLEEPTIME;
+		    if (rnd(100) < 50) turn_off(*tp, CANSNORE);
+		}
 	    }
 	}
 
 	/* Fear */
 	if (on(*tp, CANFRIGHTEN)) {
+	    turn_off(*tp, CANFRIGHTEN);
 	    if (on(player, CANREFLECT)) {
-		msg("The %s looks at you and sees its reflection. ", mname);
-		msg("The %s is terrified by its reflection !!!", mname);
-		turn_on(*tp, ISFLEE);
+		msg("The %s sees its reflection. ", mname);
+		if (save_throw(tp, VS_MAGIC)) {
+		    msg("The %s is terrified by its reflection!", mname);
+		    turn_on(*tp, ISFLEE);
+		}
 	    } else {
-	        turn_off(*tp, CANFRIGHTEN);
 	        if (!save(VS_WAND) &&
 	            !(on(player, ISFLEE) && (player.t_dest == &tp->t_pos))) {
-		        if (off(player, SUPERHERO) 
-				&& (player.t_ctype != C_PALADIN)
-				&& off(player, ISINVIS)) {
+		        if ((player.t_ctype != C_PALADIN)
+				&& off(player, SUPERHERO)) {
 			    turn_on(player, ISFLEE);
 			    player.t_dest = &tp->t_pos;
 			    msg("The sight of the %s terrifies you.", mname);
@@ -642,13 +652,18 @@ int y, x;
 	 * slow
 	 */
 	if (on(*tp, LOOKSLOW)) {
+	    turn_off(*tp, LOOKSLOW); 
 	    if (on(player, CANREFLECT)) {
-		msg("You reflect the gaze of the %s.", mname);
-		msg("The %s is slowing down !!!", mname);
-		turn_on(*tp, ISSLOW);
+		msg("You reflect the mournful glare of the %s.", mname);
+		if (save_throw(tp, VS_MAGIC)) {
+		    msg("The %s is slowing down!", mname);
+		    turn_on(*tp, ISSLOW);
+		}
 	    } 
 	    else
-	    if (!save(VS_MAGIC)) {
+	    if (is_wearing(R_FREEDOM) || save(VS_MAGIC))
+		msg("You feel run-down for a moment.");
+	    else {
 		if (on(player, ISHASTE)) { /* Already sped up */
 		    extinguish(nohaste);
 		    nohaste();
@@ -658,68 +673,79 @@ int y, x;
 			    on(player, ISSLOW) ? "even " : "");
 		    if (on(player, ISSLOW))
 			lengthen(noslow, rnd(4) + 4);
-		    else if (!is_wearing(R_FREEDOM)) {
+		    else {
 			turn_on(player, ISSLOW);
 			player.t_turn = TRUE;
 			fuse(noslow, 0, rnd(4)+4, AFTER);
 		    }
 		}
 	    }
-	    turn_off(*tp, LOOKSLOW); 
 	}
 
-	/* blinding creatures */
-	if (on(*tp, CANBLIND)) 
-	if (on(player, CANREFLECT)) {
-	    msg("You reflect the gaze of the %s.", mname);
-	    msg("The %s is blinded !!!", mname);
-	    turn_on(*tp, ISHUH);
-	} else
-	if (off(player, ISBLIND) && !is_wearing(R_SEEINVIS)
-		&& off(player, ISINVIS)
-		&& !save(VS_WAND)) {
-	    msg("The gaze of the %s blinds you.", mname);
-	    turn_on(player, ISBLIND);
-	    fuse(sight, 0, rnd(30)+20, AFTER);
-	    look(FALSE);
+	if (on(*tp, CANBLIND)) {	/* Blinding */
+	    turn_off(*tp, CANBLIND);
+	    if (on(player, CANREFLECT)) {
+		msg("You reflect the blinding stare of the %s.", mname);
+		if (save_throw(tp, VS_WAND)) {
+		    msg("The %s is blinded!", mname);
+		    turn_on(*tp, ISHUH);
+		}
+	    } else
+	    if (off(player, ISBLIND))
+		if (save(VS_WAND) || is_wearing(R_TRUESEE) ||
+		    is_wearing(R_SEEINVIS))
+		    msg("Your eyes film over for a moment.");
+		else {
+		    msg("The gaze of the %s blinds you.", mname);
+		    turn_on(player, ISBLIND);
+		    fuse(sight, 0, rnd(30)+20, AFTER);
+		    look(FALSE);
+		}
 	}
 
-	/* Turning to stone */
-	if (on(*tp, LOOKSTONE)) 
-	if (on(player, CANREFLECT)) {
-	    msg("You reflect the gaze of the %s.", mname);
-	    msg("The %s is turned to stone !!!", mname);
-	    killed(&player, it, NOMESSAGE, POINTS);
-        } else {
-
+	if (on(*tp, LOOKSTONE)) {	/* Stoning */
 	    turn_off(*tp, LOOKSTONE);
-
-	    if (on(player, CANINWALL) || on(player, ISINVIS) || 
-		on(player, CANREFLECT))
-		msg("The gaze of the %s has no effect.", mname);
-	    else {
-		if (!save(VS_PETRIFICATION) && rnd(100) < 3) {
-		    msg("The gaze of the %s petrifies you.", mname);
-		    msg("You are turned to stone !!! --More--");
-		    wait_for(' ');
-		    death(D_PETRIFY);
-		    return it;
+	    if (on(player, CANREFLECT)) {
+		msg("You reflect the flinty look of the %s.", mname);
+		if (save_throw(tp, VS_PETRIFICATION)) {
+		    msg("The %s suddenly stiffens", mname);
+		    tp->t_no_move += STONETIME;
 		}
 		else {
+		    msg("The %s is turned to stone!", mname);
+		    killed(&player, it, NOMESSAGE, POINTS);
+		}
+	    } else {
+		if (on(player, CANINWALL))
+		    msg("The %s cannot focus on you.", mname);
+		else {
 		    msg("The gaze of the %s stiffens your limbs.", mname);
-		    no_command = STONETIME;
+		    if (save(VS_PETRIFICATION))
+			no_command = STONETIME;
+		    else if (rnd(100) > 3)
+			no_command = STONETIME * 3;
+		    else {
+			msg("The gaze of the %s petrifies you.", mname);
+			msg("You are turned to stone!!! --More--");
+			wait_for(' ');
+			death(D_PETRIFY);
+			return it;
+		    }
 		}
 	    }
 	}
     }
 
     /*
-     * Hide invisible monsters and those in a wall
+     * True Sight sees all
+     * Never see ISINWALL or CANSURPRISE
+     * See INSHADOW 80%
+     * See ISINVIS with See Invisibilty
      */
-    if (((on(*tp, ISINVIS) || (on(*tp, ISSHADOW) && rnd(100) < 90)) &&
-	off(player, CANSEE)) ||
-	on(*tp, ISINWALL) ||
-	on(*tp, CANSURPRISE))
+    if (off(player, CANTRUESEE) &&
+	on(*tp, ISINWALL) || on(*tp, CANSURPRISE) ||
+	(on(*tp, ISSHADOW) && rnd(100) < 80) ||
+	(on(*tp, ISINVIS) && off(player, CANSEE)))
 	ch = mvwinch(stdscr, y, x);
 
     /*
@@ -882,6 +908,8 @@ register struct thing *tp;
  * to purchase something.
  */
 
+#define SELL_ITEMS 10	/* How many things 'q' might carry */
+
 sell(tp)
 register struct thing *tp;
 {
@@ -897,7 +925,7 @@ register struct thing *tp;
 	int worth;
 	int flags;
 	char *name;
-    } selection[10];
+    } selection[SELL_ITEMS];
     register int effective_purse = ( (player.t_ctype==C_PALADIN) ?
 		(9 * purse/10) : purse);
 
@@ -1127,9 +1155,8 @@ register struct thing *tp;
 
     which_item = (short) ((getchar() & 0177) - 'a');
     while (which_item < 0 || which_item >= nitems || selection[which_item].worth > effective_purse) {
-	if (which_item == (short) ESCAPE - (short) 'a') {
+	if (which_item == (short) ESCAPE - (short) 'a')
 	    return;
-	}
 	mvwaddstr(hw, 0, 0, "Please enter one of the listed items: ");
 	wrefresh(hw);
 	which_item = (short) ((getchar() & 0177) - 'a');
@@ -1148,8 +1175,8 @@ register struct thing *tp;
 
     /* If a stick or ring, let player know the type */
     switch (goods) {
-	when STICK: ws_know[selection[which_item].which] = TRUE;
-	when RING:  r_know[selection[which_item].which] = TRUE;
+	when STICK: know_items[TYP_STICK][selection[which_item].which] = TRUE;
+	when RING:  know_items[TYP_RING][selection[which_item].which] = TRUE;
     }
 
     if (add_pack(item, FALSE) == FALSE) {

@@ -34,8 +34,7 @@ struct thing *tp;
     /*
      * Check for regenerating spell points first
      */
-    if (curp->s_power != maxp->s_power)
-	doctor_spell_points(tp);
+    doctor_spell_points(tp);
 
     if (curp->s_hpt == maxp->s_hpt) {
 	tp->t_rest_hpt = 0;
@@ -46,8 +45,8 @@ struct thing *tp;
     switch (tp->t_ctype) {
 	when C_MAGICIAN:
 	case C_ILLUSION:
-	    turns_quiet = 32 - curp->s_lvl*2;
-	    new_points = curp->s_lvl/2 - 5;
+	    turns_quiet = 24 - curp->s_lvl*2;
+	    new_points = curp->s_lvl/2 - 4;
 	when C_THIEF:
 	case C_ASSASIN:
 	case C_NINJA:
@@ -75,11 +74,8 @@ struct thing *tp;
 	    if (tp->t_rest_hpt > turns_quiet)
 		curp->s_hpt++;
 	}
-	else {
-	    if (tp->t_rest_hpt >= 15) {
-		curp->s_hpt += rnd(new_points)+1;
-	    }
-	}
+	else if (tp->t_rest_hpt >= 15)
+	    curp->s_hpt += rnd(new_points)+1;
     }
 
     if (tp == &player) {
@@ -88,8 +84,8 @@ struct thing *tp;
 	else
 	    turns_quiet = rnd(turns_quiet/6) + 1;
 
-	/* +0 R_REGEN just eat food */
-	curp->s_hpt += ring_value(R_REGEN) * turns_quiet;
+	if (is_wearing(R_REGEN))
+	    curp->s_hpt += ring_value(R_REGEN);
     }
     if (on(*tp, ISREGEN))
 	curp->s_hpt += curp->s_lvl/5 + 1;
@@ -124,8 +120,10 @@ struct thing *tp;
     maxp = &(tp->maxstats);
     opower = curp->s_power;
 
-    if (curp->s_power==maxp->s_power || off(*tp, CANCAST)
-	|| (cur_armor && wear_ok(tp, cur_armor, FALSE)==FALSE)) {
+    /* The right ring will let you regenerate while wearing bad armor */
+    if (off(*tp, CANCAST)
+	|| ((tp == &player) && (cur_armor && wear_ok(tp, cur_armor, NOMESSAGE)==FALSE) &&
+	    !(is_wearing(R_WIZARD) || is_wearing(R_PIETY)))) {
     
 	tp->t_rest_pow = 0;
 	return;
@@ -149,8 +147,8 @@ struct thing *tp;
 	when C_FIGHTER:
 	case C_RANGER:
 	case C_PALADIN:
-	    turns_quiet = 32 - curp->s_lvl*2;
-	    new_points = curp->s_lvl - 5;
+	    turns_quiet = 24 - curp->s_lvl*2;
+	    new_points = curp->s_lvl/2 - 4;
 	when C_MONSTER:
 	    turns_quiet = 16 - curp->s_lvl;
 	    new_points = curp->s_lvl - 6;
@@ -162,10 +160,8 @@ struct thing *tp;
 	if (tp->t_rest_pow > turns_quiet)
 	    curp->s_power++;
     }
-    else {
-	if (tp->t_rest_pow >= 15)
-	    curp->s_power += rnd(new_points)+1;
-    }
+    else if (tp->t_rest_pow >= 15)
+	curp->s_power += rnd(new_points)+1;
 
     if (tp == &player) {		/* What if tp==monster? */
 	if (is_wearing(R_WIZARD) || is_wearing(R_PIETY))
@@ -200,10 +196,9 @@ rollwand()
     static int between = 0;
 
     if (++between >= 4) {
-	/* Theives may not awaken a monster */
-	if ((roll(1, 6) == 4) &&
-        ((player.t_ctype != C_THIEF && player.t_ctype != C_ASSASIN &&
-        player.t_ctype != C_NINJA) || (rnd(30) >= pstats.s_dext))) {
+	/* Thieves (only) may not waken a monster */
+	if ((rnd(6) == 0) &&
+        (player.t_ctype != C_THIEF || (rnd(30) >= pstats.s_dext))) {
 	    if (levtype != POSTLEV)
 	        wanderer();
 	    kill_daemon(rollwand);
@@ -351,14 +346,12 @@ res_strength()
 	lost_str = 0;
     }
 
-    /* Otherwise, put player at the maximum strength */
-    else {
+    else
 	pstats.s_str = max_stats.s_str + ring_value(R_ADDSTR) + 
 		(on(player, POWERSTR) ? 10 : 0) +
 		(on(player, SUPERHERO) ? 10 : 0);
-    }
 
-    updpack(TRUE);
+    updpack();
 }
 
 /*
@@ -450,7 +443,7 @@ stomach()
 
     }
     if (old_hunger != hungry_state) 
-	updpack(TRUE);
+	updpack();
     wghtchk();
 }
 /*
@@ -577,7 +570,7 @@ struct linked_list
  */
 ungaze()
 {
-    msg("The shiny particles disappear.");
+    msg("The shiny particles swirl to the floor.");
     turn_off(player, CANREFLECT);
 }
 
@@ -691,4 +684,17 @@ unmshield()
 {
     turn_off(player, HASMSHIELD);
     msg("The fog dissapates.");
+}
+
+/*
+ * untrue:
+ *	He lost his true sight power
+ */
+
+untruesee()
+{
+    if (!is_wearing(R_TRUESEE)) {
+	turn_off(player, CANTRUESEE);
+	msg("Your sensory perceptions return to normal.");
+    }
 }

@@ -129,7 +129,6 @@ int dy, dx;
     char hch;
 
     firstmove = FALSE;
-    curprice = -1;		/* if in trading post, we've moved off obj */
     if (player.t_no_move) {
 	player.t_no_move--;
 	msg("You are still stuck in the bear trap.");
@@ -1114,7 +1113,7 @@ dip_it()
 		    j = rnd(8) + 1;
 		    if(i < 50) {		/* add charges */
 			ob->o_charges += j;
-		        ws_know[wh] = TRUE;
+		        know_items[TYP_STICK][wh] = TRUE;
 			if (ob->o_flags & ISCURSED)
 			    ob->o_flags &= ~ISCURSED;
 		        msg("The %s %s glows blue for a moment.",
@@ -1123,7 +1122,7 @@ dip_it()
 		    else if(i < 65) {	/* remove charges */
 			if ((ob->o_charges -= i) < 0)
 			    ob->o_charges = 0;
-		        ws_know[wh] = TRUE;
+		        know_items[TYP_STICK][wh] = TRUE;
 			if (ob->o_flags & ISBLESSED)
 			    ob->o_flags &= ~ISBLESSED;
 			else
@@ -1135,10 +1134,10 @@ dip_it()
 			msg("Nothing seems to happen.");
 		}
 		when SCROLL:
-		    s_know[wh] = TRUE;
+		    know_items[TYP_SCROLL][wh] = TRUE;
 		    msg("The '%s' scroll unfurls.",s_names[wh]);
 		when POTION:
-		    p_know[wh] = TRUE;
+		    know_items[TYP_POTION][wh] = TRUE;
 		    msg("The %s potion bubbles for a moment.",p_colors[wh]);
 		when RING:
 		    if(i < 50) {	 /* enchant ring */
@@ -1155,7 +1154,7 @@ dip_it()
 			    ob->o_ac -= (rnd(2) + 1);
 			ob->o_flags |= ISCURSED;
 		    }
-		    r_know[wh] = TRUE;
+		    know_items[TYP_RING][wh] = TRUE;
 		    msg("The %s ring vibrates for a moment.",r_stones[wh]);
 		otherwise:
 		    msg("The pool bubbles for a moment.");

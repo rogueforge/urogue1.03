@@ -8,6 +8,9 @@
 #include "rogue.h"
 #include "death.h"
 
+
+int shield_ac = 0;		/* AC bonus via P_SHIELD */
+
 /*
  * quaff - drink a potion (or effect a potion-like spell)
  *
@@ -44,12 +47,6 @@ int flags;
 	    return;
 	}
 
-	/* remove it from the pack */
-
-	rem_pack(obj);
-	discard(item);
-	updpack(TRUE);
-
 	/*
 	 * Calculate the effect it has on the poor guy.
 	 */
@@ -57,6 +54,12 @@ int flags;
 	cursed = obj->o_flags & ISCURSED;
 	blessed = obj->o_flags & ISBLESSED;
 	which = obj->o_which;
+
+	/* remove it from the pack */
+
+	rem_pack(obj);
+	discard(item);
+	updpack();
     }
 
     switch(which) {
@@ -126,7 +129,7 @@ int flags;
 	    }
 	    curp->s_hpt = min(curp->s_hpt+hpt_gain, maxp->s_hpt);
 	    if (is_potion) {	/* Do not bump power or maximums if spell */
-		p_know[P_HEALING] = TRUE;
+		know_items[TYP_POTION][P_HEALING] = TRUE;
 		curp->s_power = min(curp->s_power+power_gain, maxp->s_power);
 		if (maxp->s_hpt == curp->s_hpt)
 		    maxp->s_hpt = curp->s_hpt += roll(1, nsides);
@@ -140,45 +143,49 @@ int flags;
     when P_GAINABIL: {
 	    short ctype;
 
-	    if (blessed) {		/* add to all attributes */
-		add_intelligence(FALSE);
-		add_dexterity(FALSE);
-		add_strength(FALSE);
-		add_wisdom(FALSE);
-		add_const(FALSE);
-	    }
+	    if (!is_potion || pstats.s_arm <= 0)
+		feel_message();
 	    else {
-		if (rnd(100) < 70) 	/* probably change own ability */
-		    ctype = player.t_ctype;
-		else switch (rnd(4)) {
-		    when 0: ctype = C_FIGHTER;
-		    when 1: ctype = C_MAGICIAN;
-		    when 2: ctype = C_CLERIC;
-		    when 3: ctype = C_THIEF;
+		if (blessed) {		/* add to all attributes */
+		    add_intelligence(FALSE);
+		    add_dexterity(FALSE);
+		    add_strength(FALSE);
+		    add_wisdom(FALSE);
+		    add_const(FALSE);
 		}
+		else {
+		    if (rnd(100) < 70) 	/* probably change own ability */
+			ctype = player.t_ctype;
+		    else switch (rnd(4)) {
+			when 0: ctype = C_FIGHTER;
+			when 1: ctype = C_MAGICIAN;
+			when 2: ctype = C_CLERIC;
+			when 3: ctype = C_THIEF;
+		    }
 
-		switch (ctype) {
-		when C_FIGHTER:	add_strength(cursed);
-		when C_PALADIN:	add_strength(cursed);
-		when C_RANGER:	add_strength(cursed);
-		when C_MAGICIAN: add_intelligence(cursed);
-		when C_ILLUSION: add_intelligence(cursed);
-		when C_CLERIC:	add_wisdom(cursed);
-		when C_DRUID:	add_wisdom(cursed);
-		when C_THIEF:	add_dexterity(cursed);
-		when C_ASSASIN:	add_dexterity(cursed);
-		when C_NINJA:	add_dexterity(cursed);
-		otherwise:	msg("You're a strange type!");
+		    switch (ctype) {
+		    when C_FIGHTER:	add_strength(cursed);
+		    when C_PALADIN:	add_strength(cursed);
+		    when C_RANGER:	add_strength(cursed);
+		    when C_MAGICIAN: add_intelligence(cursed);
+		    when C_ILLUSION: add_intelligence(cursed);
+		    when C_CLERIC:	add_wisdom(cursed);
+		    when C_DRUID:	add_wisdom(cursed);
+		    when C_THIEF:	add_dexterity(cursed);
+		    when C_ASSASIN:	add_dexterity(cursed);
+		    when C_NINJA:	add_dexterity(cursed);
+		    otherwise:	msg("You're a strange type!");
+		    }
+
 		}
+		if (rnd(100) < 10)
+		    add_const(cursed);
+		if (rnd(100) < 60)
+		    curp->s_arm += (cursed ? 1 : -1);
 
+		if (!cursed)
+		    know_items[TYP_POTION][P_GAINABIL] = TRUE;
 	    }
-	    if (rnd(100) < 10) 		/* may change constitution also */
-		add_const(cursed);
-	    if (rnd(100) < 60)		/* may change skin ac */
-		curp->s_arm += (cursed ? 1 : -1);
-
-	    if (is_potion && !cursed)
-		p_know[P_GAINABIL] = TRUE;
 	}
     when P_MONSTDET:
 	/*
@@ -208,7 +215,7 @@ int flags;
 	    wait_for(' ');
 	    msg("");
 	    if (is_potion) 
-		p_know[P_MONSTDET] = TRUE;
+		know_items[TYP_POTION][P_MONSTDET] = TRUE;
 	    break;
 	}
 	if (mlist != NULL) {
@@ -219,7 +226,7 @@ int flags;
 	    wait_for(' ');
 	    msg("");
 	    if (is_potion) 
-		p_know[P_MONSTDET] = TRUE;
+		know_items[TYP_POTION][P_MONSTDET] = TRUE;
 	    if (blessed)
 		turn_on(player, BLESSMONS);
 	}
@@ -254,7 +261,7 @@ int flags;
 	    wait_for(' ');
 	    msg("");
 	    if (is_potion) 
-		p_know[P_TREASDET] = TRUE;
+		know_items[TYP_POTION][P_TREASDET] = TRUE;
 	    break;
 	}
 	if (blessed)
@@ -291,7 +298,7 @@ int flags;
 	    if (show) {
 		msg("You sense the presence of magic on this level.");
 		if (is_potion) 
-		    p_know[P_TREASDET] = TRUE;
+		    know_items[TYP_POTION][P_TREASDET] = TRUE;
 		waddstr(cw, morestr);
 		overlay(hw,cw);
 		wrefresh(cw);
@@ -341,12 +348,12 @@ int flags;
 		blessed ? "very " : "");
 	}
     when P_RAISELEVEL:
-	if (cursed) 
+	if (cursed || (!is_potion && pstats.s_lvl > 20))
 	    lower_level(D_POTION);
 	else {
 	    msg("You suddenly feel %smore skillful.",
 		    blessed ? "much " : "");
-	    p_know[P_RAISELEVEL] = TRUE;
+	    know_items[TYP_POTION][P_RAISELEVEL] = TRUE;
 	    raise_level();
 	    if (blessed) 
 		raise_level();
@@ -375,7 +382,7 @@ int flags;
 		    blessed ? "much " : "");
 	    add_haste(blessed);
 	}
-	if (is_potion) p_know[P_HASTE] = TRUE;
+	if (is_potion) know_items[TYP_POTION][P_HASTE] = TRUE;
     when P_RESTORE: {
 	register int i;
 
@@ -713,34 +720,90 @@ int flags;
 	    msg("You feel %shealthier!",
 		blessed ? "much " : "");
 	}
-    when P_SHIELD:	/* deal with blessed/cursed later */
-	if (on(player, HASSHIELD)) {
-	    msg("Your skin stiffens for an instant");
-	    lengthen(unshield, (blessed ? 3 : 1)*PHASEDURATION);
+    when P_SHIELD: {
+	int adjustment = 0;
+
+	if (on(player, HASSHIELD)) {	/* cancel old spell */
+	    extinguish(unshield);
+	    unshield();
+	}
+
+	if (cursed)
+	    adjustment = 2;
+	else if (blessed) {
+	    msg("Your skin feels very rigid.");
+	    switch (player.t_ctype) {
+		when C_FIGHTER:
+		case C_PALADIN:
+		case C_RANGER:
+		    adjustment = -3;
+		otherwise:
+		    adjustment = -5;
+	    }
 	}
 	else {
 	    msg("Your skin hardens.");
-	    turn_on(player, HASSHIELD);
-	    pstats.s_arm -= 2;
-	    fuse(unshield, 0, (blessed ? 3 : 1)*PHASEDURATION, AFTER);
+	    adjustment = -2;
 	}
+
+	pstats.s_arm += adjustment;
+	shield_ac += adjustment;
+	turn_on(player, HASSHIELD);
+	fuse(unshield, 0, (blessed ? 3 : 1)*SEEDURATION, AFTER);
 	if (is_potion) 
-	    p_know[P_SHIELD] = TRUE;
+	    know_items[TYP_POTION][P_SHIELD] = TRUE;
+    }
+    when P_TRUESEE:
+	if (cursed) {
+	    turn_on(player, PERMBLIND);
+	    if (on(player, ISBLIND)) {
+		msg("The gloom around you thickens.");
+		lengthen(sight, SEEDURATION);
+	    }
+	    else {
+		msg("A mantle of darkness falls around you.");
+		turn_on(player, ISBLIND);
+		fuse(sight, 0, SEEDURATION, AFTER);
+		look(FALSE);
+	    }
+	    look(FALSE);
+	}
+	else if (on(player, PERMBLIND)) {
+	    if (blessed || is_potion) {
+		turn_off(player, PERMBLIND);
+		sight();
+		goto let_there_be_light;
+	    }
+	    else
+		nothing_message(ISBLESSED);
+	}
+	else
+let_there_be_light:
+	    if (off(player, CANSEE)) {
+		turn_on(player, CANSEE);
+		msg("You feel especially perceptive.");
+		fuse(untruesee, 0, blessed ? SEEDURATION*3 : SEEDURATION, AFTER);
+		light(&hero);
+	    }
+	    else if (find_slot(unsee) != NULL) {
+		nothing_message(ISNORMAL);
+		lengthen(untruesee, blessed ? SEEDURATION*3 : SEEDURATION);
+	    }
     otherwise:
 	msg("What an odd tasting potion!");
 	return;
     }
     status(FALSE);
     if (is_potion) {
-	if (!cursed && p_know[which] && p_guess[which]) {
-	    free(p_guess[which]);
-	    p_guess[which] = NULL;
+	if (!cursed && know_items[TYP_POTION][which] && guess_items[TYP_POTION][which]) {
+	    free(guess_items[TYP_POTION][which]);
+	    guess_items[TYP_POTION][which] = NULL;
 	}
-	else if (askme && !p_know[which] && p_guess[which] == NULL) {
+	else if (askme && !know_items[TYP_POTION][which] && guess_items[TYP_POTION][which] == NULL) {
 	    msg(terse ? "Call it: " : "What do you want to call it? ");
 	    if (get_str(buf, cw) == NORM) {
-		p_guess[which] = new((unsigned int) strlen(buf) + 1);
-		strcpy(p_guess[which], buf);
+		guess_items[TYP_POTION][which] = new((unsigned int) strlen(buf) + 1);
+		strcpy(guess_items[TYP_POTION][which], buf);
 	    }
 	}
 	food_left += (blessed ? rnd(100) : (cursed ? -rnd(100) : rnd(50) ));
@@ -777,6 +840,10 @@ short who;
 	when C_ASSASIN:		nsides = 6;
 	when C_NINJA:		nsides = 6;
     }
+    fewer = max(1, roll(1,16 - nsides) + int_wis_bonus());
+    pstats.s_power -= fewer;
+    max_stats.s_power -= fewer;
+
     fewer = max(1, roll(1,nsides) + const_bonus());
     pstats.s_hpt -= fewer;
     max_stats.s_hpt -= fewer;

@@ -6,11 +6,11 @@
 struct magic_item things[] = {
     { "potion",	"POTION",	250,	5 },	/* potion */
     { "scroll",	"SCROLL",	260,   30 },	/* scroll */
+    { "ring",	"RING",		 70,	5 },	/* ring */
+    { "stick",	"STICK",	 60,	0 },	/* stick */
     { "food",	"FOOD",		210,	7 },	/* food */
     { "weapon",	"WEAPON",	 60,	0 },	/* weapon */
     { "armor",	"ARMOR",	 90,	0 },	/* armor */
-    { "ring",	"RING",		 70,	5 },	/* ring */
-    { "stick",	"STICK",	 60,	0 },	/* stick */
     { "artifact","ARTIFACT",	  0,    0 },    /* special artifacts */
 };
 int numthings = NUMTHINGS;
@@ -21,26 +21,26 @@ struct magic_item s_magic[] = {
     { "light",			"WATT",		 55,   50, 25, 15},
     { "hold monster",		"HOLD",		 25,  200, 33, 10},
     { "sleep",			"SLEEP",	 13,   50, 20, 10},
-    { "enchantment",		"ENCHANT",	110,  130, 15, 10},
+    { "enchantment",		"ENCHANT",	110,  400, 15, 10},
     { "identify",		"ID",		175,  100,  0, 15},
     { "scare monster",		"SCARE",	 35,  250, 27, 21},
     { "gold detection",		"DGOLD",	 15,  110, 20, 20},
     { "teleportation",		"TELEP",	 50,  165, 10, 20},
     { "create monster",		"CREATE",	 25,   75, 30,  0},
-    { "remove curse",		"REM",		 60,  120,  5, 15},
-    { "petrification",		"PET",		 10,  185,  0,  0},
+    { "remove curse",		"REM",		 60,  220,  5, 15},
+    { "petrification",		"PET",		 10,  285,  0,  0},
     { "genocide",		"GEN",		 10, 1200,  0,  0},
     { "cure disease",		"CURING",	 70,  160,  0,  0},
     { "acquirement",		"MAKE",		  5, 2500, 50, 15},
-    { "protection",		"PROT",		 40,  150,  0,  0},
+    { "protection",		"PROT",		 40, 1150,  0,  0},
     { "nothing",		"NOTHING",	 60,   50,  0,  0},
-    { "magic hitting",		"SILVER",	 10,  875, 25, 15},
-    { "ownership",		"OWN",		 10,  550, 25, 15},
+    { "magic hitting",		"SILVER",	 10, 1875, 25, 15},
+    { "ownership",		"OWN",		 10, 1550, 25, 15},
     { "food detection",		"DFOOD",	 40,  150, 25, 15},
-    { "electrification",	"ELECTRIFY",	 20,  450,  0,  0},
+    { "electrification",	"ELECTRIFY",	 20, 1450,  0,  0},
     { "charm monster",		"CHARM",	 10, 1500, 25, 15},
     { "summon monster",		"SUMMON",	 10, 1500, 25, 15},
-    { "gaze reflection",	"REFLECT",	 35,  200, 25, 15},
+    { "gaze reflection",	"REFLECT",	 35,  400, 25, 15},
     { "summon familiar",	"SUMFAM",	  0, 3000,  0,  0},
     { "fear",			"FEAR",		 12,  700, 20, 10},
     { "missile protection",	"MSHIELD",	  0, 1300, 20, 10},
@@ -50,80 +50,82 @@ int maxscrolls = MAXSCROLLS;
 
 struct magic_item p_magic[] = {
     { "clear thought",		"CLEAR",	 90, 380, 27, 15 },
-    { "gain ability",		"GAINABIL",	 40, 250, 15, 15 },
-    { "see invisible",		"SEEINVIS",	 64, 170, 25, 15 },
-    { "healing",		"HEAL",	120, 130, 27, 27 },
+    { "gain ability",		"GAINABIL",	 40,1250, 15, 15 },
+    { "see invisible",		"SEEINVIS",	  0, 170, 25, 15 },
+    { "healing",		"HEAL",	120, 330, 27, 27 },
     { "monster detection",	"DMON",	 60, 120, 15, 20 },
     { "magic detection",	"DMAG",	 60, 105, 20, 15 },
-    { "raise level",		"RAISE",	  1, 900, 11, 10 },
-    { "haste self",		"HASTE",	140, 200, 30,  5 },
+    { "raise level",		"RAISE",	  1,1900, 11, 10 },
+    { "haste self",		"HASTE",	140, 300, 30,  5 },
     { "restore abilities",	"RESTORE",	130, 140,  0,  0 },
-    { "phasing",		"PHASE",	 45, 240, 21, 20 },
-    { "invisibility",		"INVIS",	 30, 200,  0, 15 },
+    { "phasing",		"PHASE",	 45, 340, 21, 20 },
+    { "invisibility",		"INVIS",	 30, 300,  0, 15 },
     { "acute scent",		"SMELL",	 30, 200, 20, 15 },
     { "acute hearing",		"HEAR",		 30, 200, 20, 15 },
     { "super heroism",		"SUPER",	 10, 800, 20, 15 },
     { "disguise",		"DISGUISE",	 30, 500,  0, 15 },
-    { "fire resistance",	"NOFIRE",	 30, 250, 20, 15 },
-    { "cold resistance",	"NOCOLD",	 30, 200, 20, 15 },
+    { "fire resistance",	"NOFIRE",	 30, 350, 20, 15 },
+    { "cold resistance",	"NOCOLD",	 30, 300, 20, 15 },
     { "continuous breathing",	"BREATHE",	 15, 200, 20, 15 },
     { "flying",			"FLY",		 30, 300, 20, 15 },
-    { "regeneration",	 	"REGEN",	 15, 200, 20, 15 },
+    { "regeneration",	 	"REGEN",	 15, 500, 20, 15 },
     { "shield",			"SHIELD",	  0,  500, 20, 10},
+    { "true sight",		"TRUESEE",	 64, 570, 25, 15 },
 };
 int maxpotions = MAXPOTIONS;
 
 struct magic_item r_magic[] = {
-    { "protection",		 "",		70, 200, 33, 25 },
-    { "add strength",		 "",		65, 200, 33, 25 },
-    { "sustain ability",	 "",		40, 480, 0, 0 },
-    { "searching",		 "",		65, 250, 0, 0 },
-    { "true sight",		 "",		40, 175, 0, 0 },
-    { "alertness",		 "",		40, 190, 0, 0 },
+    { "protection",		 "",		70, 500, 33, 25 },
+    { "add strength",		 "",		65, 300, 33, 25 },
+    { "sustain ability",	 "",		40, 480, 10, 0 },
+    { "searching",		 "",		65, 250, 10, 0 },
+    { "see invisible",		 "",		30, 175, 10, 0 },
+    { "alertness",		 "",		40, 190, 10, 0 },
     { "aggravate monster",	 "",		35, 100, 100, 0 },
     { "dexterity",		 "",		65, 220, 33, 25 },
-    { "increase damage",	 "",		65, 220, 33, 25 },
-    { "regeneration",		 "",		35, 260, 0, 0 },
+    { "increase damage",	 "",		65, 320, 33, 25 },
+    { "regeneration",		 "",		35, 860, 10, 0 },
     { "slow digestion",		 "",		40, 340, 15, 10 },
     { "teleportation",		 "",		35, 100, 100, 0 },
-    { "stealth",		 "",		50, 100, 0, 0 },
+    { "stealth",		 "",		50, 700, 10, 0 },
     { "add intelligence",	 "",		60, 540, 33, 25 },
-    { "increase wisdom",	 "",		60, 220, 33, 25 },
-    { "sustain health",		 "",		60, 250, 0,  0 },
-    { "vampiric regeneration",	 "",		20, 800, 25, 10 },
-    { "illumination",		 "",		20, 300, 0, 0 },
+    { "increase wisdom",	 "",		60, 540, 33, 25 },
+    { "sustain health",		 "",		60, 250, 10, 0 },
+    { "vampiric regeneration",	 "",		20, 900, 25, 10 },
+    { "illumination",		 "",		20, 300, 10, 0 },
     { "delusion",		 "",		20, 100, 75, 0 },
-    { "carrying",		 "",		20, 200, 30, 0 },
-    { "adornment",		 "",		15, 10000, 0, 0 },
-    { "levitation",		 "",		20, 450, 0, 0 },
-    { "fire resistance",	 "",		10, 250, 0, 0 },
-    { "cold resistance",	 "",		10, 250, 0, 0 },
-    { "lightning resistance",	 "",		10, 250, 0, 0 },
-    { "resurrection",		 "",		 1, 8000, 0, 0 },
-    { "breathing",		 "",		10, 250, 0, 0 },
-    { "free action",		 "",		10, 225, 0, 0 },
-    { "wizardry",		 "",		 2,1950, 0, 0 },
-    { "piety",			 "",		 2,1950, 0, 0 },
-    { "teleport control",	 "",		 5, 850, 0, 0 },
+    { "carrying",		 "",		20, 400, 30, 30 },
+    { "adornment",		 "",		15, 10000, 10, 0 },
+    { "levitation",		 "",		20, 450, 30, 0 },
+    { "fire resistance",	 "",		10, 750, 10, 0 },
+    { "cold resistance",	 "",		10, 650, 10, 0 },
+    { "lightning resistance",	 "",		10, 750, 10, 0 },
+    { "resurrection",		 "",		 1, 8000, 10, 0 },
+    { "breathing",		 "",		10, 250, 10, 0 },
+    { "free action",		 "",		10, 225, 10, 0 },
+    { "wizardry",		 "",		 2,1950, 10, 0 },
+    { "piety",			 "",		 2,1950, 10, 0 },
+    { "teleport control",	 "",		 5, 850, 10, 0 },
+    { "true sight",		 "",		10, 775, 10, 0 },
 };
 int maxrings = MAXRINGS;
 
 struct magic_item ws_magic[] = {
-    { "light",			 "LIGHT",	90, 120, 20, 20},
-    { "striking",		 "HIT",		58, 115,  0,  0},
-    { "lightning",		 "BOLT",	25, 200,  0,  0},
-    { "fire",			 "FIRE",	25, 200,  0,  0},
-    { "cold",			 "COLD",	30, 200,  0,  0},
+    { "light",			 "LIGHT",	90, 150, 20, 20},
+    { "striking",		 "HIT",		58, 400,  0,  0},
+    { "lightning",		 "BOLT",	25, 800,  0,  0},
+    { "fire",			 "FIRE",	25, 600,  0,  0},
+    { "cold",			 "COLD",	30, 600,  0,  0},
     { "polymorph",		 "POLY",	90, 210,  0,  0},
-    { "magic missile",		 "MLE",		90, 170,  0,  0},
+    { "magic missile",		 "MLE",		90, 500,  0,  0},
     { "slow monster",		 "SLOW",	76, 320, 25, 20},
-    { "drain life",		 "DRAIN",	90, 210, 20,  0},
-    { "charging",		 "CHARGE",	70, 100,  0,  0},
-    { "teleport monster",	 "RANDOM",	90, 140, 25, 20},
-    { "cancellation",		 "CANCEL",	38, 130,  0,  0},
-    { "confuse monster",   	 "CONFMON",	50, 100,  0,  0},
-    { "disintegration",	  	 "KILL-O-ZAP",	10, 550, 33,  0},
-    { "anti-matter",		 "BLACKHOLE",	30, 180,  0,  0},
+    { "drain life",		 "DRAIN",	90, 310, 20,  0},
+    { "charging",		 "CHARGE",	70,1100,  0,  0},
+    { "teleport monster",	 "RANDOM",	90, 240, 25, 20},
+    { "cancellation",		 "CANCEL",	38, 230,  0,  0},
+    { "confuse monster",   	 "CONFMON",	50, 200,  0,  0},
+    { "disintegration",	  	 "KILL-O-ZAP",	10,1550, 33,  0},
+    { "anti-matter",		 "BLACKHOLE",	30, 980,  0,  0},
     { "paralyze monster",	 "PARALYZE",	38, 300,  0,  0},
     { "heal monster",		 "XENOHEAL",	30, 200, 40, 10},
     { "nothing",		 "NOTHING",	30, 100,  0,  0},
@@ -263,15 +265,7 @@ char *s_names[MAXSCROLLS];		/* Names of the scrolls */
 char *p_colors[MAXPOTIONS];		/* Colors of the potions */
 char *r_stones[MAXRINGS];		/* Stone settings of the rings */
 char *ws_made[MAXSTICKS];		/* What sticks are made of */
-
-char *s_guess[MAXSCROLLS];		/* Players guess at what scroll is */
-char *p_guess[MAXPOTIONS];		/* Players guess at what potion is */
-char *r_guess[MAXRINGS];		/* Players guess at what ring is */
-char *ws_guess[MAXSTICKS];		/* Players guess at what wand is */
-
 char *ws_type[MAXSTICKS];		/* Is it a wand or a staff */
 
-bool s_know[MAXSCROLLS];		/* Does he know what a scroll does */
-bool p_know[MAXPOTIONS];		/* Does he know what a potion does */
-bool r_know[MAXRINGS];			/* Does he know what a ring does */
-bool ws_know[MAXSTICKS];		/* Does he know what a stick does */
+char *guess_items[MAXMAGICTYPES][MAXMAGICITEMS]; /* Players guess at what magic is */
+bool know_items[MAXMAGICTYPES][MAXMAGICITEMS];	/* Does he know what a magic item does */

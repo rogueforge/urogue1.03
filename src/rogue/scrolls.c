@@ -51,12 +51,6 @@ int flags;
 	    return;
 	}
 
-	/* remove it from the pack */
-
-	rem_pack(obj);
-	discard(item);
-	updpack(TRUE);
-
 	/*
 	 * Calculate the effect it has on the poor guy.
 	 */
@@ -64,6 +58,12 @@ int flags;
 	blessed = obj->o_flags & ISBLESSED;
 	flags = obj->o_flags;
 	which = obj->o_which;
+
+	/* remove it from the pack */
+
+	rem_pack(obj);
+	discard(item);
+	updpack();
     }
 
     switch(which) {
@@ -88,12 +88,12 @@ int flags;
 		    infest_dam = 0;
 		}
 		if (is_scroll)
-	    	    s_know[S_CURING] = TRUE;
+	    	    know_items[TYP_SCROLL][S_CURING] = TRUE;
 	    }
 	    else nothing_message(flags);
 	when S_LIGHT:
 	    if (blue_light(flags) && is_scroll)
-		s_know[S_LIGHT] = TRUE;
+		know_items[TYP_SCROLL][S_LIGHT] = TRUE;
 	when S_HOLD:
 	    if (cursed) {
 		/*
@@ -224,12 +224,12 @@ int flags;
 		/*
 		 * Identify, let the rogue figure something out
 		 */
-		if (is_scroll && s_know[S_IDENTIFY] != TRUE)
+		if (is_scroll && know_items[TYP_SCROLL][S_IDENTIFY] != TRUE)
 		    msg("This scroll is an identify scroll.");
 		whatis((struct linked_list *) NULL);
 	    }
 	    if (is_scroll)
-	        s_know[S_IDENTIFY] = TRUE;
+	        know_items[TYP_SCROLL][S_IDENTIFY] = TRUE;
 	when S_MAP:
 	    /*
 	     * Scroll of magic mapping.
@@ -240,12 +240,12 @@ int flags;
 		light(&hero);
 		status(TRUE);
 		if (is_scroll)
-		    s_know[S_MAP] = TRUE;
+		    know_items[TYP_SCROLL][S_MAP] = TRUE;
 		break;
 	    }
-	    if (is_scroll && s_know[S_MAP] != TRUE) {
+	    if (is_scroll && know_items[TYP_SCROLL][S_MAP] != TRUE) {
 		msg("Oh! This scroll has a map on it!!");
-		s_know[S_MAP] = TRUE;
+		know_items[TYP_SCROLL][S_MAP] = TRUE;
 	    }
 	    if (blessed)
 		turn_on(player, BLESSMAP);
@@ -320,7 +320,7 @@ int flags;
 		}
 		overlay(hw, cw);
 		if (is_scroll) 
-		    s_know[S_GFIND] = TRUE;
+		    know_items[TYP_SCROLL][S_GFIND] = TRUE;
 		break;
 	    }
 	    if (blessed)
@@ -340,7 +340,7 @@ int flags;
 		}
 		if (gtotal) {
 		    if (is_scroll) 
-			s_know[S_GFIND] = TRUE;
+			know_items[TYP_SCROLL][S_GFIND] = TRUE;
 		    msg("You begin to feel greedy and you sense gold.");
 		    overlay(hw,cw);
 		    break;
@@ -375,7 +375,7 @@ int flags;
 		rm = teleport();
 	    }
 	    if (is_scroll)
-	        s_know[S_SELFTELEP] = TRUE;
+	        know_items[TYP_SCROLL][S_SELFTELEP] = TRUE;
 	    if (off(player, ISCLEAR)) {
 	        if (on(player, ISHUH))
 		    lengthen(unconfuse, rnd(4)+4);
@@ -437,7 +437,7 @@ int flags;
 		    nobj = OBJPTR(nitem);
 		    msg("Removed the curse from %s.",inv_name(nobj,TRUE));
 		    nobj->o_flags &= ~ISCURSED;
-	    	    s_know[S_REMOVECURSE] = TRUE;
+	    	    know_items[TYP_SCROLL][S_REMOVECURSE] = TRUE;
 		}
 	    }
 	when S_PETRIFY:
@@ -510,12 +510,12 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 	    wait_for(' ');
 	    msg("");
 	    genocide(flags);
-	    if (is_scroll) s_know[S_GENOCIDE] = TRUE;
+	    if (is_scroll) know_items[TYP_SCROLL][S_GENOCIDE] = TRUE;
 	when S_PROTECT: 
 	{
 	    struct linked_list *ll;
 	    struct object *lb;
-	    if (is_scroll && s_know[S_PROTECT] == FALSE)
+	    if (is_scroll && know_items[TYP_SCROLL][S_PROTECT] == FALSE)
 	        msg("You are granted the power of protection.");
 	    if ((ll = get_item("protect",0)) != NULL) {
 		lb = OBJPTR(ll);
@@ -523,32 +523,37 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		mpos = 0;
 		msg("Protected %s.", inv_name(lb,TRUE));
 	    }
-	    s_know[S_PROTECT] = TRUE;
+	    know_items[TYP_SCROLL][S_PROTECT] = TRUE;
 	}
 	when S_MAKEITEMEM:
-	    s_know[S_MAKEITEMEM] = TRUE;
-	    msg("You have been endowed with the power of creation.");
-	    if (blessed)
-		create_obj(0, 0, ISNORMAL);
+	    if (!is_scroll || rnd(luck + 10))
+		feel_message();
 	    else {
-		char item;
+		char itemtype;
 
-		switch (rnd(6)) {
-		    when 0: item = RING;
-		    when 1: item = POTION;
-		    when 2: item = SCROLL;
-		    when 3: item = ARMOR;
-		    when 4: item = WEAPON;
-		    when 5: item = STICK;
-		}
-		create_obj(item, 0, flags);
+		if (is_scroll)
+		    know_items[TYP_SCROLL][S_MAKEITEMEM] = TRUE;
+		msg("You have been endowed with the power of creation.");
+		if (blessed)
+		    itemtype = '\0';
+		else
+		    switch (rnd(6)) {
+			when 0: itemtype = RING;
+			when 1: itemtype = POTION;
+			when 2: itemtype = SCROLL;
+			when 3: itemtype = ARMOR;
+			when 4: itemtype = WEAPON;
+			when 5: itemtype = STICK;
+		    }
+		flags |= SCR_MAGIC;
+		buy_it(itemtype, flags);
 	    }
 	when S_ENCHANT: 
 	{
 	    struct linked_list *ll;
 	    struct object *lb;
 	    int howmuch, flags;
-	    if (is_scroll && s_know[S_ENCHANT] == FALSE) {
+	    if (is_scroll && know_items[TYP_SCROLL][S_ENCHANT] == FALSE) {
 		msg("You are granted the power of enchantment.");
 		msg("You may enchant anything(weapon,ring,armor,scroll,potion)");
 	    }
@@ -602,7 +607,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 				when R_ADDWISDOM:
 				    pstats.s_wisdom += howmuch;
 				when R_CARRYING:
-				    updpack(FALSE);
+				    updpack();
 				default:
 				    ;
 			     }
@@ -660,7 +665,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		if (lb != NULL) 
 		    msg("Enchanted %s.", inv_name(lb,TRUE));
 	    }
-	    s_know[S_ENCHANT] = TRUE;
+	    know_items[TYP_SCROLL][S_ENCHANT] = TRUE;
 	}
 	when S_NOTHING:
 	    msg("This scroll is blank.");
@@ -668,7 +673,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 	{
 	    struct linked_list *ll;
 	    struct object *lb;
-	    if (is_scroll && s_know[S_SILVER] == FALSE)
+	    if (is_scroll && know_items[TYP_SCROLL][S_SILVER] == FALSE)
 	        msg("You are granted the power of magic hitting.");
 	    if ((ll = get_item("annoint",WEAPON)) != NULL) {
 		lb = OBJPTR(ll);
@@ -693,12 +698,12 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		    msg("Your weapon has turned to silver.");
 		}
 	    }
-	    s_know[S_SILVER] = TRUE;
+	    know_items[TYP_SCROLL][S_SILVER] = TRUE;
 	}
 	when S_OWNERSHIP: {
 	    struct linked_list *ll;
 	    struct object *lb;
-	    if (is_scroll && s_know[S_OWNERSHIP] == FALSE)
+	    if (is_scroll && know_items[TYP_SCROLL][S_OWNERSHIP] == FALSE)
 	        msg("You are granted the power of ownership.");
 	    if ((ll = get_item("claim",0)) != NULL) {
 		lb = OBJPTR(ll);
@@ -726,7 +731,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		    msg("The gods look upon you.");
 		}
 	    }
-	    s_know[S_OWNERSHIP] = TRUE;
+	    know_items[TYP_SCROLL][S_OWNERSHIP] = TRUE;
 	}
 	when S_FOODDET:
 	    /*
@@ -747,7 +752,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		}
 		overlay(hw, cw);
 		if (is_scroll) 
-		    s_know[S_FOODDET] = TRUE;
+		    know_items[TYP_SCROLL][S_FOODDET] = TRUE;
 		break;
 	    }
 	    if (blessed)
@@ -786,7 +791,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		}
 		if (fcount) {
 		    if (is_scroll) 
-			s_know[S_FOODDET] = TRUE;
+			know_items[TYP_SCROLL][S_FOODDET] = TRUE;
 		    if (same_room)
 			msg("FOOOOD!!");
 		    else
@@ -811,7 +816,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		light(&hero);
 	    }
 	    if (is_scroll) 
-		s_know[S_ELECTRIFY] = TRUE;
+		know_items[TYP_SCROLL][S_ELECTRIFY] = TRUE;
 	when S_CHARM:
 	    /*
 	     * Beauty, brains and experience make a person charming.
@@ -976,7 +981,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		fuse(unshield, 0, (blessed ? 3 : 1)*HEROTIME, AFTER);
 	    }
 	    if (is_scroll) 
-		s_know[S_MSHIELD] = TRUE;
+		know_items[TYP_SCROLL][S_MSHIELD] = TRUE;
 	otherwise:
 	    msg("What a puzzling scroll!");
 	    return;
@@ -986,15 +991,15 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
     status(FALSE);
 
     if (is_scroll) {
-	if (s_know[which] && s_guess[which]) {
-	    free(s_guess[which]);
-	    s_guess[which] = NULL;
+	if (know_items[TYP_SCROLL][which] && guess_items[TYP_SCROLL][which]) {
+	    free(guess_items[TYP_SCROLL][which]);
+	    guess_items[TYP_SCROLL][which] = NULL;
 	}
-	else if (askme && !s_know[which] && s_guess[which] == NULL) {
+	else if (askme && !know_items[TYP_SCROLL][which] && guess_items[TYP_SCROLL][which] == NULL) {
 	    msg(terse ? "Call it: " : "What do you want to call it? ");
 	    if (get_str(buf, cw) == NORM) {
-		s_guess[which] = new(strlen(buf) + 1);
-		strcpy(s_guess[which], buf);
+		guess_items[TYP_SCROLL][which] = new(strlen(buf) + 1);
+		strcpy(guess_items[TYP_SCROLL][which], buf);
 	    }
 	}
     }

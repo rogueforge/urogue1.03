@@ -60,7 +60,7 @@ register struct thing *tp;
 	else 
 	    obj->o_flags |= ISCURSED;
     }
-    updpack (FALSE);
+    updpack ();
     do_motion(obj, ydelta, xdelta, tp);
 
    /*

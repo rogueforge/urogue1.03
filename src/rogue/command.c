@@ -294,7 +294,7 @@ command()
 			mpos = 0;
 			ch = readchar();
 			switch(ch) {
-			when 'c' : create_obj(0, 0, ISNORMAL);
+			when 'c' : buy_it('\0', ISNORMAL);
 			when 'i' : inventory(lvl_obj, 0);
 			when 'I' : whatis((struct linked_list *) NULL);
 			when 'r' : msg("rnd(4)%d, rnd(40)%d, rnd(100)%d",
@@ -307,7 +307,6 @@ command()
 			when 's' : activity();
 			when 'e' : {
 			    wizard = FALSE;
-			    trader = 0;
 			    msg("Not wizard any more.");
 			}
 			when 'v' :
@@ -390,10 +389,10 @@ command()
 			    item = spec_item(STICK, WS_DISINTEGRATE, 10000, 0);
 			    obj = OBJPTR(item);
 			    obj->o_flags |= ISKNOW;
-			    ws_know[WS_DISINTEGRATE] = TRUE;
-			    if (ws_guess[WS_DISINTEGRATE]) {
-				free(ws_guess[WS_DISINTEGRATE]);
-				ws_guess[WS_DISINTEGRATE] = NULL;
+			    know_items[TYP_STICK][WS_DISINTEGRATE] = TRUE;
+			    if (guess_items[TYP_STICK][WS_DISINTEGRATE]) {
+				free(guess_items[TYP_STICK][WS_DISINTEGRATE]);
+				guess_items[TYP_STICK][WS_DISINTEGRATE] = NULL;
 			    }
 			    add_pack(item, TRUE);
 
@@ -414,10 +413,10 @@ command()
 				item = spec_item(RING, R_SEARCH, 0, 0);
 				obj = OBJPTR(item);
 				obj->o_flags |= ISKNOW;
-				r_know[R_SEARCH] = TRUE;
-				if (r_guess[R_SEARCH]) {
-				    free(r_guess[R_SEARCH]);
-				    r_guess[R_SEARCH] = NULL;
+				know_items[TYP_RING][R_SEARCH] = TRUE;
+				if (guess_items[TYP_RING][R_SEARCH]) {
+				    free(guess_items[TYP_RING][R_SEARCH]);
+				    guess_items[TYP_RING][R_SEARCH] = NULL;
 				}
 				add_pack(item, TRUE);
 			    }
@@ -425,10 +424,10 @@ command()
 				item = spec_item(RING, R_LIGHT, 0, 0);
 				obj = OBJPTR(item);
 				obj->o_flags |= ISKNOW;
-				r_know[R_LIGHT] = TRUE;
-				if (r_guess[R_LIGHT]) {
-				    free(r_guess[R_LIGHT]);
-				    r_guess[R_LIGHT] = NULL;
+				know_items[TYP_RING][R_LIGHT] = TRUE;
+				if (guess_items[TYP_RING][R_LIGHT]) {
+				    free(guess_items[TYP_RING][R_LIGHT]);
+				    guess_items[TYP_RING][R_LIGHT] = NULL;
 				}
 				add_pack(item, TRUE);
 			    }
@@ -436,20 +435,20 @@ command()
 				item = spec_item(RING, R_WIZARD, 0, 0);
 				obj = OBJPTR(item);
 				obj->o_flags |= ISKNOW;
-				r_know[R_WIZARD] = TRUE;
-				if (r_guess[R_WIZARD]) {
-				    free(r_guess[R_WIZARD]);
-				    r_guess[R_WIZARD] = NULL;
+				know_items[TYP_RING][R_WIZARD] = TRUE;
+				if (guess_items[TYP_RING][R_WIZARD]) {
+				    free(guess_items[TYP_RING][R_WIZARD]);
+				    guess_items[TYP_RING][R_WIZARD] = NULL;
 				}
 				add_pack(item, TRUE);
 			    }
 			    item = spec_item(SCROLL, S_ELECTRIFY, 0, 0);
 			    obj = OBJPTR(item);
 			    obj->o_flags |= ISKNOW;
-			    s_know[S_ELECTRIFY] = TRUE;
-			    if (s_guess[S_ELECTRIFY]) {
-				free(s_guess[S_ELECTRIFY]);
-				s_guess[S_ELECTRIFY] = NULL;
+			    know_items[TYP_SCROLL][S_ELECTRIFY] = TRUE;
+			    if (guess_items[TYP_SCROLL][S_ELECTRIFY]) {
+				free(guess_items[TYP_SCROLL][S_ELECTRIFY]);
+				guess_items[TYP_SCROLL][S_ELECTRIFY] = NULL;
 			    }
 			    add_pack(item, TRUE);
 
@@ -460,7 +459,7 @@ command()
 			    quaff(&player, P_SEEINVIS, ISBLESSED);
 			    quaff(&player, P_PHASE, ISBLESSED);
 			    purse += 50000;
-			    updpack(TRUE);
+			    updpack();
 			}
 			when ESCAPE :	/* Escape */
 			    door_stop = FALSE;
@@ -473,18 +472,6 @@ command()
 		    }
 		when ESCAPE :	/* Escape */
 			after = doescape();
-		when '#':
-		    if (levtype == POSTLEV)		/* buy something */
-			buy_it();
-		    after = FALSE;
-		when '$':
-		    if (levtype == POSTLEV)		/* price something */
-			price_it();
-		    after = FALSE;
-		when '%':
-		    if (levtype == POSTLEV)		/* sell something */
-			sell_it();
-		    after = FALSE;
 		otherwise :
 		    after = FALSE;
 		    msg("Illegal command '%s'.", unctrl(ch));
@@ -520,6 +507,8 @@ command()
      * Kick off the rest of the daemons and fuses
      */
     if (an_after) {
+	register int i;
+
 	look(FALSE);
 	do_daemons(AFTER);
 	do_fuses(AFTER);
@@ -529,7 +518,7 @@ command()
 	    player.t_ctype == C_NINJA || player.t_ctype == C_RANGER) &&
 	    (rnd(100) < (2*pstats.s_dext + 5*pstats.s_lvl))) 
 		    search(TRUE);
-	if (is_wearing(R_SEARCH)) 
+	for (i = 0; i <= ring_value(R_SEARCH); i++)
 	    search(FALSE);
 	if (is_wearing(R_TELEPORT) && rnd(100) < 2) {
 	    teleport();
@@ -900,7 +889,7 @@ d_level()
 	msg("You can't!  You're floating in the air.");
 	return;
     }
-    if (rnd(pstats.s_dext) < 4*(2-hitweight()+(on(player, STUMBLER) ? 4 : 0))) {
+    if (rnd(pstats.s_dext) < 3*(2-hitweight()+(on(player, STUMBLER) ? 4 : 0))) {
 	msg("You trip and fall down the stairs.");
 	if ((pstats.s_hpt -= roll(1,10)) <= 0) {
 	    msg("You break your neck and die.");
@@ -1023,8 +1012,9 @@ call(mark)
 bool mark;
 {
     register struct object *obj;
-    register char **guess, *elsewise;
-    register bool *know;
+    register char *elsewise;
+    int item_type = numthings;
+    char **item_color;
 
     int bff_callable(), bff_markable();
     object *get_object();
@@ -1036,33 +1026,27 @@ bool mark;
 	return;
     switch (obj->o_type) {
 	when RING:
-	    guess = r_guess;
-	    know = r_know;
-	    elsewise = (r_guess[obj->o_which] != NULL ?
-			r_guess[obj->o_which] : r_stones[obj->o_which]);
+	    item_type = TYP_RING;
+	    item_color = r_stones;
 	when POTION:
-	    guess = p_guess;
-	    know = p_know;
-	    elsewise = (p_guess[obj->o_which] != NULL ?
-			p_guess[obj->o_which] : p_colors[obj->o_which]);
+	    item_type = TYP_POTION;
+	    item_color = p_colors;
 	when SCROLL:
-	    guess = s_guess;
-	    know = s_know;
-	    elsewise = (s_guess[obj->o_which] != NULL ?
-			s_guess[obj->o_which] : s_names[obj->o_which]);
+	    item_type = TYP_SCROLL;
+	    item_color = s_names;
 	when STICK:
-	    guess = ws_guess;
-	    know = ws_know;
-	    elsewise = (ws_guess[obj->o_which] != NULL ?
-			ws_guess[obj->o_which] : ws_made[obj->o_which]);
+	    item_type = TYP_STICK;
+	    item_color = ws_made;
 	otherwise:
 	    if (!mark) {
 		msg("You can't call that anything.");
 		return;
 	    }
-	    else know = (bool *) 0;
     }
-    if (know && know[obj->o_which] && !mark) {
+    elsewise = (guess_items[item_type][obj->o_which] != NULL ?
+		guess_items[item_type][obj->o_which] :
+		item_color[obj->o_which]);
+    if (know_items[item_type][obj->o_which] && !mark) {
 	msg("That has already been identified.");
 	return;
     }
@@ -1078,8 +1062,8 @@ bool mark;
 	addmsg(terse ? "C" : "Was c");
 	msg("alled \"%s\".", elsewise);
 	msg(terse ? "Call it: " : "What do you want to call it? ");
-	if (guess[obj->o_which] != NULL)
-	    free(guess[obj->o_which]);
+	if (guess_items[item_type][obj->o_which] != NULL)
+	    free(guess_items[item_type][obj->o_which]);
 	strcpy(prbuf, elsewise);
     }
     if (get_str(prbuf, cw) == NORM) {
@@ -1088,8 +1072,9 @@ bool mark;
 	    obj->o_mark[MARKLEN-1] = '\0';
 	}
 	else {
-	    guess[obj->o_which] = new((unsigned int) strlen(prbuf) + 1);
-	    strcpy(guess[obj->o_which], prbuf);
+	    guess_items[item_type][obj->o_which] =
+		new((unsigned int) strlen(prbuf) + 1);
+	    strcpy(guess_items[item_type][obj->o_which], prbuf);
 	}
     }
 }
