@@ -1439,4 +1439,12 @@
 5)	hearing monsters is more likely
 6)	tidied up debug and regular messages somewhat
 
+1.03 Alpha, Sep 8, 86
+1)	move.c call to save_throw indirection fixed
+2)	environment reset when restoring a game to get proper options 
+3)	clear proper window when saving a game
+4)	initialize variable for determining when monster casts spells
+5)	fix up passing pointer to incant()
+	above by Mike Laman
+
 -------	End of File ------

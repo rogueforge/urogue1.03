@@ -1200,7 +1200,7 @@ int flags;
     register struct stats *maxp = &(zapper->maxstats);
     bool blessed = flags & ISBLESSED;
     bool cursed  = flags & ISCURSED;
-    bool shoot;
+    bool shoot = FALSE;
     int damage;
     int ndice, nsides;
     char ch;

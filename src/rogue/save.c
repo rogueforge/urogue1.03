@@ -55,8 +55,9 @@ save_game()
 	}
 	strcpy(file_name, buf);
 gotfile:
-	clear();
-	refresh();
+	wclear(hw);
+	wmove(hw, LINES-1, 0);
+	wrefresh(hw);
 	if ((savefd = creat(file_name, 0400)) == -1)
 	    msg(sys_errlist[errno]);	/* fake perror() */
     } while (savefd == -1);
@@ -203,6 +204,8 @@ char **envp;
 #endif
 
     environ = envp;
+    if ((sp = getenv(OPTIONS)) != NULL)
+	parse_opts(sp);
 #if defined(USGV5)
     if (isatty(2)) {
 #else
