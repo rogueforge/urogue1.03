@@ -1,5 +1,5 @@
 /*
- * Last Modified: 06/05/86
+ * Last Modified: 11/03/86
  */
 #include <stdio.h>
 #include "rogue.h"
@@ -83,7 +83,7 @@ usage()
 	fprintf(stderr, "\t-A\tPrint all of the above (except monsters).\n");
 }
 
-extern struct init_armor armors[MAXARMORS];
+extern struct init_armor armors[];
 
 pr_armour()
 {
@@ -91,7 +91,7 @@ pr_armour()
 
     printf("%25s   %%  AC Weight Worth\n", "Armor");
 
-    for (i=0; i<MAXARMORS; i++) {
+    for (i=0; i<maxarmors; i++) {
 
 		printf("%25.25s ", armors[i].a_name);
 		printf("%3d ", armors[i].a_prob);
@@ -111,7 +111,7 @@ pr_scrolls()
     float q;
 
     printf("%25s   %%   Curse Bless Worth\n", "Scrolls");
-    for (i=0; i<MAXSCROLLS; i++) {
+    for (i=0; i<maxscrolls; i++) {
 
 		printf("%25.25s  ", s_magic[i].mi_name);
 		q = s_magic[i].mi_prob  / 10.0;
@@ -132,7 +132,7 @@ pr_potions()
     float q;
 
     printf("%25s   %%   Curse Bless Worth\n", "Potions");
-    for (i=0; i<MAXPOTIONS; i++) {
+    for (i=0; i<maxpotions; i++) {
 
 		printf("%25.25s  ", p_magic[i].mi_name);
 		q = p_magic[i].mi_prob  / 10.0;
@@ -153,7 +153,7 @@ pr_rings()
     float q;
 
     printf("%25s   %%   Curse Bless Worth\n", "Rings");
-    for (i=0; i<MAXRINGS; i++) {
+    for (i=0; i<maxrings; i++) {
 
 		printf("%25.25s  ", r_magic[i].mi_name);
 		q = r_magic[i].mi_prob  / 10.0;
@@ -174,7 +174,7 @@ pr_food()
     float q;
 
     printf("%25s   %%   Curse Bless Worth\n", "Food");
-    for (i=0; i<MAXFOODS; i++) {
+    for (i=0; i<maxfoods; i++) {
 
 		printf("%25.25s  ", fd_data[i].mi_name);
 		q = fd_data[i].mi_prob  / 10.0;
@@ -195,7 +195,7 @@ pr_sticks()
     float q;
 
     printf("%25s   %%   Curse Bless Worth\n", "Sticks");
-    for (i=0; i<MAXSTICKS; i++) {
+    for (i=0; i<maxsticks; i++) {
 
 		printf("%25.25s  ", ws_magic[i].mi_name);
 		q = ws_magic[i].mi_prob  / 10.0;
@@ -210,7 +210,7 @@ pr_sticks()
 		putchar('\n');
 }
 
-extern struct monster monsters[NUMMONST+2];
+extern struct monster monsters[];
 
 pr_monsters()
 {
@@ -231,7 +231,7 @@ pr_monsters()
 	"Number%30s Letter  Int Str  Lvl    Exp(X) Tres  AC Flags\n%64s%12s\n",
 		"Monster", "HP", "Damage");
 
-    for (i=1; i<NUMMONST+2; i++) {
+    for (i=1; i<nummonst+2; i++) {
 		printf("%4d) %30.30s   '%c' %5s %2d %c",
 			i,
 		    monsters[i].m_name,	
@@ -299,7 +299,7 @@ register int i;
 					case CANSEE:		printf(" SEE");				break;
 					case HASFIRE:		printf(" FIRE");			break;
 					case ISSLOW:		printf(" SLOW");			break;
-					case ISHASTE:		printf(" TE");				break;
+					case ISHASTE:		printf(" HASTE");			break;
 					case ISCLEAR:		printf(" CLEAR");			break;
 					case CANINWALL:		printf(" INWALL");			break;
 					case ISDISGUISE:	printf(" DISGUISE");		break;
@@ -417,7 +417,7 @@ register int i;
 					case CANSTICK:		printf(" STICK");			break;
 					case CANTANGLE:		printf(" TANGLE");			break;
 					case DRAINMAGIC:	printf(" D_ENCHANT");		break;
-					case SHOOTNEEDLE:	printf(" S_NEEDLE");		break;
+					case SHOOTNEEDLE:	printf(" NEEDLE");		break;
 					case CANZAP:		printf(" ELECTRIC_ZAP");	break;
 					case HASARMOR:		printf(" HASARMOR");		break;
 					case CANTELEPORT:	printf(" TELEPORT");		break;
@@ -426,12 +426,18 @@ register int i;
 					case HASFAMILIAR:	printf(" HASFAMILIAR");		break;
 					case SUMMONING:		printf(" SUMMONING");		break;
 					case CANREFLECT:	printf(" REFLECT");		break;
-					case LOWFRIENDLY:	printf(" L_FRIENDLY");		break;
-					case HIGHFRIENDLY:	printf(" H_FRIENDLY");		break;
+					case LOWFRIENDLY:	printf(" L_FRIEND");		break;
+					case HIGHFRIENDLY:	printf(" H_FRIEND");		break;
 					case MAGICATTRACT:	printf(" M_ATTRACT");		break;
-					case ISGOD:		printf(" GOD");		break;
-					case CANLIGHT:		printf(" CANLIGHT");		break;
-					case MEDFRIENDLY:	printf(" M_FRIENDLY");		break;
+					case ISGOD:		printf(" *GOD*");		break;
+					case CANLIGHT:		printf(" LIGHT");		break;
+					case MEDFRIENDLY:	printf(" M_FRIEND");		break;
+					case LOWCAST:		printf(" L_CAST");		break;
+					case MEDCAST:		printf(" M_CAST");		break;
+					case HIGHCAST:	printf(" H_CAST");		break;
+					case WASSUMMONED:	printf(" SUMMONER");		break;
+					case HASSUMMONED:	printf(" HASSUMMONED");		break;
+					case CANTRUESEE:	printf(" TRUESEE");		break;
 					default:
 						printf(" ?????");							break;
 					}
@@ -439,7 +445,7 @@ register int i;
     }
 }
 
-extern struct init_weps weaps[MAXWEAPONS];
+extern struct init_weps weaps[];
 
 pr_weapons()
 {
@@ -447,7 +453,7 @@ pr_weapons()
 
     printf("%17s  Damage    Throw  Weight Worth Flags\n", "Weapon");
 
-    for (i=1; i<MAXWEAPONS; i++) {
+    for (i=1; i<maxweapons; i++) {
 
 		printf("%17.17s ", weaps[i].w_name);
 		printf("%5s ", weaps[i].w_dam);
@@ -490,7 +496,7 @@ register int i;
 						case ISMANY:	printf(" MANY");		break;
 						case CANBURN:	printf(" BURN");		break;
 						case ISSHARP:	printf(" SHARP");		break;
-						case ISTWOH:		printf(" BIG");			break;
+						case ISTWOH:		printf(" TWOH");			break;
 						case ISLITTLE:	printf(" LITTLE");		break;
 					}
 	}

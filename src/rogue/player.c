@@ -8,19 +8,6 @@
 #include "rogue.h"
 #include <ctype.h>
 
-/* Constitution bonus */
-
-const_bonus()	/* Hit point adjustment for changing levels */
-{
-    if (pstats.s_const > 6 && pstats.s_const <= 12) 
-	return(0);
-    if (pstats.s_const > 12) 
-	return(pstats.s_const-12);
-    if (pstats.s_const > 3) 
-	return(-1);
-    return(-2);
-}
-
 /*
  * Pray to a deity
  *
@@ -306,7 +293,7 @@ steal()
 	    detach(tp->t_pack, s_item);
 
 	    /* Give it to player */
-	    if (add_pack(s_item, FALSE) == FALSE) {
+	    if (add_pack(s_item, MESSAGE) == FALSE) {
 	       (OBJPTR(s_item))->o_pos = hero;
 	       fall(&player, s_item, TRUE);
 	    }

@@ -17,6 +17,7 @@ static struct object bolt =
 {
     NULL, '*' , 0, {0, 0}, "", 0, 0, "1d4" , 0, 0, 100, 1
 };
+struct object null_stick = {0};
 
 char *bolt_name;
 
@@ -98,9 +99,8 @@ register struct object *cur;
  * which:	which WS_STICK (-1 means ask from pack)
  * flags:	ISBLESSED, ISCURSED
  */
-do_zap(zapper, gotdir, which, flags)
+do_zap(zapper, which, flags)
 struct thing *zapper;
-bool gotdir;
 int which;
 int flags;
 {
@@ -137,7 +137,7 @@ int flags;
 	    return;
 	}
 	obj->o_charges--;
-	if (!gotdir)
+	if (delta.y == 0 && delta.x == 0)
 	    do {
 		delta.y = rnd(3) - 1;
 		delta.x = rnd(3) - 1;
@@ -147,6 +147,8 @@ int flags;
 	cursed = obj->o_flags & ISCURSED;
 	blessed = obj->o_flags & ISBLESSED;
     }
+    else
+	obj = &null_stick;
 
     /* Find out who the target is */
     y = hero.y;
@@ -383,7 +385,7 @@ int flags;
 		else if (cursed) strike.o_hplus  = 3;
 		else		 strike.o_hplus  = 6;
 
-		if (strcmp(ws_type[which], "staff") == 0)
+		if (!is_stick || strcmp(ws_type[which], "staff") == 0)
 		     ndice = 3;
 		else ndice = 2;
 		if (blessed)	 nsides  = 16;
@@ -392,10 +394,10 @@ int flags;
 		sprintf(buf, "%dd%d", ndice, nsides);
 
 		strike.o_damage = buf;
-		fight(&delta, ch, &strike, FALSE);
+		fight(&tp->t_pos, ch, &strike, NOTHROWN);
 	    }
 	}
-	case WS_SLOW_M:
+	when WS_SLOW_M:
 	    if (got_one) {
 		if (cursed) {
 		    if (off(*tp, ISSLOW))
@@ -766,34 +768,57 @@ int flags;
 			show(bolt.o_pos.y, bolt.o_pos.x));
 	}
 	when WS_KNOCK:
-	case WS_CLOSE: {
-	    coord zap_loc;
-	    char loc;
+	case WS_CLOSE:
+	    if (blessed) {	/* Do all doors in room */
+		char new_door = (which == WS_KNOCK ? DOOR : SECRETDOOR);
+		struct room *rp = roomin(&hero);
 
-	    zap_loc.y = hero.y + delta.y;
-	    zap_loc.x = hero.x + delta.x;
-	    loc = winat(zap_loc.y, zap_loc.x);
-
-	    switch (loc) {
-	    when SECRETDOOR:
-		if (which == WS_KNOCK) {
-		    mvaddch(zap_loc.y, zap_loc.x, DOOR);
-		    msg("A secret door stands revealed before you!");
-		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
-		}
-		else goto n_doing;
-	    when DOOR:
-		if (which == WS_CLOSE) {
-		    mvaddch(zap_loc.y, zap_loc.x, DOOR);
-		    msg("You block the door off.");
-		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
-		}
-		else goto n_doing;
-	    otherwise:
-n_doing:
-		nothing_message(flags);
+		if (rp != NULL)
+		    for (x = 0; x < rp->r_nexits; x++) {
+			move(rp->r_exit[x].y, rp->r_exit[x].x);
+			addch(new_door);
+		    }
+		else		/* Do all adjacent doors */
+		    for (x = hero.x - 1; x <= hero.x + 1; x++)
+			for (y = hero.y - 1; y <= hero.y + 1; y++)
+			    switch (winat(y, x)) {
+			    when DOOR:
+			    case SECRETDOOR:
+				addch(new_door);
+			    }
+		light(&hero);
 	    }
-	}
+	    else if (cursed)	/* do opposite spell */
+		do_zap(zapper, (which == WS_KNOCK ? WS_CLOSE : WS_KNOCK),
+		    ISBLESSED);
+	    else {
+		coord zap_loc;
+		char loc;
+
+		zap_loc.y = hero.y + delta.y;
+		zap_loc.x = hero.x + delta.x;
+		loc = winat(zap_loc.y, zap_loc.x);
+
+		switch (loc) {
+		when SECRETDOOR:
+		    if (which == WS_KNOCK) {
+			mvaddch(zap_loc.y, zap_loc.x, DOOR);
+			msg("A secret door stands revealed before you!");
+			if (is_stick) know_items[TYP_STICK][which] = TRUE;
+		    }
+		    else goto n_doing;
+		when DOOR:
+		    if (which == WS_CLOSE) {
+			mvaddch(zap_loc.y, zap_loc.x, SECRETDOOR);
+			msg("You sucessfully block off the door.");
+			if (is_stick) know_items[TYP_STICK][which] = TRUE;
+		    }
+		    else goto n_doing;
+		otherwise:
+n_doing:
+		    nothing_message(flags);
+		}
+	    }
 	otherwise:
 	    msg("What a bizarre schtick!");
     }
@@ -1020,7 +1045,7 @@ int damage;			/* make zapee suffer */
 			    no_effect=TRUE;
 			if ( on(*tp, BOLTDIVIDE) ) {
 			    no_effect=TRUE;
-			    if (creat_mons(tp, tp->t_index, FALSE))
+			    if (creat_mons(tp, tp->t_index, NOMESSAGE))
 				msg("The %s divides the %s.", name, mname);
 			}
 		    }

@@ -54,62 +54,7 @@ struct linked_list *what;
 	}
     }
     if (print_message)
-	msg(inv_name(obj, FALSE));
-}
-
-/*
- * make a monster for the wizard
- */
-makemon() 
-{
-    register int i;
-    register short which_monst;
-    register int pres_monst=1, num_lines=LINES-3;
-    char monst_name[2*LINELEN];
-
-    /* Print out the monsters */
-    while (pres_monst <= nummonst+2) {
-	wclear(hw);
-	touchwin(hw);
-
-	wmove(hw, 2, 0);
-	for (i=0; i<num_lines && pres_monst <= nummonst+2; i++) {
-	    sprintf(monst_name, "[%d] %s\n",
-				pres_monst, monsters[pres_monst].m_name);
-	    waddstr(hw, monst_name);
-	    pres_monst++;
-	}
-
-	if (pres_monst <= nummonst+2) {
-	    mvwaddstr(hw, LINES-1, 0, morestr);
-	    wrefresh(hw);
-	    wait_for(' ');
-	}
-
-	else {
-	    mvwaddstr(hw, 0, 0, "Which monster");
-	    if (!terse) waddstr(hw, " do you wish to create");
-	    waddstr(hw, "? ");
-	    wrefresh(hw);
-	}
-    }
-
-    do {
-	i = get_str(monst_name, hw);
-	if (i == QUIT) {
-	    restscr(cw);
-	    msg("");
-	    return;
-	}
-	which_monst = atoi(monst_name);
-	if (which_monst < 1 || which_monst > nummonst+2) {
-	    mvwaddstr(hw, 0, 0, "Please enter a number in the displayed range: ");
-	    wrefresh(hw);
-	}
-    } until (which_monst > 0 && which_monst <= nummonst+2);
-    restscr(cw);
-    creat_mons (&player, which_monst, TRUE);
-    touchwin(cw);
+	msg(inv_name(obj, UPPERCASE));
 }
 
 /*

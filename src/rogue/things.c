@@ -16,9 +16,9 @@
  *	inventory.
  */
 char *
-inv_name(obj, drop)
+inv_name(obj, lowercase)
 register struct object *obj;
-register bool drop;
+register bool lowercase;
 {
     register char *pb;
 
@@ -182,11 +182,11 @@ register bool drop;
     else if (obj == cur_ring[RIGHT_4]) strcat(prbuf, " (on right hand)");
     if (obj->o_flags & ISPROT)
 	strcat(prbuf, " [protected]");
-    if (drop && isupper(prbuf[0]))
+    if (lowercase && isupper(prbuf[0]))
 	prbuf[0] = tolower(prbuf[0]);
-    else if (!drop && islower(*prbuf))
+    else if (!lowercase && islower(*prbuf))
 	*prbuf = toupper(*prbuf);
-    if (!drop)
+    if (!lowercase)
 	strcat(prbuf, ".");
     return prbuf;
 }
@@ -311,7 +311,7 @@ struct linked_list *item;
       rem_pack(op);
     }
     if(ch == POOL) {
-	msg("Your %s sinks out of sight.",inv_name(op,TRUE));
+	msg("Your %s sinks out of sight.",inv_name(op,LOWERCASE));
 	discard(obj);
 	obj = NULL;
     }

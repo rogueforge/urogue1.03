@@ -815,12 +815,12 @@ bool thrown;
 			nitem = new_item(sizeof *obj);
 			op = OBJPTR(nitem);
 			*op = *obj;
-			msg("The %s stole %s!", mname, inv_name(obj, DROP));
+			msg("The %s stole %s!", mname, inv_name(obj, LOWERCASE));
 			obj->o_count = oc;
 			attach(mp->t_pack, nitem);
 		    }
 		    else {
-			msg("The %s stole %s!", mname, inv_name(obj, DROP));
+			msg("The %s stole %s!", mname, inv_name(obj, LOWERCASE));
 			obj->o_flags &= ~ISCURSED;
 			dropcheck(obj);
 			rem_pack(obj);
@@ -886,10 +886,6 @@ bool thrown;
     struct thing *attackee;
 
     attackee = THINGPTR(mon);
-
-    /* If the monster is in a wall, it cannot attack */
-    if (on(*attacker, ISINWALL)) 
-	return(FALSE);
 
     visible = cansee(attacker->t_pos.y, attacker->t_pos.x);
 
@@ -1011,7 +1007,7 @@ bool print_message;
  */
 check_level()
 {
-    register int num_jumped, j, add = 0;
+    register int num_jumped, j, add;
     int nsides;
 
     if ( (num_jumped=next_exp_level(NOMESSAGE)) <= 0)
@@ -1039,8 +1035,11 @@ check_level()
     }
 
     /* Take care of multi-level jumps */
-    for (j = 0; j < num_jumped; j++)
-	add += max(1, roll(1,nsides) + const_bonus());
+    for (add = 0, j = 0; j < num_jumped; j++) {
+	int increase = roll(1,nsides) + const_bonus();
+
+	add += max(1, increase);
+    }
     max_stats.s_hpt += add;
     pstats.s_hpt += add;
     msg("Welcome, %s, to level %d.",
@@ -1049,9 +1048,11 @@ check_level()
 
     /* Now add new spell points and learn new spells */
     nsides = 16 - nsides;
-    add = 0;
-    for (j = 0; j < num_jumped; j++)
-	add += max(1, roll(1,nsides) + int_wis_bonus());
+    for (add = 0, j = 0; j < num_jumped; j++) {
+	int increase = roll(1,nsides) + int_wis_bonus();
+
+	add += max(1, increase);
+    }
     max_stats.s_power += add;
     pstats.s_power += add;
     learn_new_spells();
@@ -1097,17 +1098,8 @@ struct object *cur_weapon;
 	    prop_dplus = cur_weapon->o_dplus;
 	}
 	else cp = (weap->o_flags&ISMISL ? weap->o_damage : weap->o_hurldmg);
-    else {
+    else
 	cp = weap->o_damage;
-	/*
-	 * Drain a staff of striking
-	 */
-	if (weap->o_type == STICK && weap->o_which == WS_HIT
-	    && weap->o_charges == 0) {
-		    weap->o_damage = "0d0";
-		    weap->o_hplus = weap->o_dplus = 0;
-		}
-    }
     for (;;)
     {
 	int damage;
@@ -1202,7 +1194,7 @@ struct object *cur_weapon;
 	    if (on(*def_er, BLOWDIVIDE) && rnd(3) == 0 &&
 			!((weap != NULL) && (weap->o_flags & CANBURN))) {
 		damage = 0;
-		creat_mons(def_er, def_er->t_index, FALSE);
+		creat_mons(def_er, def_er->t_index, NOMESSAGE);
 	    }
 
 	    damage = max(0, damage);
@@ -1642,11 +1634,28 @@ bool print_message, give_points;
 		pstats.s_exp += tp->t_stats.s_exp;
 	}
 
-	/* Clerics and paladins get extra for smiting UNDEAD */
-	if ( is_player &&
-	    (player.t_ctype==C_CLERIC || player.t_ctype==C_PALADIN) &&
-	    (on(*tp, ISUNDEAD) || on(*tp, ISUNIQUE)) )
-		pstats.s_exp += tp->t_stats.s_exp / 2;
+	if (is_player) {
+	    switch (player.t_ctype) {
+		when C_CLERIC:
+		case C_PALADIN:
+		    if (on(*tp, ISUNDEAD) || on(*tp, ISUNIQUE)) {
+			pstats.s_exp += tp->t_stats.s_exp / 2;
+			msg("You are to be commended for smiting the ungodly.");
+		    }
+		when C_DRUID:
+		case C_RANGER:
+		    if (on(*tp, ISLARGE)) {
+			pstats.s_exp += tp->t_stats.s_exp / 2;
+			msg("Congratulations on smiting a dangerous monster.");
+		    }
+		when C_MAGICIAN:
+		case C_ILLUSION:
+		    if (on(*tp, DRAINBRAIN)) {
+			pstats.s_exp += tp->t_stats.s_exp / 2;
+			msg("Congratulations on smiting a dangerous monster.");
+		    }
+	    }
+	}
 
 	check_level();
     }
@@ -1738,11 +1747,32 @@ bool force;
 	    register struct linked_list *ip;
 	    register struct thing *tp;
 
-	    if ((ip = creat_mons(mons, which, FALSE)) != NULL) {
+	    if ((ip = creat_mons(mons, which, NOMESSAGE)) != NULL) {
 		tp = THINGPTR(ip);
 		turn_off(*tp, ISFRIENDLY);
 	    }
 	}
     }
     return(TRUE);
+}
+
+/*
+ * maxdamage:
+ *	return the max damage a weapon can do
+ */
+maxdamage(cp)
+register char *cp;
+{
+    register int ndice, nsides, nplus;
+    char *strchr();
+
+    ndice = atoi(cp);
+    if (cp == NULL || (cp = strchr(cp, 'd')) == NULL)
+	return(0);
+    nsides = atoi(++cp);
+    if (cp != NULL && (cp = strchr(cp, '+')) != NULL)
+	nplus = atoi(++cp);
+    else nplus = 0;
+
+    return(ndice * nsides + nplus);
 }

@@ -88,19 +88,19 @@ register struct thing *tp;
 	    if (obj->o_type == WEAPON)
 		addmsg("The %s", weaps[obj->o_which].w_name);
 	    else
-		addmsg(inv_name(obj, TRUE));
+		addmsg(inv_name(obj, LOWERCASE));
 	    msg(" vanishes in a puff of greasy smoke.");
 	    discard(item);
 	}
 	else {
 	    fall(&player, item, TRUE);
 	    if (obj->o_flags & CANRETURN)
-		msg("You have %s.", inv_name(obj, TRUE));
+		msg("You have %s.", inv_name(obj, LOWERCASE));
 	}
     }
     else if (obj->o_flags & ISOWNED) {
-	add_pack(item, TRUE);
-	msg("You have %s.", inv_name(obj, TRUE));
+	add_pack(item, NOMESSAGE);
+	msg("You have %s.", inv_name(obj, LOWERCASE));
     }
     mvwaddch(cw, hero.y, hero.x, PLAYER);
 }
@@ -167,7 +167,7 @@ bool pr;
     obj = OBJPTR(item);
     rp = roomin(&(tp->t_pos));
     if (obj->o_flags & CANRETURN) {
-	add_pack(item, TRUE);
+	add_pack(item, NOMESSAGE);
 	return;
     }
     else if (fallpos(&obj->o_pos, &fpos, TRUE)) {
@@ -200,7 +200,7 @@ bool pr;
 	    if (obj->o_type == WEAPON)
 		addmsg("The %s", weaps[obj->o_which].w_name);
 	    else
-		addmsg(inv_name(obj, TRUE));
+		addmsg(inv_name(obj, LOWERCASE));
 	    msg(" vanishes as it hits the ground.");
 	}
     }
@@ -231,43 +231,37 @@ char type;
 }
 
 /*
- * Does the missile hit the monster
+ * hit_monster - does the missile hit the target
  */
 
-hit_monster(y, x, obj, tp)
+hit_monster(y, x, weapon, thrower)
 register int y, x;
-struct object *obj;
-register struct thing *tp;
+struct object *weapon;
+register struct thing *thrower;
 {
-    static coord mp;
+    register struct linked_list *mon;
+    static coord target;
 
-    mp.y = y;
-    mp.x = x;
-    if (tp == &player) {
-	/* Make sure there is a monster where it landed */
-	if (!isalpha(mvwinch(mw, y, x))) {
-		return(FALSE);
-	}
-	return(fight(&mp, winat(y, x), obj, TRUE));
-    } 
-    else {
-	if ((good_monster(*tp)) && ce(mp, hero)) {
-	    if (on(*tp, ISFAMILIAR))
+    target.y = y;
+    target.x = x;
+    if (thrower == &player)
+	return(fight(&target, winat(y, x), weapon, THROWN));
+
+    if (ce(target, hero)) {
+	if (good_monster(*thrower)) {
+	    if (on(*thrower, ISFAMILIAR))
 		msg("Please get out of the way, Master!  I nearly hit you.");
 	    else
-		msg("Get out of the way %s! I nearly hit you.", whoami);
+		msg("Get out of the way %s!", whoami);
 	    return(FALSE);
 	}
-	if (!isalpha(mvwinch(mw, y, x))) 
-	    return FALSE;
-	if (ce(mp, hero))
-		return attack(tp, obj, TRUE);
-	else {
-	    register struct linked_list *mon;
-	    if ((mon = find_mons(y, x)) != NULL)
-		return mon_mon_attack(tp, mon, obj, TRUE);
-	}
+	return(attack(thrower, weapon, THROWN));
     }
+
+    if ((mon = find_mons(y, x)) != NULL)
+	return(mon_mon_attack(thrower, mon, weapon, THROWN));
+    else
+	return(FALSE);
 }
 
 /*
@@ -319,7 +313,7 @@ wield()
 	return;
     }
     
-    msg("%sielding %s.", (terse ? "W" : "You are now w"), inv_name(obj, TRUE));
+    msg("%sielding %s.", (terse ? "W" : "You are now w"), inv_name(obj, LOWERCASE));
     cur_weapon = obj;
 }
 

@@ -131,9 +131,9 @@ register struct linked_list *item;
  * use it as the linked_list pointer instead of getting it off the ground.
  */
 bool
-add_pack(item, silent)
+add_pack(item, print_message)
 register struct linked_list *item;
-bool silent;
+bool print_message;
 {
     register struct linked_list *ip, *lp;
     register struct object *obj, *op;
@@ -172,7 +172,7 @@ bool silent;
       register struct linked_list *mitem;
       register struct thing *tp;
       
-      if (!silent) {
+      if (print_message) {
 	  if (!terse) addmsg("You found ");
 	  msg("%d gold pieces.", obj->o_count);
 	}
@@ -208,9 +208,9 @@ bool silent;
   
   if (itemweight(obj) + pstats.s_pack > pstats.s_carry) {
       msg("Too much for you to carry.");
-      if (!silent) {
+      if (print_message) {
 	  msg("%s onto %s", terse ? "Moved" : "You moved",
-	      inv_name(obj, TRUE));
+	      inv_name(obj, LOWERCASE));
 	}
       return FALSE;
     }
@@ -226,7 +226,7 @@ bool silent;
       op->o_count += obj->o_count;	/* add it to the rest */
       if (from_floor)
 	  rem_obj(item, FALSE);
-      pack_report(op, silent, "You now have ");
+      pack_report(op, print_message, "You now have ");
       return(TRUE);
     }
   
@@ -247,10 +247,10 @@ bool silent;
   
   if (count_bag(pack, obj->o_type, NULL) == max_print()) {
       msg("You have no room for more %s.", name_type(obj->o_type));
-      if (!silent) {
+      if (print_message) {
 	obj = OBJPTR(item);
 	msg("%s onto %s.", terse ? "Moved" : "You moved",
-	    inv_name(obj, TRUE));
+	    inv_name(obj, LOWERCASE));
       }
       return(FALSE);
     }
@@ -263,7 +263,7 @@ bool silent;
   if (from_floor)
       rem_obj(item, FALSE);
   push_bag(&pack, obj, obj->o_type);
-  pack_report(obj, silent, "You now have ");
+  pack_report(obj, print_message, "You now have ");
   ur_free(item);
   return(TRUE);		/* signal success */
 }
@@ -275,9 +275,9 @@ bool silent;
  * post processing.
  */
 
-pack_report(obj, silent, message)
+pack_report(obj, print_message, message)
 register object *obj;
-bool silent;
+bool print_message;
 char *message;
 {
   extern char print_letters[];
@@ -285,7 +285,7 @@ char *message;
   /*
    * Notify the user
    */
-  if (!silent) {
+  if (print_message) {
       if (!terse)
 	addmsg(message);
       msg("(%c%c) %s.",obj->o_type, print_letters[get_ident(obj)],
@@ -362,7 +362,7 @@ pick_up(ch)
     case ARTIFACT:
     case RING:
     case STICK:
-      add_pack(NULL, FALSE);
+      add_pack(NULL, MESSAGE);
       break;
     }
 }

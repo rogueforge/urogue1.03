@@ -467,7 +467,7 @@ coord shoot_dir;
 	    delta.x = shoot_dir.x;
 	    delta.y = shoot_dir.y;
 	}
-	do_zap(caster, TRUE, sp->sp_which, bless_or_curse);
+	do_zap(caster, sp->sp_which, bless_or_curse);
     otherwise:
 	msg("What a strange %s!", spell_type);
     }
@@ -721,14 +721,14 @@ struct thing *caster;
     }
 
     /* Any flags added here must also be in player_powers[] */
-    if (rnd(3)==0		&& on(player, HASOXYGEN) ||
+    if (rnd(5) == 0 && (on(player, HASOXYGEN) ||
 	on(player, CANFLY)	|| on(player, CANINWALL) ||
 	on(player, CANREFLECT)	|| on(player, CANSEE) ||
 	on(player, HASMSHIELD)	|| on(player, HASSHIELD) ||
 	on(player, ISHASTE)	|| on(player, ISREGEN) ||
 	on(player, ISDISGUISE)	|| on(player, ISINVIS) ||
 	on(player, NOCOLD)	|| on(player, NOFIRE) ||
-	on(player, ISELECTRIC) ) {
+	on(player, ISELECTRIC)) ) {
 	    sp = &monst_spells[M_CANCEL];
 	    if (sp->sp_flags & ISKNOW)
 		return(sp);

@@ -24,7 +24,7 @@ struct thing *reader;
 int which;
 int flags;
 {
-    register struct object *obj, *nobj;
+    register struct object *obj;
     register struct linked_list *item, *nitem;
     register int i,j,charm_power;
     register char ch, nch;
@@ -201,13 +201,13 @@ int flags;
 	    else if (cursed) {
 		i = rnd(4) + 3;
 		for(j=0; j<i; j++) {
-		    if((ip = creat_mons(&player, (short) 0, TRUE)) != NULL) {
+		    if((ip = creat_mons(&player, (short) 0, MESSAGE)) != NULL) {
 			tp = THINGPTR(ip);
 			turn_off(*tp, ISFRIENDLY);
 		    }
 		}
 	    }
-	    else if((ip = creat_mons(&player, (short) 0, TRUE)) != NULL) {
+	    else if((ip = creat_mons(&player, (short) 0, MESSAGE)) != NULL) {
 		tp = THINGPTR(ip);
 		turn_off(*tp, ISFRIENDLY);
 	    }
@@ -389,28 +389,27 @@ int flags;
 		    aggravate(); 
 	    }
 	when S_REMOVECURSE:
-	    if (cursed) { /* curse all player's possessions */
+	    if (cursed) { /* curse a player's possession */
 		for (nitem = pack; nitem != NULL; nitem = next(nitem)) {
-		    nobj = OBJPTR(nitem);
-		    if (nobj->o_flags & ISBLESSED) 
-			nobj->o_flags &= ~ISBLESSED;
-		    else 
-			nobj->o_flags |= ISCURSED;
+		    obj = OBJPTR(nitem);
+		    if (rnd(5) == 0)
+			if (obj->o_flags & ISBLESSED) 
+			    obj->o_flags &= ~ISBLESSED;
+			else 
+			    obj->o_flags |= ISCURSED;
 		}
-		msg("The smell of fire and brimstone fills the air.");
+		msg("The smell of fire and brimstone comes from your pack.");
 	    }
 	    else if (blessed) {
-		for (nitem = pack; nitem != NULL; nitem = next(nitem)) {
-		    nobj = OBJPTR(nitem);
-		    nobj->o_flags &= ~ISCURSED;
-		}
+		for (nitem = pack; nitem != NULL; nitem = next(nitem))
+		    (OBJPTR(nitem))->o_flags &= ~ISCURSED;
 		msg("Your pack glistens brightly.");
 	    }
 	    else {
 		if ((nitem = get_item("remove the curse on",0)) != NULL) {
-		    nobj = OBJPTR(nitem);
-		    msg("Removed the curse from %s.",inv_name(nobj,TRUE));
-		    nobj->o_flags &= ~ISCURSED;
+		    obj = OBJPTR(nitem);
+		    msg("Removed the curse from %s.",inv_name(obj,LOWERCASE));
+		    obj->o_flags &= ~ISCURSED;
 		    if (is_scroll)
 			know_items[TYP_SCROLL][S_REMOVECURSE] = TRUE;
 		}
@@ -487,20 +486,25 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 	    genocide(flags);
 	    if (is_scroll) know_items[TYP_SCROLL][S_GENOCIDE] = TRUE;
 	when S_PROTECT: 
-	{
-	    struct linked_list *ll;
-	    struct object *lb;
 	    if (is_scroll && know_items[TYP_SCROLL][S_PROTECT] == FALSE) {
 	        msg("You can protect something from rusting or theft.");
 		know_items[TYP_SCROLL][S_PROTECT] = TRUE;
 	    }
-	    if ((ll = get_item("protect",0)) != NULL) {
-		lb = OBJPTR(ll);
-		lb->o_flags |= ISPROT;
-		mpos = 0;
-		msg("Protected %s.", inv_name(lb,TRUE));
+	    if ((item = get_item("protect",0)) != NULL) {
+		struct object *lb = OBJPTR(item);
+
+		if (cursed) {
+		    lb->o_flags &= ~ISPROT;
+		    mpos = 0;
+		    msg("Unprotected %s.", inv_name(lb,LOWERCASE));
+		}
+		/* Hmmm. else if (blessed) { } */
+		else {
+		    lb->o_flags |= ISPROT;
+		    mpos = 0;
+		    msg("Protected %s.", inv_name(lb,LOWERCASE));
+		}
 	    }
-	}
 	when S_MAKEITEMEM:
 	    if (!is_scroll || rnd(luck + 10))
 		feel_message();
@@ -594,7 +598,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 			if (armors[lb->o_which].a_class - lb->o_ac > 8
 					&& rnd(5) == 0) {
 			    msg("Your %s explodes in a cloud of dust.",
-				inv_name(lb, TRUE));
+				inv_name(lb, LOWERCASE));
 			    lb->o_flags &= ~ISCURSED;
 			    if (lb == cur_armor)
 			        pstats.s_hpt /= 2;
@@ -612,7 +616,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 			if (lb->o_charges > 50
 					&& rnd(5) == 0) {
 			    msg("Your %s explodes in a cloud of dust.",
-				inv_name(lb, TRUE));
+				inv_name(lb, LOWERCASE));
 			    lb->o_flags &= ~ISCURSED;
 			    dropcheck(lb);
 			    del_pack(ll);
@@ -625,7 +629,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 			    lb->o_dplus += howmuch;
 			if (lb->o_hplus + lb->o_dplus > 15 && rnd(5) == 0) {
 			    msg("Your %s explodes in a cloud of dust.",
-				inv_name(lb, TRUE));
+				inv_name(lb, LOWERCASE));
 			    lb->o_flags &= ~ISCURSED;
 			    if (lb == cur_weapon)
 			        chg_dext(-2, FALSE, TRUE);
@@ -640,7 +644,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		}
 		mpos = 0;
 		if (lb != NULL) 
-		    msg("Enchanted %s.", inv_name(lb,TRUE));
+		    msg("Enchanted %s.", inv_name(lb,LOWERCASE));
 	    }
 	}
 	when S_NOTHING:
@@ -858,16 +862,13 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 	    }
 
  	    if (cursed) {
-		creat_mons(&player, (short) 0, TRUE);
+		creat_mons(&player, (short) 0, MESSAGE);
 		break;
 	    } 
 	    if (blessed) {	/* Summon a possibly very high monster */
-		register int sides, num;
+		register int nsides = max(2, max(pstats.s_lvl,12) - luck);
 
-		sides = rnd(25) + 8;
-		num = max(pstats.s_lvl,12) - luck;
-		num = max(num, 2);
-		mon_type = roll(num, sides);
+		mon_type = roll(nsides, rnd(pstats.s_charisma + 15) + 8);
 		mon_type = min(mon_type, nummonst);
 	    }
 	    else
@@ -894,16 +895,20 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 
 	when S_SUMFAMILIAR: {
 	    short fam_type = 0;
-	    char num_str[20];
 	    if (on(player,HASFAMILIAR)) {
-		msg("But you already have a familiar!");
+		msg("But you already have a familiar - somewhere...");
 		return;
 	    }
-	    if (wizard) {
-		msg("What monster do you want to be your familiar? ");
-		ch = get_str(num_str,cw);
-		fam_type = (ch==ESCAPE) ? 0 : (short) atoi(num_str);
+	    if (wizard)
+		fam_type = get_monster_number("be your familiar");
+	    else if (blessed) {	/* Summon a possibly very high monster */
+		register int nsides = max(2, max(pstats.s_lvl,12) - luck);
+
+		fam_type = roll(nsides, rnd(pstats.s_charisma + 15) + 8);
+		fam_type = min(fam_type, nummonst);
 	    }
+	    else if (cursed)	/* Summon a bat, maggot, eye, etc */
+		fam_type = rnd(20) + 1;	/* For now */
 	    summon_monster(fam_type, FAMILIAR, MESSAGE);
 	    turn_on(player,HASFAMILIAR);
 	}
@@ -988,10 +993,10 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
  */
 
 struct linked_list *
-creat_mons(person, monster, report)
+creat_mons(person, monster, message)
 struct thing *person;	/* Where to create next to */
 short monster;
-bool report;
+bool message;
 {
     coord *mp;
     /*
@@ -1013,7 +1018,7 @@ bool report;
 	light(&hero);
 	return(nitem);
     }
-    if (report) 
+    if (message) 
 	msg("You hear a faint cry of anguish in the distance.");
     return(NULL);
 }

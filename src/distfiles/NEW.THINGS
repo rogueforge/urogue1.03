@@ -1526,4 +1526,38 @@
 2)	partially implemented stacking of more than one object on a square
 	above by Nick Flor
 
+1.03 Alpha, Nov 3, 86
+1)	Fixed urprint with new flags
+2)	UPPERCASE/LOWERCASE flags for inv_name()
+3)	Removed unused zxcv argument from do_zap()
+4)	MESSAGE/NOMESSAGE flags for pack_report(), add_pack()
+5)	THROWN/NOTHROWN flags for mon_mon_attack()
+6)	Removed unused mean argument from find_shoot()
+7)	Breath attack by familiar gives hero exp
+8)	pick_weap() uses natural attacks if better than wielded weapon
+9)	Reordered wizard commands in command() to mimic help information
+10)	Moved electrificate() to misc.c
+11)	Weakened regen powers of R_PIETY and R_WIZARDRY
+12)	created feed_me()
+13)	ISINWALL monsters can now attack player
+14)	fixed htp, pow gains in check_level()
+15)	Preliminary extra exp for other classes in killed()
+16)	Created maxdamage() to be called by pick_weap()
+17)	Reduced monsters chance of casting CANCEL
+18)	Hackery to tr_name()
+19)	Fixed bug in const_bonus() vis #14
+20)	Reordered many monsters in monsdata.c.  Set up Undead chain summoning.
+21)	Made s_charisma do more
+22)	Fixed up which weapons monsters start with
+23)	More twiddling in the morass of trader.c.  Whither the menu code???
+24)	No trading posts on the way up
+25)	read_scroll(S_REMOVECURSE, ISCURSED) curses 1 in 5, not everything
+26)	read_scroll(S_PROTECT, ISCURSED) unprotects
+27)	Cursed, blessed WS_KNOCK, WS_CLOSE do interesting things
+28)	Monster-thrown arrows, etc now hit the hero
+	if (!isalpha(mvwinch(mw, y, x))) return FALSE was the culprit) 
+29)	get_monster_number() created - kludgy until menu code arrives
+30)	Fixed WS_HIT bug that caused core dumps and slowed monsters
+	above by Carl Hommel
+
 -------	End of File ------

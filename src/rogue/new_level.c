@@ -18,6 +18,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
     register struct thing *tp;
     coord stairs;
     struct linked_list *fpack, *nitem;
+    bool going_down = TRUE;
 
     /* Start player off right */
     turn_off(player, ISHELD);
@@ -27,8 +28,10 @@ LEVTYPE	ltype;		/* designates type of level to create */
     trap_tries = 0;
     no_food++;
 
-    if (level > max_level)
+    if (level >= max_level)
 	max_level = level;
+    else
+	going_down = FALSE;
     /*
      * check to see if he missed a UNIQUE, If he did then put it back
      * in the monster table for next time
@@ -67,8 +70,8 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	do_maze();
     when POSTLEV:
     default:
-	if (level == 0 || (level % 15) == 0) {
-	    do_post();			/* do post stuff */
+	if (going_down && (level == 0 || (level % 15) == 0)) {
+	    do_post();
 	    level++;
 	    levtype = ltype = NORMLEV;
 	}

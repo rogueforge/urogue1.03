@@ -228,7 +228,7 @@ init_player()
 	    obj = OBJPTR(item);
 	    obj->o_count = 1;
 	    obj->o_flags |= ISKNOW | ISPOISON | ISOWNED | CANRETURN;
-	    add_pack(item, TRUE);
+	    add_pack(item, NOMESSAGE);
 	when C_MAGICIAN:
 	case C_ILLUSION:
 	    purse = roll(20,60);
@@ -243,7 +243,7 @@ init_player()
     obj->o_flags |= ISKNOW;
     obj->o_flags |= other_weapon_flags;
     obj->o_count = 1;
-    add_pack(item, TRUE);
+    add_pack(item, NOMESSAGE);
     cur_weapon = obj;
 
     /*
@@ -253,7 +253,7 @@ init_player()
     obj = OBJPTR(item);
     obj->o_flags |= ISKNOW;
     obj->o_weight = armors[which_armor].a_wght;
-    add_pack(item, TRUE);
+    add_pack(item, NOMESSAGE);
     cur_armor = obj;
 
     /*
@@ -262,7 +262,7 @@ init_player()
     item = spec_item(FOOD, 0, 0, 0);
     obj = OBJPTR(item);
     obj->o_weight = things[TYP_FOOD].mi_wght;
-    add_pack(item, TRUE);
+    add_pack(item, NOMESSAGE);
 }
 
 /*

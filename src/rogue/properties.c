@@ -75,9 +75,10 @@ char id;			/* small number identifying item */
   
     if (type == NULL)
 	sprintf(inv_temp, "%c%c) %s", obj_p->o_type,
-		print_letters[id], inv_name(obj_p), FALSE);
+		print_letters[id], inv_name(obj_p, LOWERCASE), FALSE);
     else
-	sprintf(inv_temp, "%c) %s", print_letters[id], inv_name(obj_p), FALSE);
+	sprintf(inv_temp, "%c) %s", print_letters[id],
+		inv_name(obj_p, LOWERCASE), FALSE);
     add_line(inv_temp);
     return(TRUE);
 }

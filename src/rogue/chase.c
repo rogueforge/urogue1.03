@@ -119,7 +119,7 @@ register bool flee;
 	struct linked_list *mon_to_hit, *f_mons_a();
 
 	if ((mon_to_hit=f_mons_a(th->t_pos.y, th->t_pos.x, hit_bad))) {
-	    mon_mon_attack(th, mon_to_hit, pick_weap(th), FALSE);
+	    mon_mon_attack(th, mon_to_hit, pick_weap(th), NOTHROWN);
 	    return;
 	}
     }
@@ -363,7 +363,7 @@ register bool flee;
      */
     if (on(*tp, CANBREATHE) || on(*tp, CANSHOOT) || on(*tp, CANCAST))
 	if (good_monster(*tp)) {
-	    shoot_dir = find_shoot(tp, TRUE); /* find a mean monster to shoot */
+	    shoot_dir = find_shoot(tp); /* find a mean monster */
 	    if (wizard && shoot_dir)
 		msg("Found monster to attack towards (%d,%d).", 
 			shoot_dir->x,shoot_dir->y);
@@ -494,9 +494,7 @@ register bool flee;
 		    breath = "fear gas";
 		}
 
-		/* Now breathe */
-		/* save() call vs player happens on shoot_bolt */
-		shoot_bolt(tp, *er, *shoot_dir, NOPOINTS,
+		shoot_bolt(tp, *er, *shoot_dir, (tp == THINGPTR(fam_ptr)),
 			   tp->t_index, breath, roll(tp->t_stats.s_lvl, 6));
 
 		ch_ret = *er;
@@ -802,9 +800,8 @@ register int y, x;
 }
 
 coord *
-find_shoot(tp, mean)
+find_shoot(tp)
 struct thing *tp;
-bool mean;
 {
 struct room 
     *rtp;
@@ -991,26 +988,31 @@ register struct thing *tp;
 
 /*
  * pick_weap:
- * returns the weapon that the monster will wield if it has a
+ * returns the biggest weapon that the monster will wield if it has a
  * non-launching or non-missile weapon
+ * returns NULL if no weapon, or bare hands is better
  */
 
 struct object *
 pick_weap(tp)
 register struct thing *tp;
 {
+    int weap_dam = maxdamage(tp->t_stats.s_dmg);
+    struct object *ret_obj = NULL;
     register struct linked_list *pitem;
     register struct object *obj;
 
-    if (off(*tp, CANWIELD))
-	return NULL;
-
-    for (pitem = tp->t_pack; pitem != NULL; pitem = next(pitem)) {
-	obj = OBJPTR(pitem);
-	if (obj->o_type == WEAPON && !(obj->o_flags & (ISLAUNCHER | ISMISL)))
-	    return obj;
+    if (on(*tp, CANWIELD)) {
+	for (pitem = tp->t_pack; pitem != NULL; pitem = next(pitem)) {
+	    obj = OBJPTR(pitem);
+	    if (obj->o_type != WEAPON && !(obj->o_flags & (ISLAUNCHER | ISMISL)) &&
+		maxdamage(obj->o_damage) > weap_dam) {
+		weap_dam = maxdamage(obj->o_damage);
+		ret_obj = obj;
+	    }
+	}
     }
-    return NULL;
+    return(ret_obj);
 }
 
 /*

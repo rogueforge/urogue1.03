@@ -13,41 +13,48 @@
  * tr_name:
  *	print the name of a trap
  */
+static char ret_string[40];
 
 char *
 tr_name(ch)
 char ch;
 {
-    register char *s;
+    register char *s, *prefix;
 
+    ret_string[0] = '\0';
     switch (ch)
     {
 	when TRAPDOOR:
-	    s = terse ? "A trapdoor." : "You found a trapdoor.";
+	    s = "trapdoor.";
 	when BEARTRAP:
-	    s = terse ? "A beartrap." : "You found a beartrap.";
+	    s = "beartrap.";
 	when SLEEPTRAP:
-	    s = terse ? "A sleeping gas trap.":"You found a sleeping gas trap.";
+	    s = "sleeping gas trap.";
 	when ARROWTRAP:
-	    s = terse ? "An arrow trap." : "You found an arrow trap.";
+	    s = "arrow trap.";
 	when TELTRAP:
-	    s = terse ? "A teleport trap." : "You found a teleport trap.";
+	    s = "teleport trap.";
 	when DARTTRAP:
-	    s = terse ? "A dart trap." : "You found a poison dart trap.";
+	    s = "dart trap.";
 	when POOL:
-	    s = terse ? "A shimmering pool." : "You found a shimmering pool.";
+	    s = "shimmering pool.";
 	when MAZETRAP:
-	    s = terse ? "A maze entrance." : "You found a maze entrance.";
+	    s = "maze entrance.";
 	when FIRETRAP:
-	    s = terse ? "A fire trap." : "You found a fire trap.";
+	    s = "fire trap.";
 	when POISONTRAP:
-	    s = terse ? "A poison pool trap." : "You found a poison pool trap.";
+	    s = "poison pool trap.";
 	when LAIR:
-	    s = terse ? "A monster lair." : "You found a monster lair.";
+	    s = "monster lair.";
 	when RUSTTRAP:
-	    s = terse ? "A rust trap." : "You found a rust trap.";
+	    s = "rust trap.";
+	otherwise:
+	    ;
     }
-    return s;
+    prefix = (terse ? "A " : "You found a ");
+    strcpy(ret_string, prefix);
+    strcat(ret_string, s);
+    return(ret_string);
 }
 
 /*
@@ -715,6 +722,23 @@ feel_message()
 }
 
 /*
+ * const_bonus - Hit point adjustment for changing levels
+ */
+const_bonus()
+{
+    register int ret_val = -2;
+
+    if (pstats.s_const > 12)
+	ret_val = pstats.s_const - 12;
+    else if (pstats.s_const > 6)
+	ret_val = 0;
+    else if (pstats.s_const > 3)
+	ret_val = -1;
+
+    return(ret_val);
+}
+
+/*
  * int_wis_bonus - Spell point adjustment for changing levels
  */
 int_wis_bonus()
@@ -748,6 +772,178 @@ int_wis_bonus()
 	ret_val = 0;
     else if (casters_stat > 3)
 	ret_val = -1;
+
+    return(ret_val);
+}
+
+electrificate()
+{
+    register int lvl;
+    register int affect_dist = 4 + player.t_stats.s_lvl/4;
+    register struct linked_list *item, *nitem;
+
+    for (item = mlist; item != NULL; item = nitem) {
+	register struct thing *tp = THINGPTR(item);
+	char *mname = monsters[tp->t_index].m_name;
+
+	nitem = next(item); /* Get next item now since monster may disappear */
+	if (DISTANCE(tp->t_pos.y, tp->t_pos.x, hero.y, hero.x) < affect_dist) {
+	    register int damage = roll(1,player.t_stats.s_lvl) + player.t_stats.s_lvl;
+	    debug("Charge does %d (%d)", damage, tp->t_stats.s_hpt - damage);
+	    if (on(*tp, NOBOLT)) {
+	       msg("The %s basks in your glow", mname);
+	       continue;
+	    }
+	    if ((tp->t_stats.s_hpt -= damage) <= 0) {
+		msg("The %s is killed by an electric shock.", mname);
+		killed(&player, item, MESSAGE, POINTS);
+		continue;
+	    }
+	    lvl = tp->t_stats.s_intel - 5;
+	    if (lvl < 0)
+		lvl = 10 + tp->t_stats.s_intel;
+	    if (rnd(lvl + 1)/5 == 0) {
+		turn_on(*tp, ISFLEE);
+		msg("The %s is shocked by electricity.", mname);
+	    }
+	    else msg("The %s is zapped by your electricity.", mname);
+
+	    summon_help(tp, NOFORCE);
+	    turn_off(*tp, ISFRIENDLY);
+	    turn_off(*tp, ISCHARMED);
+	    turn_on(*tp, ISRUN);
+	    turn_off(*tp, ISDISGUISE);
+	    runto(&tp->t_pos, &hero);
+	    fighting = after = running = FALSE;
+	}
+    }
+}
+
+/*
+ * feed_me - Print out interesting messages about food consumption
+ */
+static char *f_hungry[] = {
+    "want a cookie",
+    "feel like a snack",
+    "feel like some fruit",
+    "start having the munchies",
+    "are starting to get hungry"
+};
+static char *f_weak[] = {
+    "are really hungry",
+    "could eat a horse",
+    "want some food - now",
+    "are starting to feel weak",
+    "feel a gnawing in your stomach",
+    "are even willing to eat up cram",
+    "feel lightheaded from not eating"
+};
+static char *f_faint[] = {
+    "get dizzy from not eating",
+    "are starving for nutrients",
+    "feel too weak from lack of food",
+    "see a mirage of an incredible banquet",
+    "have incredible cramps in your stomach"
+};
+static char *f_plop[] = {
+    "faint",
+    "pass out",
+    "keel over",
+    "black out"
+};
+
+feed_me(hungry_state)
+{
+    char *charp, *charp2;
+
+    switch (hungry_state) {
+	when F_OK:
+	default:
+	    debug("feed_me(%d) called.", hungry_state);
+	when F_HUNGRY:
+	    charp = f_hungry[rnd(sizeof(f_hungry) / sizeof(char *))];
+	when F_WEAK:
+	    charp = f_weak[rnd(sizeof(f_weak) / sizeof(char *))];
+	when F_FAINT:
+	    charp = f_faint[rnd(sizeof(f_faint) / sizeof(char *))];
+	    charp2 = f_plop[rnd(sizeof(f_plop) / sizeof(char *))];
+    }
+
+    msg("You %s.", charp);
+    if (hungry_state == F_FAINT)
+	msg("You %s.", charp2);
+}
+
+
+/*
+ * get_monster_number - prompt player for a monster on list
+ *	returns 0 if none selected
+ */
+get_monster_number(message)
+char *message;
+{
+    register int i;
+    register int pres_monst = 1;
+    register int ret_val = -1;
+    char buf[2*LINELEN];
+    char monst_name[2*LINELEN];
+
+    while (ret_val == -1) {
+	msg("Which monster do you wish to %s? (* for list)", message);
+	if ((get_str(buf, cw)) != NORM)
+	    return;
+
+	if ((i = atoi(buf)) != 0)
+	    ret_val = i;
+
+	else if (buf[0] != '*') {
+	    for (i = 1; i < nummonst; i++)
+		if ((strcmp(monsters[i].m_name, buf) == 0))
+		    ret_val = i;
+	}
+
+	/* The following hack should be redone by the windowing code */
+	else
+	    while (pres_monst < nummonst) {	/* Print out the monsters */
+		int num_lines = LINES-3;
+
+		wclear(hw);
+		touchwin(hw);
+
+		wmove(hw, 2, 0);
+		for (i=0; i<num_lines && pres_monst < nummonst; i++) {
+		    sprintf(monst_name, "[%d] %s\n",
+				pres_monst, monsters[pres_monst].m_name);
+		    waddstr(hw, monst_name);
+		    pres_monst++;
+		}
+
+		if (pres_monst < nummonst) {
+		    mvwaddstr(hw, LINES-1, 0, morestr);
+		    wrefresh(hw);
+		    wait_for(' ');
+		}
+
+		else {
+		    mvwaddstr(hw, 0, 0, "Which monster");
+		    waddstr(hw, "? ");
+		    wrefresh(hw);
+		}
+	    }
+
+get_monst:
+	get_str(monst_name, hw);
+	ret_val = atoi(monst_name);
+	if ((ret_val < 1 || ret_val > nummonst-1)) {
+	    mvwaddstr(hw, 0, 0, "Please enter a number in the displayed range -- ");
+	    wrefresh(hw);
+	    goto get_monst;
+	}
+
+	/* Set up for redraw */
+	clearok(cw, TRUE);
+	touchwin(cw);
+    }
 
     return(ret_val);
 }

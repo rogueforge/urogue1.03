@@ -59,7 +59,7 @@ take_off()
 	return;
     addmsg(terse ? "Was" : "You used to be");
     msg(" wearing %c%c) %s.", ARMOR, print_letters[get_ident(obj)],
-	inv_name(obj, TRUE));
+	inv_name(obj, LOWERCASE));
     cur_armor = NULL;
     if (on(player, STUMBLER)) {
 	msg("Your foot feels a lot better now.");

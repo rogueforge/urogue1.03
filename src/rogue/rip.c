@@ -435,7 +435,7 @@ total_winner()
 	if (obj->o_type == ARTIFACT && obj->o_which == TR_PURSE) 
 	    bag = obj->art_stats.t_art;
 	mvprintw(c - 'a' + 1, 0, "%c) %8d  %s", c, 
-		worth, inv_name(obj, FALSE));
+		worth, inv_name(obj, UPPERCASE));
     }
     if (bag != NULL) {
 	mvaddstr(LINES - 1, 0, morestr);
@@ -449,7 +449,7 @@ total_winner()
 	    whatis(item);
 	    purse += worth;
 	    mvprintw(c - 'a' + 1, 0, "%c) %8d %s\n", c, 
-			worth, inv_name(obj, FALSE));
+			worth, inv_name(obj, UPPERCASE));
 	}
     }
     mvprintw(c - 'a' + 1, 0,"   %6d  Gold Pieces          ", oldpurse);
@@ -544,7 +544,7 @@ char *howso;
 		purse += worth;
 		if (obj->o_type == ARTIFACT && obj->o_which == TR_PURSE)
 			bag = obj->art_stats.t_art;
-		iname = inv_name(obj, FALSE);
+		iname = inv_name(obj, UPPERCASE);
 		mvprintw(cnt, 0, "%d) %s\n",ch,iname);
 		ch += 1;
 		if (++cnt > LINES - 5 && next(item) != NULL) {
@@ -569,7 +569,7 @@ char *howso;
 			worth = get_worth(obj);
 			whatis(item);
 			purse += worth;
-			mvprintw(cnt, 0, "%d) %s\n", ch, inv_name(obj, FALSE));
+			mvprintw(cnt, 0, "%d) %s\n", ch, inv_name(obj, UPPERCASE));
 			ch += 1;
 			if (++cnt > LINES - 5 && next(item) != NULL) {
 				cnt = 1;

@@ -8,7 +8,7 @@ CFLAGS = -O -I../hdrs
 control: control.o tunable.o
 	cc control.o tunable.o -o control
 
-urprint: urprint.o ../rogue/monsdata.o ../rogue/rogue.o
+urprint: urprint.o ../rogue/monsdata.o ../rogue/magic_items.o ../rogue/rogue.o
 	cc urprint.o ../rogue/monsdata.o ../rogue/magic_items.o ../rogue/rogue.o -o urprint
 
 clean:

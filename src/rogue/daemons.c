@@ -163,14 +163,10 @@ struct thing *tp;
     else if (tp->t_rest_pow >= 15)
 	curp->s_power += rnd(new_points)+1;
 
-    if (tp == &player) {		/* What if tp==monster? */
-	if (is_wearing(R_WIZARD) || is_wearing(R_PIETY))
-	    curp->s_power += ring_value(R_WIZARD) + ring_value(R_PIETY) + 1;
-	else {
-	    if (curp->s_power >= maxp->s_power)
-		curp->s_power = maxp->s_power;
-	}
-    }
+    if (tp == &player && (is_wearing(R_WIZARD) || is_wearing(R_PIETY)))
+	curp->s_power += ring_value(R_WIZARD) + ring_value(R_PIETY);
+
+    curp->s_power = min(max(0, curp->s_power), maxp->s_power);
 
     if (curp->s_power != opower)
 	tp->t_rest_pow = 0;
@@ -402,12 +398,10 @@ stomach()
 	if (no_command || rnd(100) > 20)
 	    return;
 	no_command = rnd(8)+4;
-	if (!terse)
-	    addmsg("You feel too weak from lack of food.  ");
-	msg("You faint.");
 	running = FALSE;
 	count = 0;
 	hungry_state = F_FAINT;
+	feed_me(hungry_state);
     }
     else {
 	oldfood = food_left;
@@ -432,12 +426,14 @@ stomach()
 	food_left -= amount * power_scale;
 
 	if (food_left < MORETIME && oldfood >= MORETIME) {
-	    msg("You are starting to feel weak.");
 	    hungry_state = F_WEAK;
+	    running = FALSE;
+	    feed_me(hungry_state);
 	}
 	else if (food_left < 2 * MORETIME && oldfood >= 2 * MORETIME) {
-	    msg(terse ? "Getting hungry." : "You are starting to get hungry.");
 	    hungry_state = F_HUNGRY;
+	    running = FALSE;
+	    feed_me(hungry_state);
 	}
 
     }

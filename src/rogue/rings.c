@@ -143,7 +143,7 @@ ring_off()
     if (dropcheck(obj)) {
 	if (obj->o_which == R_LEVITATION)
 	    msg("You float gently to the ground.");
-	msg("Was wearing %s.", inv_name(obj, TRUE));
+	msg("Was wearing %s.", inv_name(obj, LOWERCASE));
     }
     updpack();
 }

@@ -250,7 +250,7 @@ buy_more:
 	obj = OBJPTR(item);
 	if (which_type == TYP_ARTIFACT) {
 	    new_artifact(which_one, obj);
-	    add_pack(item, TRUE);
+	    add_pack(item, NOMESSAGE);
 	    itemtype = '\0';
 	    goto buy_more;
 	}
@@ -360,7 +360,7 @@ buy_more:
 	 * The hero bought the item here
 	 */
 	mpos = 0;
-	if (add_pack(item, TRUE) && !is_spell) {
+	if (add_pack(item, NOMESSAGE) && !is_spell) {
 	    purse -= cur_worth;		/* take his money */
 	    effective_purse -= cur_worth;
 	    ++num_transactions;
@@ -419,7 +419,7 @@ sell_it()
 	purse += cur_worth;		/* give him his money */
 	++num_transactions;
 	effective_purse += cur_worth;
-	sprintf(buf, "Sold %s.  Hit space to continue.", inv_name(obj, TRUE));
+	sprintf(buf, "Sold %s.  Hit space to continue.", inv_name(obj, LOWERCASE));
 	mvwaddstr(hw, 13, 0, buf);
 	touchwin(hw);
 	wrefresh(hw);

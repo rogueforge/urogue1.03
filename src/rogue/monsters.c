@@ -30,12 +30,15 @@ bool familiar,print_message;
 	return;
     }
 
-    if (type == 0)			/* Random monster modified by level */
-	 monster = roll(min(pstats.s_lvl, (nummonst - NUMSUMMON) / 8), 8);
+    if (type == 0) {			/* Random monster modified by level */
+	int ndice = min(pstats.s_lvl, (nummonst - NUMSUMMON) / 8);
+
+	monster = min(nummonst, roll(ndice, pstats.s_charisma));
+    }
     else monster = type;
 
     turn_on(player, SUMMONING);
-    if ( !(mp = creat_mons(&player, monster, FALSE))) {
+    if ( !(mp = creat_mons(&player, monster, NOMESSAGE))) {
         msg("Summon failed.");
 	turn_off(player, SUMMONING);
 	return(NULL);
@@ -140,6 +143,8 @@ bool max_monster;
     register char *ip, *hitp;
     register short i, min_intel, max_intel;
     register short num_dice, num_sides=8, num_extra=0;
+    int eff_charisma = pstats.s_charisma;
+    int eff_intel = pstats.s_intel;
     char *strchr();
 
     attach(mlist, item);
@@ -324,35 +329,43 @@ bool max_monster;
     }
 
     /* monsters that wield weapons */
-    if (on(*tp, CANWIELD) && (rnd(9) < 5 || max_monster)) {
-	struct linked_list *wield_item;
-	register struct object *wielded;
+    if (on(*tp, CANWIELD)) {
+	if (max_monster || rnd(2)) {
+	    struct linked_list *wield_item;
+	    register struct object *wielded;
 
-	wield_item = new_item(sizeof *wielded);
-	wielded = OBJPTR(wield_item);
-	carried_weapon(tp, wielded);
+	    wield_item = new_item(sizeof *wielded);
+	    wielded = OBJPTR(wield_item);
+	    carried_weapon(tp, wielded);
 
-	i = rnd(tp->t_stats.s_lvl);
-	switch (i) {
-	    when 0: wielded->o_which = CLUB;
-	    when 1: wielded->o_which = SHORT_SPEAR;
-	    when 2: wielded->o_which = SHORT_SWORD;
-	    when 3: wielded->o_which = LIGHT_MACE;
-	    when 4: wielded->o_which = MORNINGSTAR;
-	    when 5: wielded->o_which = BROAD_SWORD;
-	    when 6: wielded->o_which = LONG_SWORD;
-	    when 7: wielded->o_which = LANCE;
-	    when 8: wielded->o_which = HEAVY_MACE;
-	    when 9: wielded->o_which = BAST_SWORD;
-	    otherwise:
-		wielded->o_which = TWO_SWORD;
+	    i = rnd(CLAYMORE - CLUB) + rnd(2 * tp->t_stats.s_lvl);
+	    i = min(i, CLAYMORE);
+	    wielded->o_which = i;
+	    init_weapon(wielded, wielded->o_which);
+
+	    /* Is it too heavy? */
+	    if (itemweight(wielded) > 8 * tp->t_stats.s_str)
+		 discard(wield_item);
+	    else attach(tp->t_pack, wield_item);
 	}
-	init_weapon(wielded, wielded->o_which);
 
-	/* Is it too heavy? */
-	if (itemweight(wielded) > 8 * tp->t_stats.s_str)
-	     discard(wield_item);
-	else attach(tp->t_pack, wield_item);
+	/*
+	if (max_monster || rnd(2)) {
+	    struct linked_list *wear_item;
+	    struct object *worn;
+
+	    wear_item = new_item(sizeof *worn);
+	    worn = OBJPTR(wear_item);
+	    carried_weapon(tp, worn);
+
+	    i = rnd(CLAYMORE-CLUB) + rnd(2*tp->t_stats.s_lvl);
+	    i = min(i, CLAYMORE);
+	    worn->o_which = i;
+	    init_armor(worn, worn->o_which);
+
+	    attach(tp->t_pack, wear_item);
+	}
+	*/
     }
 
 
@@ -360,37 +373,40 @@ bool max_monster;
 	runto(cp, &hero);
     }
     else {
-	/* Normally scared monsters have a chance to not be scared */
+	turn_off(*tp, ISRUN);
+
 	if (on(*tp, ISFLEE) && (rnd(4) == 0)) turn_off(*tp, ISFLEE);
 
+	if (rnd(luck) == 0)
+	    switch (player.t_ctype) {
+		when C_MAGICIAN:
+		case C_ILLUSION:
+		    eff_intel = 2 * pstats.s_intel;
+		when C_DRUID:
+		    eff_intel = 2 * pstats.s_intel;
+		case C_RANGER:
+		    eff_charisma = 2 * pstats.s_charisma;
+		when C_ASSASIN:
+		case C_THIEF:
+		case C_NINJA:
+		    eff_charisma = pstats.s_charisma / 2;
+	    }
+
 	/* LOWFRIENDLY monsters might be friendly */
-	if (on(*tp, LOWFRIENDLY) && rnd(43) < 4)
+	i = roll(100);
+	if (i == 0 || (on(*tp, LOWFRIENDLY) && i < eff_charisma) ||
+		      (on(*tp, MEDFRIENDLY) && i < 3 * eff_charisma) ||
+		      (on(*tp, HIGHFRIENDLY) && i < 5 * eff_charisma)) {
 	    turn_on(*tp, ISFRIENDLY);
-
-	/* MEDFRIENDLY monsters might be friendly */
-	if (on(*tp, MEDFRIENDLY) && rnd(43) < 18)
-	    turn_on(*tp, ISFRIENDLY);
-
-	/* HIGHFRIENDLY monsters probably will be friendly */
-	if (on(*tp, HIGHFRIENDLY) && rnd(43) < 30)
-	    turn_on(*tp, ISFRIENDLY);
-
-	if (on(*tp, ISFRIENDLY))
 	    turn_off(*tp, ISMEAN);
+	}
 
-	/* LOWCAST monsters might use spells */
-	if (on(*tp, LOWCAST) && rnd(43) < 4)
+	i = roll(100);
+	if (i == 0 || (on(*tp, LOWCAST) && i < eff_intel) ||
+		      (on(*tp, MEDCAST) && i < 3 * eff_intel) ||
+		      (on(*tp, HIGHCAST) && i < 5 * eff_intel)) {
 	    turn_on(*tp, CANCAST);
-
-	/* MEDCAST monsters might use spells */
-	if (on(*tp, MEDCAST) && rnd(43) < 18)
-	    turn_on(*tp, CANCAST);
-
-	/* HIGHFRIENDLY monsters probably will use spells */
-	if (on(*tp, HIGHCAST) && rnd(43) < 30)
-	    turn_on(*tp, CANCAST);
-
-	turn_off(*tp, ISRUN);		/* start the monster off right */
+	}
 
 	if (on(*tp, ISDISGUISE)) {
 	    char mch;
@@ -460,12 +476,11 @@ wanderer()
 	count = 0;
 
     for (i = 1; i <= count; i++) {
-	register struct linked_list *ip;
-	register struct thing *mp;
+	register struct linked_list *ip = creat_mons(tp, which, NOMESSAGE);
 
-	
-	if ((ip = creat_mons(tp, which, FALSE)) != NULL) {
-	    mp = THINGPTR(ip);
+	if (ip != NULL) {
+	    register struct thing *mp = THINGPTR(ip);
+
 	    if (on(*tp, ISFRIENDLY))
 		turn_on(*mp, ISFRIENDLY);
 	    else
@@ -775,53 +790,14 @@ int flags;
 {
     register struct linked_list *ip;
     register struct thing *mp;
-    register int i;
     register struct linked_list *nip;
     register int pres_monst=1, num_lines=LINES-3;
     register short which_monst;
-    char monst_name[2*LINELEN];
     bool blessed = flags & ISBLESSED;
     bool cursed  = flags & ISCURSED;
 
-    /* Print out the monsters */
-    while (pres_monst < nummonst) {
-	wclear(hw);
-	touchwin(hw);
-
-	wmove(hw, 2, 0);
-	for (i=0; i<num_lines && pres_monst < nummonst; i++) {
-	    sprintf(monst_name, "[%d] %s\n",
-				pres_monst, monsters[pres_monst].m_name);
-	    waddstr(hw, monst_name);
-	    pres_monst++;
-	}
-
-	if (pres_monst < nummonst) {
-	    mvwaddstr(hw, LINES-1, 0, morestr);
-	    wrefresh(hw);
-	    wait_for(' ');
-	}
-
-	else {
-	    mvwaddstr(hw, 0, 0, "Which monster");
-	    if (!terse) waddstr(hw, " do you wish to wipe out");
-	    waddstr(hw, "? ");
-	    wrefresh(hw);
-	}
-    }
-
-get_monst:
-    get_str(monst_name, hw);
-    which_monst = atoi(monst_name);
-    if ((which_monst < 1 || which_monst > nummonst-1)) {
-	mvwaddstr(hw, 0, 0, "Please enter a number in the displayed range -- ");
-	wrefresh(hw);
-	goto get_monst;
-    }
-
-    /* Set up for redraw */
-    clearok(cw, TRUE);
-    touchwin(cw);
+    while ((which_monst = get_monster_number("genocide")) == 0)
+	;
 
     if (cursed) {					/* oops... */
 	extern int throne_monster;
@@ -1177,7 +1153,7 @@ register struct thing *tp;
 	when RING:  know_items[TYP_RING][selection[which_item].which] = TRUE;
     }
 
-    if (add_pack(item, FALSE) == FALSE) {
+    if (add_pack(item, MESSAGE) == FALSE) {
 	obj->o_pos = hero;
 	fall(&player, item, TRUE);
     }

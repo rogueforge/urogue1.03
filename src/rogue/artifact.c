@@ -516,18 +516,18 @@ struct object *tr;
 	when 89:
 		if (cur_weapon != NULL) 
 		    msg("You feel your %s get very hot.", 
-			inv_name(cur_weapon, DROP));
+			inv_name(cur_weapon, LOWERCASE));
 	when 90:
 		if (cur_weapon != NULL) 
 		    msg("Your %s glows white for an instant.",
-			inv_name(cur_weapon, DROP));
+			inv_name(cur_weapon, LOWERCASE));
 	when 91:
 		if (cur_armor != NULL) 
-		    msg("Your %s gets very hot.", inv_name(cur_armor, DROP));
+		    msg("Your %s gets very hot.", inv_name(cur_armor, LOWERCASE));
 	when 92:
 		if (cur_weapon != NULL) 
 		    msg("Your %s suddenly feels very cold.",
-			inv_name(cur_weapon, DROP));
+			inv_name(cur_weapon, LOWERCASE));
 	when 93:
 		if (cur_armor != NULL)
 		    msg("Your armor is covered by an oily film.");
@@ -544,7 +544,7 @@ struct object *tr;
 			    continue;
 			delta.x = x;
 			delta.y = y;
-			do_zap(&player, TRUE, WS_POLYMORPH, 
+			do_zap(&player, WS_POLYMORPH, 
 				rnd(2) ? ISCURSED : ISNORMAL);
 		    }
 		}
@@ -558,13 +558,13 @@ struct object *tr;
 			    continue;
 			delta.x = x;
 			delta.y = y;
-			do_zap(&player, TRUE, WS_INVIS, ISNORMAL);
+			do_zap(&player, WS_INVIS, ISNORMAL);
 		    }
 		}
 	}
 	otherwise:
 		tr->art_stats.ar_flags &= ~ISACTIVE;
-		msg("You hear a click coming from %s.", inv_name(tr, DROP));
+		msg("You hear a click coming from %s.", inv_name(tr, LOWERCASE));
     }
 }
 
@@ -682,9 +682,9 @@ struct object *tr;
 	}
 	obj = apply_to_bag(pack, NULL, NULL, bafcweapon, NULL);
 	if (obj->o_flags & ISMETAL)
-	    msg("Your %s melts and disappears.", inv_name(obj, TRUE));
+	    msg("Your %s melts and disappears.", inv_name(obj, LOWERCASE));
 	else
-	    msg("Your %s crumbles in your hands.", inv_name(obj, TRUE));
+	    msg("Your %s crumbles in your hands.", inv_name(obj, LOWERCASE));
 	obj->o_flags &= ~ISCURSED;
 	dropcheck(obj);
 	del_bag(pack, obj);
@@ -700,7 +700,7 @@ struct object *tr;
 	}
 	obj = apply_to_bag(pack, NULL, NULL, bafcarmor, NULL);
 	msg("Your %s crumbles into small black powdery dust.",
-	      inv_name(obj, TRUE));
+	      inv_name(obj, LOWERCASE));
 	obj->o_flags &= ~ISCURSED;
 	dropcheck(obj);
 	del_bag(pack, obj);
@@ -990,7 +990,7 @@ do_bag(obj)
 	    if ((new_obj_p = get_object(pack, "add", NULL, NULL)) != NULL) {
 		rem_pack(new_obj_p);		/* free up pack slot */
  		push_bag(&obj->art_stats.t_art, new_obj_p, new_obj_p->o_type);
-		pack_report(new_obj_p, FALSE, "You just added ");
+		pack_report(new_obj_p, MESSAGE, "You just added ");
   	    }
 	}
 	when 2: {
@@ -1001,7 +1001,7 @@ do_bag(obj)
 	    if ((obj_p = get_object(obj->art_stats.t_art, "remove", NULL, NULL))
 		!= NULL) {
 		item_p = make_item(obj_p);	/* attach upper structure */
-		if (add_pack(item_p, FALSE) != FALSE) 
+		if (add_pack(item_p, MESSAGE) != FALSE) 
 		    pop_bag(obj->art_stats.t_art, obj_p);
 		}
 	    }
@@ -1081,19 +1081,19 @@ do_sceptre()
 
     switch (which) {
 	when 0: if (get_dir()) 
-		    do_zap(&player, TRUE, WS_CANCEL, ISBLESSED);
+		    do_zap(&player, WS_CANCEL, ISBLESSED);
 	when 1: if (get_dir()) 
-		    do_zap(&player, TRUE, WS_POLYMORPH, ISBLESSED);
+		    do_zap(&player, WS_POLYMORPH, ISBLESSED);
 	when 2: if (get_dir()) 
-		    do_zap(&player, TRUE, WS_SLOW_M, ISBLESSED);
+		    do_zap(&player, WS_SLOW_M, ISBLESSED);
 	when 3: if (get_dir()) 
-		    do_zap(&player, TRUE, WS_MONSTELEP, ISBLESSED);
+		    do_zap(&player, WS_MONSTELEP, ISBLESSED);
 	when 4: if (get_dir()) 
-		    do_zap(&player, TRUE, WS_CONFMON, ISBLESSED);
+		    do_zap(&player, WS_CONFMON, ISBLESSED);
 	when 5: if (get_dir()) 
-		    do_zap(&player, TRUE, WS_PARALYZE, ISBLESSED);
+		    do_zap(&player, WS_PARALYZE, ISBLESSED);
 	when 6: if (get_dir()) 
-		    do_zap(&player, TRUE, WS_DRAIN, ISBLESSED);
+		    do_zap(&player, WS_DRAIN, ISBLESSED);
 	when 7: quaff(&player, P_SMELL, ISNORMAL);
 	otherwise:
 		msg("What a strange thing to do!!");
@@ -1156,7 +1156,7 @@ do_wand()
     }
 
     if (get_dir()) 
-	do_zap(&player, TRUE, which, ISBLESSED);
+	do_zap(&player, which, ISBLESSED);
 }
 
 /*

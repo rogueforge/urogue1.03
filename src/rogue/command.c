@@ -208,7 +208,7 @@ command()
 		when 'Q' : after = FALSE; quit();
 		when 'i' : after = FALSE; inventory(pack, '*');
 		when 'I' : after = FALSE; inventory(pack, 0);
-		when ',' : add_pack(NULL, TRUE);
+		when ',' : add_pack(NULL, NOMESSAGE);
 		when 'd' : drop((struct linked_list *) NULL);
 		when 'q' : quaff(&player, -1, ISNORMAL);
 		when 'r' : read_scroll(&player, -1, ISNORMAL);
@@ -237,7 +237,7 @@ command()
 		when 's' : search(FALSE);
 		when 'z' :
 		    if (get_dir())
-			 do_zap(&player, TRUE, -1, ISNORMAL);
+			 do_zap(&player, -1, ISNORMAL);
 		    else after = FALSE;
 		when 'p' : prayer();
 		when 'C' : incant(&player, NULL);
@@ -291,28 +291,40 @@ command()
 			    msg("Oh no you don't!");
 		    } 
 		    else {
+			object *get_object();
+			register object *obj;
+
 			msg("Wizard command: ");
 			mpos = 0;
 			ch = readchar();
 			switch(ch) {
-			when 'c' : buy_it('\0', ISNORMAL);
-			when 'i' : inventory(lvl_obj, 0);
-			when 'I' : whatis((struct linked_list *) NULL);
-			when 'r' : msg("rnd(4)%d, rnd(40)%d, rnd(100)%d",
-						rnd(4),rnd(40),rnd(100));
-			when 'f' : overlay(stdscr,cw);
-			when 'm' : overlay(mw,cw);
-			when 't' : teleport();
-			when 'F' : msg("food left: %d\tfood level: %d", 
-						food_left, foodlev);
-			when 'M' : makemon();
-			when 's' : activity();
+			when 'v' :
+			    wiz_verbose = !wiz_verbose;
 			when 'e' : {
 			    wizard = FALSE;
 			    msg("Not wizard any more.");
 			}
-			when 'v' :
-			    wiz_verbose = !wiz_verbose;
+			when 's' : activity();
+			when 't' : teleport();
+			when 'm' : overlay(mw,cw);
+			when 'f' : overlay(stdscr,cw);
+			when 'i' : inventory(lvl_obj, 0);
+			when 'c' : buy_it('\0', ISNORMAL);
+			when 'I' : whatis((struct linked_list *) NULL);
+			when 'F' : msg("food left: %d\tfood level: %d", 
+						food_left, foodlev);
+			when 'M' : creat_mons(&player,
+					get_monster_number("create"), MESSAGE);
+			when 'r' : msg("rnd(4)%d, rnd(40)%d, rnd(100)%d",
+						rnd(4),rnd(40),rnd(100));
+			when 'C' :
+			    if ((obj = get_object(pack, "charge", STICK, NULL))
+				!= NULL)
+				obj->o_charges=10000;
+			when 'w' :
+			    if ((obj = get_object(pack, "price", NULL, NULL))
+				!= NULL)
+				msg("Worth %d.", get_worth(obj));
 			when 'g' : {
 			    int tlev;
 			    prbuf[0] = NULL;
@@ -342,26 +354,9 @@ command()
 				new_level(levtype);
 			    }
 			}
-			when 'C' : {
- 			  register object *obj_p;
- 			  object *get_object();
-  
-  			  if ((obj_p = get_object(pack, "charge", STICK, NULL))
-  			      != NULL)
-				obj_p->o_charges=10000;
-			}
-			when 'w' : {
- 			  register object *obj_p;
- 			  object *get_object();
-  
-  			  if ((obj_p = get_object(pack, "price", NULL, NULL))
-  			      != NULL)
-				msg("Worth %d.", get_worth(obj_p));
-			}
 			when 'o' : {
 			    register int i;
 			    register struct linked_list *item;
-			    register struct object *obj;
 
 			    for (i = 0; i < 20; i++)
 				raise_level();
@@ -378,11 +373,10 @@ command()
 			    max_stats.s_wisdom	= pstats.s_wisdom	= 25;
 			    max_stats.s_dext	= pstats.s_dext		= 25;
 			    max_stats.s_const	= pstats.s_const	= 25;
-			    /* Give the rogue a sword */
 			    if (cur_weapon == NULL || 
 			      cur_weapon->o_which != CLAYMORE) {
 				item = spec_item(WEAPON, CLAYMORE, 10, 10);
-				add_pack(item, TRUE);
+				add_pack(item, NOMESSAGE);
 				cur_weapon = OBJPTR(item);
 				cur_weapon->o_flags |= ISKNOW;
 			    }
@@ -396,7 +390,7 @@ command()
 				free(guess_items[TYP_STICK][WS_DISINTEGRATE]);
 				guess_items[TYP_STICK][WS_DISINTEGRATE] = NULL;
 			    }
-			    add_pack(item, TRUE);
+			    add_pack(item, NOMESSAGE);
 
 			    /* and his suit of armor */
 			    if (cur_armor == NULL || 
@@ -408,7 +402,7 @@ command()
 				obj->o_weight = 
 					armors[CRYSTAL_ARMOR].a_wght * 0.2;
 				cur_armor = obj;
-				add_pack(item, TRUE);
+				add_pack(item, NOMESSAGE);
 			    }
 
 			    /* and some rings (have to put them on, for now) */
@@ -421,7 +415,7 @@ command()
 				    free(guess_items[TYP_RING][R_SEARCH]);
 				    guess_items[TYP_RING][R_SEARCH] = NULL;
 				}
-				add_pack(item, TRUE);
+				add_pack(item, NOMESSAGE);
 			    }
 			    if (!is_wearing(R_PIETY)) {
 				item = spec_item(RING, R_PIETY, 0, 0);
@@ -432,7 +426,7 @@ command()
 				    free(guess_items[TYP_RING][R_PIETY]);
 				    guess_items[TYP_RING][R_PIETY] = NULL;
 				}
-				add_pack(item, TRUE);
+				add_pack(item, NOMESSAGE);
 			    }
 			    item = spec_item(SCROLL, S_ELECTRIFY, 0, 0);
 			    obj = OBJPTR(item);
@@ -442,7 +436,7 @@ command()
 				free(guess_items[TYP_SCROLL][S_ELECTRIFY]);
 				guess_items[TYP_SCROLL][S_ELECTRIFY] = NULL;
 			    }
-			    add_pack(item, TRUE);
+			    add_pack(item, NOMESSAGE);
 
 			    /* Spiff him up a bit */
 			    quaff(&player, P_SHERO, ISBLESSED);
@@ -543,7 +537,7 @@ command()
 		return;
 	    }
 	    else if (cur_weapon->o_flags & ISPOISON && rnd(4) == 0) {
-		msg("You are cut by your %s!", inv_name(cur_weapon, TRUE));
+		msg("You are cut by your %s!", inv_name(cur_weapon, LOWERCASE));
 		if (player.t_ctype != C_PALADIN
 			&& !(player.t_ctype == C_NINJA && pstats.s_lvl > 12) 
 			&& !save(VS_POISON)) {
@@ -1092,50 +1086,4 @@ att_bonus()
 		(pstats.s_lvl > 4 && pstats.s_lvl < 9 && rnd(2))))
 	bonus = TRUE;
     return bonus;
-}
-
-electrificate()
-{
-    register int lvl;
-    register struct linked_list *item, *nitem;
-    register struct thing *tp;
-    register int damage;
-    register int affect_dist = 4 + player.t_stats.s_lvl/4;
-    char *mname;
-
-    for (item = mlist; item != NULL; item = nitem) {
-	nitem = next(item); /* Get next item now since monster may disappear */
-	tp = THINGPTR(item);
-	mname = monsters[tp->t_index].m_name;
-
-	if (DISTANCE(tp->t_pos.y, tp->t_pos.x, hero.y, hero.x) < affect_dist) {
-	    damage = roll(1,player.t_stats.s_lvl) + player.t_stats.s_lvl;
-	    debug("Charge does %d (%d)", damage, tp->t_stats.s_hpt - damage);
-	    if (on(*tp, NOBOLT)) {
-	       msg("The %s basks in your glow", mname);
-	       continue;
-	    }
-	    if ((tp->t_stats.s_hpt -= damage) <= 0) {
-		msg("The %s is killed by an electric shock.", mname);
-		killed(&player, item, MESSAGE, POINTS);
-		continue;
-	    }
-	    lvl = tp->t_stats.s_intel - 5;
-	    if (lvl < 0)
-		lvl = 10 + tp->t_stats.s_intel;
-	    if (rnd(lvl + 1)/5 == 0) {
-		turn_on(*tp, ISFLEE);
-		msg("The %s is shocked by electricity.", mname);
-	    }
-	    else msg("The %s is zapped by your electricity.", mname);
-
-	    summon_help(tp, NOFORCE);
-	    turn_off(*tp, ISFRIENDLY);
-	    turn_off(*tp, ISCHARMED);
-	    turn_on(*tp, ISRUN);
-	    turn_off(*tp, ISDISGUISE);
-	    runto(&tp->t_pos, &hero);
-	    fighting = after = running = FALSE;
-	}
-    }
 }

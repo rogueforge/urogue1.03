@@ -691,8 +691,8 @@
 #define	NOMESSAGE	FALSE
 #define	POINTS		TRUE
 #define	NOPOINTS	FALSE
-#define	DROP		TRUE
-#define	NODROP		FALSE
+#define	LOWERCASE	TRUE
+#define	UPPERCASE	FALSE
 #define	WANDER		TRUE
 #define	NOWANDER	FALSE
 #define	GRAB		TRUE
@@ -703,6 +703,8 @@
 #define	NOMAXSTATS	FALSE
 #define	FORCE		TRUE
 #define	NOFORCE		FALSE
+#define	THROWN		TRUE
+#define	NOTHROWN	FALSE
 
 #define	good_monster(m) (on(m, ISCHARMED) || \
 			on(m, ISFRIENDLY) || \
