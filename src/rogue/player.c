@@ -426,7 +426,7 @@ undead_sense()
     for (item = mlist; item != NULL; item = next(item)) {
 	tp = THINGPTR(item);
 	if (on(*tp, ISUNDEAD)) {
-	    mvwaddch(hw, tp->t_pos.y, tp->t_pos.x, '#');
+	    mvwaddch(hw, tp->t_pos.y, tp->t_pos.x, '&');
 	    show = TRUE;
 	}
     }

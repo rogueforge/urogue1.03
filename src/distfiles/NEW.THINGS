@@ -1510,4 +1510,10 @@
 18)	fixed up add_line() off-by-one error in display calculation
 	abive by Henry Chai
 
+1.03 Alpha, Oct 6, 86
+1)	fix POW and HPT healing rate calculation in check_level()
+2)	undead sense should show a '&', not a '#'
+3)	fix declarations of arrays of string pointers for Sun compiler
+4)	initialize pluses and minuses of stuff in trading posts
+
 -------	End of File ------
