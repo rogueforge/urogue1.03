@@ -1,25 +1,27 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/05/86
  */
 /*
  * File for the fun ends
  * Death or a total win
  *
- * @(#)rip.c	3.13 (Berkeley) 6/16/81
  */
 
-#include "curses.h"
+#include <signal.h>
+#include <ctype.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include "rogue.h"
+#include "mach_dep.h"
+#include "score.h"
+#include "death.h"
 #if defined(RTU2) || defined(USGV5)
 #include <time.h>
 #else
 #include <sys/time.h>
 #endif
-#include <signal.h>
-#include <ctype.h>
-#include <sys/types.h>
-#include <pwd.h>
-#include "mach_dep.h"
-#include "rogue.h"
+
+#define RN (((seed = seed*11109+13849) & 0x7fff) >> 1)
 
 static char *rip[] = {
 "                       __________",
@@ -54,7 +56,7 @@ register short monst;
     char buf[80];
     struct tm *localtime();
 
-    if (ISWEARING(R_RESURRECT) || rnd(67) == 0) {
+    if (is_wearing(R_RESURRECT) || rnd(wizard ? 3 : 67) == 0) {
 	int die = TRUE;
 
 	if (resurrect-- == 0) 
@@ -77,7 +79,7 @@ register short monst;
 	    }
 	    else {
 		for (item=pack; item!=NULL; item=next_item) {
-		    obj = (struct object *) ldata(item);
+		    obj = OBJPTR(item);
 		    if (obj->o_flags & ISOWNED || obj->o_flags & ISPROT) {
 			next_item = next(item);
 			continue;
@@ -87,10 +89,8 @@ register short monst;
 		    dropcheck(obj);
 		    obj->o_flags = flags;
 		    next_item = next(item);
-		    detach(pack, item);
-		    freeletter(item);
+		    rem_pack(obj);
 		    attach(lvl_obj, item);
-		    inpack--;
 		    if (obj->o_type == ARTIFACT)
 			has_artifact &= ~(1 << obj->o_which);
 		    do {
@@ -116,7 +116,7 @@ register short monst;
 	if (die) {
 	    wmove(cw, mpos, 0);
 	    waddstr(cw, morestr);
-	    draw(cw);
+	    wrefresh(cw);
 	    wait_for(' ');
 	}
 	else
@@ -208,6 +208,14 @@ int lvl;
 	refresh();
 	gets(prbuf);
 	showpack(packend);
+    }
+
+    /*
+     * Should we return the terminal's keypad mode to
+     * numeric mode?
+     */
+    if(keypadmode) {
+	keypadoff();
     }
 
     /*
@@ -323,7 +331,7 @@ int lvl;
 		bool first = TRUE;
 
 		things[0] = '\0';
-		for (i = 0; i <= MAXARTIFACT; i++) {
+		for (i = 0; i <= maxartifact; i++) {
 		    if (scp->sc_artifacts & (1 << i)) {
 			if (strlen(things))
 			    strcat(things, ", ");
@@ -347,8 +355,9 @@ int lvl;
 	    if (scp->sc_flags == 0) {
 		printf(" by");
 		killer = killname(scp->sc_monster);
-		printf(" %s\n", killer);
+		printf(" %s", killer);
 	    }
+	    putchar('\n');
 	}
     }
     lseek(fd_score, 0L, 0);
@@ -357,10 +366,12 @@ int lvl;
      */
     encwrite((char *) top_ten, sizeof top_ten, fd_score);
     close(fd_score);
-    putchar('\n');
-    printf(retstr);
-    fflush(stdout);
-    gets(prbuf);
+    if(!prscore) {
+    	putchar('\n');
+    	printf(retstr);
+    	fflush(stdout);
+    	gets(prbuf);
+    }
 }
 
 total_winner()
@@ -419,7 +430,7 @@ total_winner()
     oldpurse = purse;
     mvaddstr(0, 0, "   Worth  Item");
     for (c = 'a', item = pack; item != NULL; c++, item = next(item)) {
-	obj = (struct object *) ldata(item);
+	obj = OBJPTR(item);
 	worth = get_worth(obj);
 	purse += worth;
 	if (obj->o_type == ARTIFACT && obj->o_which == TR_PURSE) 
@@ -495,6 +506,16 @@ register short monst;
 		return "falling";
 	    case D_FIRE:
 		return "slow boiling in oil";
+	    case D_SPELLFUMBLE:
+		return "a botched spell";
+	    case D_DRAINLIFE:
+		return "a drain life spell";
+	    case D_ARTIFACT:
+		return "an artifact of the gods";
+	    case D_GODWRATH:
+		return "divine retribution";
+	    case D_CLUMSY:
+		return "excessive clumsyness";
 	}
 }
 

@@ -3,7 +3,7 @@
 #
 # stupid Makefile to keep things in synch
 
-rogue.h: defs.h
+rogue.h: defs.h curses.h
 	touch rogue.h
 
 mach_dep.h: defs.h

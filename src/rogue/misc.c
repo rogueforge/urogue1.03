@@ -1,7 +1,6 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/12/86
  */
-#include "curses.h"
 #include "rogue.h"
 #include <ctype.h>
 
@@ -108,12 +107,10 @@ bool wakeup;
     ey = hero.y + 1;
     ex = hero.x + 1;
     for (x = hero.x - 1; x <= ex; x++)
-	if (x >= 0 && x < COLS) for (y = hero.y - 1; y <= ey; y++)
-	{
+	if (x >= 0 && x < COLS) for (y = hero.y - 1; y <= ey; y++) {
 	    if (y <= 0 || y >= LINES - 2)
 		continue;
-	    if (isalpha(mvwinch(mw, y, x)))
-	    {
+	    if (isalpha(mvwinch(mw, y, x))) {
 		register struct linked_list *it;
 		register struct thing *tp;
 
@@ -123,7 +120,7 @@ bool wakeup;
 		    it = find_mons(y, x);
 		if (it == NULL) 
 		    continue;
-		tp = (struct thing *) ldata(it);
+		tp = THINGPTR(it);
 		tp->t_oldch = mvinch(y, x);
 		if (isatrap(tp->t_oldch)) {
 		    register struct trap *trp = trap_at(y, x);
@@ -145,8 +142,7 @@ bool wakeup;
 	     * Don't show room walls if he is in a passage and
 	     * check for maze turns
 	     */
-	    if (off(player, ISBLIND))
-	    {
+	    if (off(player, ISBLIND)) {
 		if (y == hero.y && x == hero.x
 		    || (inpass && (ch == '-' || ch == '|')))
 			continue;
@@ -163,10 +159,8 @@ bool wakeup;
 
 	    wmove(cw, y, x);
 	    waddch(cw, ch);
-	    if (door_stop && !firstmove && running)
-	    {
-		switch (runch)
-		{
+	    if (door_stop && !firstmove && running) {
+		switch (runch) {
 		    when 'h':
 			if (x == ex)
 			    continue;
@@ -192,8 +186,7 @@ bool wakeup;
 			if ((y - x) - (hero.y - hero.x) <= -1)
 			    continue;
 		}
-		switch (ch)
-		{
+		switch (ch) {
 		    case DOOR:
 			if (x == hero.x || y == hero.y)
 			    running = FALSE;
@@ -245,19 +238,16 @@ register int y, x;
 {
     register int i;
     register struct room *rp;
-    register coord *cpp;
     static coord cp;
 
     cp.y = y;
     cp.x = x;
-    cpp = &cp;
-    for (rp = rooms, i = 0; i < MAXROOMS; rp++, i++)
-	if (inroom(rp, cpp))
-	    if (y == rp->r_pos.y || y == rp->r_pos.y + rp->r_max.y - 1)
-		return('-');
-	    else
-		return('|');
-
+    if ((rp = roomin(&cp)) != NULL) {
+	if (y == rp->r_pos.y || y == rp->r_pos.y + rp->r_max.y - 1)
+	    return('-');
+	else
+	    return('|');
+    }
     return('p');
 }
 
@@ -274,10 +264,9 @@ int x;
     register struct linked_list *obj;
     register struct object *op;
 
-    for (obj = lvl_obj; obj != NULL; obj = next(obj))
-    {
-	op = (struct object *) ldata(obj);
-	if (op->o_pos.y == y && op->o_pos.x == x)
+    for (obj = lvl_obj; obj != NULL; obj = next(obj)) {
+	op = OBJPTR(obj);
+	if (op && op->o_pos.y == y && op->o_pos.x == x)
 		return obj;
     }
     return NULL;
@@ -290,14 +279,15 @@ int x;
 
 eat()
 {
-    register struct linked_list *item;
     register struct object *obj;
     register int amount;
 
-    if ((item = get_item("eat", FOOD)) == NULL)
+    object *get_object();
+
+    if ((obj = get_object(pack, "eat", FOOD, NULL)) == NULL)
 	return;
-    obj = (struct object *) ldata(item);
-    del_pack(item);
+    if (--obj->o_count == 0)
+	discard_pack(obj);
     switch (obj->o_which) {
 	when FD_RATION:
 	    amount = HUNGERTIME + rnd(400) - 200;
@@ -319,11 +309,11 @@ eat()
 	    msg("Yum, the honey cakes tasted good.");
 	when FD_LEMBA:
 	    amount = (HUNGERTIME / 2) + rnd(900);
-	    quaff(P_HEALING, FALSE);
+	    quaff(&player, P_HEALING, ISNORMAL);
 	when FD_MIRUVOR:
 	    amount = (HUNGERTIME / 3) + rnd(500);
-	    quaff(P_HEALING, FALSE);
-	    quaff(P_RESTORE, FALSE);
+	    quaff(&player, P_HEALING, ISNORMAL);
+	    quaff(&player, P_RESTORE, ISNORMAL);
 	otherwise:
 	    msg("What a strange thing to eat!");
 	    amount = HUNGERTIME;
@@ -459,7 +449,7 @@ aggravate()
     register struct thing *tp;
 
     for (mi = mlist; mi != NULL; mi = next(mi)) {
-        tp = (struct thing *) ldata(mi);
+        tp = THINGPTR(mi);
 	runto(&tp->t_pos, &hero);
 	turn_off(*tp, ISFRIENDLY);
     }
@@ -517,18 +507,16 @@ get_dir()
     register char *prompt;
     register bool gotit;
 
-    if (terse) {
+    if (terse)
 	prompt = "Direction? ";
-    } else {
+    else {
 	prompt = "Which direction? ";
 	msg(prompt);
     }
 
-    do
-    {
+    do {
 	gotit = TRUE;
-	switch (readchar())
-	{
+	switch (readchar()) {
 	    when 'h': case'H': delta.y =  0; delta.x = -1;
 	    when 'j': case'J': delta.y =  1; delta.x =  0;
 	    when 'k': case'K': delta.y = -1; delta.x =  0;
@@ -545,8 +533,7 @@ get_dir()
 	}
     } until (gotit);
     if (on(player, ISHUH) && rnd(100) > 80)
-	do
-	{
+	do {
 	    delta.y = rnd(3) - 1;
 	    delta.x = rnd(3) - 1;
 	} while (delta.y == 0 && delta.x == 0);
@@ -554,91 +541,22 @@ get_dir()
     return TRUE;
 }
 
-
-
 /*
- * Incantation:
- *   Chooses between a spell and a prayer
- *
+ * is_wearing:
+ *	is the hero wearing a particular ring
  */
-incant()
+
+bool
+is_wearing(type)
+int type;
 {
-char
-    ch;
-/*
- * Check for spell casting ability
- */
-    if (!(MAGICIAN_ABILITY) && !(ILLUSION_ABILITY) &&
-	!(CLERIC_ABILITY) && !(DRUID_ABILITY)) {
-	msg("You are not permitted to cast spells.");
-	return;
-    }
+#define	ISRING(h, r) (cur_ring[h] != NULL && cur_ring[h]->o_which == r)
 
-
-get_incant:
-    msg("What class of spells? (* for list) ");
-    ch = readchar();
-
-    switch (ch) {
-	case 'i':
-	    if (ILLUSION_ABILITY)
-	        illusion_cast();
-            break;
-        case 'w': 
-	    if (MAGICIAN_ABILITY) 
-		magician_cast(); 
-	    break;
-	case 'c':
-	    if (CLERIC_ABILITY) 
-		cleric_pray(); 
-	    break;
-        case 'd': 
-	    if (DRUID_ABILITY) 
-		druid_pray(); 
-	    break;
-	case 's':
-	    if (FAMILIAR_ABILITY || wizard) { 
-	    short fam_type;
-	    char num_str[20];
-	        if (wizard) {
-		    msg("What monster do you want to be your familiar? ");
-		    ch = get_str(num_str,cw);
-		    if (ch == ESCAPE)
-		        fam_type = 0;
-		    else
-		        fam_type = (short) atoi(num_str);
-	        } else
-		    fam_type = 0;
-	    /* Only *one* familiar per game */
-	        summon_monster(fam_type,TRUE,FALSE);
-		turn_on(player,HASFAMILIAR);
-	    } else
-		msg("Hmm.  For some reason you can't summon a familiar.");
-	    break;
-	case '*':
-	    if (ILLUSION_ABILITY)
-	        add_line("(i)llusionist spells");
-	    if (MAGICIAN_ABILITY)
-	        add_line("(w)izard spells");
-	    if (CLERIC_ABILITY)
-	        add_line("(c)leric prayers");
-	    if (DRUID_ABILITY)
-	        add_line("(d)ruid prayers");
-	    if (FAMILIAR_ABILITY) 
-	        add_line("(s)ummon familiar");
-	    end_line();
-	goto get_incant;
-
-	case ESCAPE:
-	    msg("");
-	    return;
-
-	default:
-	    goto get_incant;
-    }
+    return (ISRING(LEFT_1, type) || ISRING(LEFT_2, type) ||
+		ISRING(LEFT_3, type) || ISRING(LEFT_4, type) ||
+		ISRING(RIGHT_1, type) || ISRING(RIGHT_2, type) ||
+		ISRING(RIGHT_3, type) || ISRING(RIGHT_4, type));
 }
-
-
 
 /*
  * Maze_view:
@@ -707,9 +625,9 @@ listen()
 	thief_bonus = 10;
 
     for (item = mlist; item != NULL; item = next(item)) {
-	tp = (struct thing *) ldata(item);
-	if (DISTANCE(hero.y, hero.x, tp->t_pos.y, tp->t_pos.x) < 64
-	    && rnd(100) < (thief_bonus + 2*pstats.s_dext + 5*pstats.s_lvl)) {
+	tp = THINGPTR(item);
+	if (DISTANCE(hero.y, hero.x, tp->t_pos.y, tp->t_pos.x) < 81
+ 	    && rnd(70) < (thief_bonus + 3*pstats.s_dext + 6*pstats.s_lvl)) {
  	    msg("You hear a%s %s nearby.", 
 		vowelstr(monsters[tp->t_index].m_name),
 		monsters[tp->t_index].m_name);
@@ -718,4 +636,69 @@ listen()
     }
     if (mcount == 0)
 	msg("You hear nothing.");
+}
+
+/*
+ * nothing_message - print out "Nothing <adverb> happens."
+ */
+static char *nothings[] = {
+    "",
+    "unusual ",
+    "seems to ",
+    "at all ",
+    "really ",
+    "noticeable ",
+    "different ",
+    "strange ",
+    "wierd ",
+    "bizzare ",
+    "wonky ",
+    ""
+};
+
+nothing_message(flags)
+register int flags;
+{
+    register int adverb = rnd(sizeof(nothings) / sizeof(char *));
+    register bool blessed = flags & ISBLESSED;
+    register bool cursed  = flags & ISCURSED;
+
+    msg("Nothing %s%shappens.", (blessed ? "good " : (cursed ? "bad " : "")),
+	nothings[adverb]);
+}
+
+/*
+ * feel_message - print out "You feel <description>."
+ */
+feel_message()
+{
+    char *charp;
+    switch(rnd(25)) {
+    when 1: charp = "bad";
+    when 2: charp = "hurt";
+    when 3: charp = "sick";
+    when 4: charp = "faint";
+    when 5: charp = "yucky";
+    when 6: charp = "wonky";
+    when 7: charp = "wierd";
+    when 8: charp = "queasy";
+    when 9: charp = "wounded";
+    when 11: charp = "unusual";
+    when 12: charp = "no pain";
+    when 13: charp = "strange";
+    when 14: charp = "noticable";
+    when 15: charp = "bizzare";
+    when 16: charp = "distressed";
+    when 17: charp = "different";
+    when 18: charp = "a touch of ague";
+    when 19: charp = "a migrane coming on";
+    when 20: charp = "excedrin headache #666";
+    when 21: charp = "a disturbance in the force";
+    when 22: charp = "like someone dropped a house on you";
+    when 23: charp = "as if every nerve in your body is on fire";
+    when 24: charp = "like thousands of red-hot army ants are crawling under your skin";
+    otherwise:
+	charp = "ill";
+    }
+    msg("You feel %s.", charp);
 }

@@ -1,4 +1,4 @@
-Last Modified: 05/25/86
+Last Modified: 06/30/86
 
 Congratulations!  You are now reading the installation information file
 for UltraRogue Release 1.  I would appreciate it if you dropped me a
@@ -41,7 +41,9 @@ variable ROGDEFS in tunable.c is used to provide a facility for keeping
 multiple versions of urogue around that either have different formats
 or different contents.  OPTIONS should be modified to be the correct
 name of the environment variable that the user sets their options at
-startup.  By default it is UROGUE.
+startup.  By default it is UROGUE.  PAGER is the program to use when
+printing out the MOTD, NEWS and PERMOK files.  ROGUE_SAVE is used to
+specify the default name of the save file.
 
 Review the Makefile to verify that the specified uid's and other
 such things exist or need modification for your environment.
@@ -50,17 +52,16 @@ After running make, run "control -i" (for initialize).  This will set
 up the list of people allowed to bypass load control and also allows
 you to specify the wizard's password.  The files PASSCTL, PERMOK, and
 SCOREDIR are created or recreated as neccesary.  The NEWS and MOTD
-files will be created if they do not exist, but they will be empty.
-(Note: "make init" will remove existing versions of the above files and
-create new empty ones.)  If they already exist, they will not be
-touched.  When running "control" with the -i flag and SCOREDIR already
-exists, it will prompt for a reset of SCOREDIR.  Replying with a 'y'
-will empty SCOREDIR.  To initialize the SCOREDIR so that there is
-something in it, play a game in regular (nonwizard) mode and kill at
-least one monster before quitting.  When the SCOREDIR is empty, urogue
-will fill it.  The other flags for "control" are:  c, check list of
-authorized users; a, authorize another user; p, change wizard's
-password; and d, remove authorization for a user.  The seed for the
+files will be created if they do not exist, but they will be empty.  If
+they already exist, they will not be touched.  When running "control"
+with the -i flag and SCOREDIR already exists, it will prompt for a
+reset of SCOREDIR.  Replying with a 'y' will empty SCOREDIR.  To
+initialize the SCOREDIR so that there is something in it, play a game
+in regular (nonwizard) mode and kill at least one monster before
+quitting.  When the SCOREDIR is empty, urogue will fill it.  The other
+flags for "control" are:  c, check list of authorized users; a,
+authorize another user; p, change wizard's password; d, remove
+authorization for a user; and s, reset the scorefile.  The seed for the
 password is 2 characters.
 
 The NEWS file is to be filled in with things of lasting importance such

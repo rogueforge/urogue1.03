@@ -1,7 +1,6 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/05/86
  */
-#include "curses.h"
 #include "rogue.h"
 
 /*
@@ -18,6 +17,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
     register struct linked_list *item;
     register struct thing *tp;
     coord stairs;
+    struct linked_list *fpack, *nitem;
 
     /* Start player off right */
     turn_off(player, ISHELD);
@@ -28,9 +28,6 @@ LEVTYPE	ltype;		/* designates type of level to create */
 
     if (level > max_level)
 	max_level = level;
-    wclear(cw);
-    wclear(mw);
-    clear();
     /*
      * check to see if he missed a UNIQUE, If he did then put it back
      * in the monster table for next time
@@ -43,26 +40,37 @@ LEVTYPE	ltype;		/* designates type of level to create */
     /*
      * Free up the monsters on the last level
      */
-    free_list(mlist);
+    if (fam_ptr != NULL) { 	/* save what familiar is carrying */
+	fpack = (THINGPTR(fam_ptr))->t_pack;
+	(THINGPTR(fam_ptr))->t_pack = NULL;
+    }
+    fam_ptr = NULL;		/* just in case */
+    for (i = 0; i <= mons_summoned; i++)
+	extinguish(unsummon);
+    mons_summoned = 0;
+    for (item = mlist; item != NULL; item = nitem) {
+	nitem = next(item);
+	killed(NULL, item, NOMESSAGE, NOPOINTS);
+    }
+
     free_list(lvl_obj);			/* Free up previous objects (if any) */
+
+    wclear(cw);
+    wclear(mw);
+    clear();
     levtype = ltype;
-    if (ltype == THRONE) {
+    switch(ltype) {
+    when THRONE:
 	do_throne();			/* do monster throne stuff */
-	put_things(ltype);		/* Place objects (if any) */
-    }
-    else if (ltype == POSTLEV) {
+    when POSTLEV:
 	do_post();			/* do post stuff */
-    }
-    else if (ltype == MAZELEV) {
+    when MAZELEV:
 	do_maze();
 	no_food++;
-	put_things(ltype);		/* Place objects (if any) */
-    }
-    else {
+    otherwise:
 	do_rooms();			/* Draw rooms */
 	do_passages();			/* Draw passages */
 	no_food++;
-	put_things(ltype);		/* Place objects (if any) */
     }
 
     /*
@@ -77,21 +85,21 @@ LEVTYPE	ltype;		/* designates type of level to create */
 
     if (ltype == POSTLEV) {
 	item = new_item(sizeof (struct thing));		/* Friendly Fiend */
-	new_monster(item, NUMMONST+2, &stairs, FALSE);
+	new_monster(item, nummonst+2, &stairs, MAXSTATS);
     }
+    else put_things(ltype);			/* Place objects (if any) */
 
     /*
      * special surprise on the way back up
-     * create Lucifer
+     * create Lucifer with more than the usual god abilities
      */
     if (has_artifact && level == 1) {
 	register struct thing *tp;
 	item = new_item(sizeof (struct thing));
-	new_monster(item, NUMMONST+1, &stairs, FALSE);
-	tp = (struct thing *) ldata(item);
+	new_monster(item, nummonst+1, &stairs, MAXSTATS);
+	tp = THINGPTR(item);
 	turn_on(*tp, CANINWALL);
 	turn_on(*tp, CANHUH);
-	turn_on(*tp, CANSEE);
 	turn_on(*tp, CANBLINK);
 	turn_on(*tp, CANSNORE);
 	turn_on(*tp, CANDISEASE);
@@ -112,7 +120,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
     }
 
     /*
-     * maybe add a trading post 
+     * maybe add a doorway to a trading post 
      */
     if (level > 15 && rnd(11) == 7 && ltype == NORMLEV) {
 	cnt = 0;
@@ -153,8 +161,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
 		traps[i].tr_show = FLOOR;
 		traps[i].tr_pos = stairs;
 	    }
-	    while (i--)
-	    {
+	    while (i--) {
 		cnt = 0;
 		do {
 		    rm = rnd_room();
@@ -198,39 +205,39 @@ LEVTYPE	ltype;		/* designates type of level to create */
 
     if (levtype != POSTLEV && levtype != THRONE) {
 	if (on(player, BLESSMAP) && rnd(5) == 0) {
-	    read_scroll(S_MAP, FALSE);
+	    read_scroll(&player, S_MAP, ISNORMAL);
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSMAP);
 	}
 	if (on(player, BLESSGOLD) && rnd(5) == 0) {
-	    read_scroll(S_GFIND, FALSE);
+	    read_scroll(&player, S_GFIND, ISNORMAL);
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSGOLD);
 	}
 	else if (player.t_ctype == C_THIEF)
 		gsense();
 	if (on(player, BLESSFOOD) && rnd(5) == 0) {
-	    read_scroll(S_FOODFIND, FALSE);
+	    read_scroll(&player, S_FOODDET, ISNORMAL);
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSFOOD);
 	}
 	if (on(player, BLESSMAGIC) && rnd(5) == 0) {
-	    quaff(P_TFIND, FALSE);
+	    quaff(&player, P_TREASDET, ISNORMAL);
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSMAGIC);
 	}
 	if (on(player, BLESSMONS) && rnd(5) == 0) {
-	    quaff(P_MFIND, FALSE);
+	    quaff(&player, P_MONSTDET, ISNORMAL);
 	    if (rnd(3) == 0)
 		turn_off(player, BLESSMONS);
 	}
     }
 
-    if (ISWEARING(R_ADORNMENT) || 
+    if (is_wearing(R_ADORNMENT) || 
 		cur_armor != NULL && cur_armor->o_which == MITHRIL) {
 	register bool greed = FALSE;
 	for (item = mlist; item != NULL; item = next(item)) {
-	    tp = (struct thing *) ldata(item);
+	    tp = THINGPTR(item);
 	    if (on(*tp, ISGREED)) {
 		turn_on(*tp, ISRUN);
 		turn_on(*tp, ISMEAN);
@@ -247,8 +254,36 @@ LEVTYPE	ltype;		/* designates type of level to create */
     /*
      * Summon familiar if player has one
      */
-    if (on(player,HASFAMILIAR) && on(player,CANSUMMON))
-        summon_monster((short) familiar_type,TRUE,TRUE);
+    if (on(player,HASFAMILIAR) && on(player,CANSUMMON)) {
+        summon_monster((short) fam_type,FAMILIAR, MESSAGE);
+	if (fam_ptr != NULL) {	/* add old pack to new */
+	    tp = THINGPTR(fam_ptr);
+	    if (tp->t_pack == NULL)
+		tp->t_pack = fpack;
+	    else if (fpack != NULL) {
+		for (item = tp->t_pack; item->l_next != NULL; item = next(item))
+		    {}	/* find last item in list */
+		item->l_next = fpack;
+		fpack->l_prev = item;
+	    }
+	}
+	else
+	    free_list(fpack);
+    }
+
+    /* Phial lights your way */
+    if (is_carrying(TR_PHIAL)) {
+	msg("The Phial banishes the darkness!");
+	read_scroll(&player, S_LIGHT, ISBLESSED);
+    }
+
+    /* Palantir shows all */
+    if (is_carrying(TR_PALANTIR)) {
+	msg("The Palantir reveals all!");
+	overlay(stdscr,cw);			/* Wizard mode 'f' command */
+	overlay(mw,cw);				/* followed by 'm' command */
+    }
+
     status(TRUE);
 }
 
@@ -262,8 +297,7 @@ rnd_room()
 
     if (levtype != NORMLEV)
 	rm = 0;
-    else do
-	{
+    else do {
 	    rm = rnd(MAXROOMS);
 	} while (rooms[rm].r_flags & ISGONE);
     return rm;
@@ -311,8 +345,8 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	rp->r_flags |= ISTREAS;
 
 	/* Make all the doors secret doors */
-	for (i=0; i<rp->r_nexits; i++) {
-	    cmov(rp->r_exit[i]);
+	for (i = 0; i < rp->r_nexits; i++) {
+	    move(rp->r_exit[i].y, rp->r_exit[i].x);
 	    addch(SECRETDOOR);
 	}
 
@@ -338,12 +372,13 @@ LEVTYPE	ltype;		/* designates type of level to create */
 		     * only put one UNIQUE per treasure room at most
 		     */
 		    if (got_unique)
-			new_monster(item,randmonster(FALSE, TRUE),&trp,FALSE);
+			new_monster(item,randmonster(NOWANDER, GRAB), &trp, NOMAXSTATS);
 		    else {
-			new_monster(item,randmonster(FALSE, FALSE),&trp,FALSE);
+			new_monster(item,randmonster(NOWANDER, NOGRAB), &trp, NOMAXSTATS);
 			if (on(*tp, ISUNIQUE))
 			    got_unique = TRUE;
 		    }
+		    turn_off(*tp, ISFRIENDLY);	/* no friendly monsters */
 		    turn_on(*tp, ISMEAN);
 		    if (off(*tp, CANINWALL)) {
 			tp->t_dest = &hero;
@@ -351,7 +386,8 @@ LEVTYPE	ltype;		/* designates type of level to create */
 		    }
 
 		    /* If it is a mimic, undisguise it */
-		    if (on(*tp, ISDISGUISE)) turn_off(*tp, ISDISGUISE);
+		    if (on(*tp, ISDISGUISE)) 
+			turn_off(*tp, ISDISGUISE);
 		}
 
 		/* Treasures */
@@ -359,7 +395,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
 		    (mvinch(rp->r_pos.y+j, rp->r_pos.x+i) == FLOOR)) {
 		    item = new_thing();
 		    attach(lvl_obj, item);
-		    cur = (struct object *) ldata(item);
+		    cur = OBJPTR(item);
 	
 		    mvaddch(trp.y, trp.x, cur->o_type);
 		    cur->o_pos = trp;
@@ -379,7 +415,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	     */
 	    item = new_thing();
 	    attach(lvl_obj, item);
-	    cur = (struct object *) ldata(item);
+	    cur = OBJPTR(item);
 	    /*
 	     * Put it somewhere
 	     */
@@ -399,7 +435,7 @@ LEVTYPE	ltype;		/* designates type of level to create */
     {
 	item = new_item(sizeof *cur);
 	attach(lvl_obj, item);
-	cur = (struct object *) ldata(item);
+	cur = OBJPTR(item);
 	new_artifact(-1, cur);
 	cnt = 0;
 	do {
@@ -411,64 +447,67 @@ LEVTYPE	ltype;		/* designates type of level to create */
     }
 }
 
+int throne_monster = 0;		/* identifies monster type in THRONE room */
 /*
  * do_throne:
  *	Put a monster's throne room and monsters on the screen
  */
 do_throne()
 {
-	coord mp;
-	int save_level;
-	reg int i;
-	reg struct room *rp;
-	reg struct thing *tp;
-	reg struct linked_list *item;
+    coord mp;
+    int save_level;
+    reg int i;
+    reg struct room *rp;
+    reg struct thing *tp;
+    reg struct linked_list *item;
 
-	for (rp = rooms; rp < &rooms[MAXROOMS]; rp++) {
-	    rp->r_nexits = 0;			/* no exits */
-	    rp->r_flags = ISGONE;		/* kill all rooms */
-	}
-	rp = &rooms[0];				/* point to only room */
-	rp->r_flags = 0;			/* this room NOT gone */
-	rp->r_max.x = 40;
-	rp->r_max.y = 10;			/* 10 * 40 room */
-	rp->r_pos.x = (COLS - rp->r_max.x) / 2;	/* center horizontal */
-	rp->r_pos.y = 1;			/* 2nd line */
-	draw_room(rp);				/* draw the only room */
+    for (rp = rooms; rp < &rooms[MAXROOMS]; rp++) {
+	rp->r_nexits = 0;			/* no exits */
+	rp->r_flags = ISGONE;			/* kill all rooms */
+    }
+    rp = &rooms[0];				/* point to only room */
+    rp->r_flags = 0;				/* this room NOT gone */
+    rp->r_max.x = 40;
+    rp->r_max.y = 10;				/* 10 * 40 room */
+    rp->r_pos.x = (COLS - rp->r_max.x) / 2;	/* center horizontal */
+    rp->r_pos.y = 3;				/* 2nd line */
+    draw_room(rp);				/* draw the only room */
 
-	save_level = level;			/* save current level */
-	level = max(2*level, level + roll(4,6));
+    save_level = level;
+    level = max(2*level, level + roll(4,6));
 
+    if (throne_monster == 0)			/* Who has he offended? */
+	do {
+	    throne_monster = nummonst - roll(1, NUMSUMMON);
+	} while (!monsters[throne_monster].m_normal);
+
+    /* Create summoning monster */
+    item = new_item(sizeof *tp);
+    tp = THINGPTR(item);
+    do {
+	rnd_pos(rp, &mp);
+    } until(mvwinch(stdscr, mp.y, mp.x) == FLOOR);
+
+    new_monster(item, throne_monster, &mp, MAXSTATS);
+    turn_on(*tp, CANSEE);
+    turn_off(*tp, ISFRIENDLY);
+
+    if (on(*tp, CANSUMMON))			/* summon his helpers */
+	summon_help(tp, FORCE);
+    else {
 	for (i = roll(4,10); i >= 0; i--) {
 	    item = new_item(sizeof *tp);
 	    tp = THINGPTR(item);
-	    do
-	    {
+	    do {
 		rnd_pos(rp, &mp);
 	    } until(mvwinch(stdscr, mp.y, mp.x) == FLOOR);
-	    new_monster(item, randmonster(FALSE, FALSE), &mp, FALSE);
+	    new_monster(item, randmonster(NOWANDER, NOGRAB), &mp, MAXSTATS);
 	    turn_on(*tp, CANSEE);
-	    tp->t_stats.s_hpt *= 2;
-	    tp->t_stats.s_lvl *= 2;
-	    tp->t_stats.s_arm -= roll(2,3);
+	    turn_off(*tp, ISFRIENDLY);
 	}
-	
-	level = save_level + roll(2,3);		/* send the hero down */
-
-	i = NUMMONST - roll(1, NUMSUMMON);
-	item = new_item(sizeof *tp);
-	tp = THINGPTR(item);
-	do
-	{
-	    rnd_pos(rp, &mp);
-	} until(mvwinch(stdscr, mp.y, mp.x) == FLOOR);
-	new_monster(item, i, &mp, FALSE);
-        turn_on(*tp, CANINWALL);
-	turn_on(*tp, CANSEE);
-	tp->t_stats.s_hpt *= 2;
-	tp->t_stats.s_lvl *= 2;
-	tp->t_stats.s_arm -= roll(2,3);
-	msg("You have been summoned by a%s %s.", vowelstr(monsters[i].m_name),
-				monsters[i].m_name);
-	aggravate();
+    }
+    
+    level = save_level + roll(2,3);		/* send the hero down */
+    aggravate();
+    throne_monster = 0;
 }

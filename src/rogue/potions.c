@@ -1,349 +1,557 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/12/86
  */
 /*
  * Function(s) for dealing with potions
  */
 
-#include "curses.h"
 #include "rogue.h"
+#include "death.h"
 
-quaff(which, blessed)
+/*
+ * quaff - drink a potion (or effect a potion-like spell)
+ *
+ * quaffer:	who does it
+ * which:	which P_POTION (-1 means ask from pack)
+ * flags:	ISBLESSED, ISCURSED
+ */
+quaff(quaffer, which, flags)
+struct thing *quaffer;
 int which;
-bool blessed;
+int flags;
 {
     register struct object *obj;
-    register struct linked_list *item, *titem;
     register struct thing *th;
-    bool cursed, is_potion;
-    char buf[LINELEN];
+    register struct stats *curp = &(quaffer->t_stats);
+    register struct stats *maxp = &(quaffer->maxstats);
+    bool blessed = flags & ISBLESSED;
+    bool cursed  = flags & ISCURSED;
+    bool is_potion = (which<0 ? TRUE : FALSE);
+    
+    struct linked_list *item, *titem;
+    char buf[2*LINELEN];
 
-    cursed = FALSE;
-    is_potion = FALSE;
-
-    if (which < 0) {	/* A regular potion */
-	is_potion = TRUE;
-	item = get_item("quaff", POTION);
-	/*
-	 * Make certain that it is somethings that we want to drink
-	 */
-	if (item == NULL)
+    if (quaffer != &player) {
+	monster_quaff(quaffer, which, flags);
+	return;
+    }
+    if (is_potion) {			/* A regular potion */
+	if ((item = get_item("quaff", POTION)) == NULL)
 	    return;
-
-	obj = (struct object *) ldata(item);
+	obj = OBJPTR(item);
 	if (obj->o_type != POTION) {
 	    msg("You can't drink that!");
 	    return;
 	}
+
 	/* remove it from the pack */
-	inpack--;
-	detach(pack, item);
-	freeletter(item);
+
+	rem_pack(obj);
+	discard(item);
+	updpack(TRUE);
 
 	/*
 	 * Calculate the effect it has on the poor guy.
 	 */
+	flags = obj->o_flags;
 	cursed = obj->o_flags & ISCURSED;
 	blessed = obj->o_flags & ISBLESSED;
-
 	which = obj->o_which;
     }
 
     switch(which) {
-	when P_CLEAR:
-	    if (cursed) {
+    when P_CLEAR:
+	if (cursed) {
+	    if (off(player, ISCLEAR)) {
+		msg("Wait, what's going on here. Huh? What? Who?");
+		if (on(player, ISHUH))
+		    lengthen(unconfuse, rnd(8)+HUHDURATION);
+		else
+		    fuse(unconfuse, 0, rnd(8)+HUHDURATION, AFTER);
+		turn_on(player, ISHUH);
+	    }
+	    else msg("You feel dizzy for a moment, but it passes.");
+	}
+	else {
+	    if (blessed) {	/* Make player immune for the whole game */
+		extinguish(unclrhead);  /* If we have a fuse, put it out */
+		msg("A strong blue aura surrounds your head.");
+	    }
+	    else {	/* Just light a fuse for how long player is safe */
 		if (off(player, ISCLEAR)) {
-		    msg("Wait, what's going on here. Huh? What? Who?");
-		    if (on(player, ISHUH))
-			lengthen(unconfuse, rnd(8)+HUHDURATION);
-		    else
-			fuse(unconfuse, 0, rnd(8)+HUHDURATION, AFTER);
-		    turn_on(player, ISHUH);
+		    fuse(unclrhead, 0, CLRDURATION, AFTER);
+		    msg("A faint blue aura surrounds your head.");
 		}
-		else msg("You feel dizzy for a moment, but it passes.");
+		else {  /* If we have a fuse lengthen it, else we
+			 * are permanently clear.
+			 */
+		    if (find_slot(unclrhead) == NULL)
+			msg("Your blue aura continues to glow strongly.");
+		    else {
+			lengthen(unclrhead, CLRDURATION);
+			msg("Your blue aura brightens for a moment.");
+		    }
+		}
+	    }
+	    turn_on(player, ISCLEAR);
+	    /* If player is confused, unconfuse him */
+	    if (on(player, ISHUH)) {
+		extinguish(unconfuse);
+		unconfuse();
+	    }
+	}
+    when P_HEALING:
+	if (cursed) {
+	    if (player.t_ctype != C_PALADIN
+		    && !(player.t_ctype == C_NINJA && curp->s_lvl > 12)
+		    && !save(VS_POISON)) {
+		msg("You feel very sick now.");
+		curp->s_hpt /= 2;
+		curp->s_power /= 2;
+		if ((curp->s_hpt -= 1) <= 0) {
+		    death(D_POISON);
+		    return;
+		}
+	    }
+	    else msg("You feel momentarily sick.");
+	}
+	else {
+	    register int nsides = (blessed ? 8 : 4);
+	    register int hpt_gain = roll(curp->s_lvl, nsides);
+	    register int power_gain = roll(curp->s_lvl, nsides);
+
+	    if (blessed && on(player, ISHUH)) {
+		extinguish(unconfuse);
+		unconfuse();
+	    }
+	    curp->s_hpt = min(curp->s_hpt+hpt_gain, maxp->s_hpt);
+	    if (is_potion) {	/* Do not bump power or maximums if spell */
+		p_know[P_HEALING] = TRUE;
+		curp->s_power = min(curp->s_power+power_gain, maxp->s_power);
+		if (maxp->s_hpt == curp->s_hpt)
+		    maxp->s_hpt = curp->s_hpt += roll(1, nsides);
+		if (maxp->s_power == curp->s_power)
+		    maxp->s_power = curp->s_power += roll(1, nsides);
+	    }
+	    msg("You begin to feel %sbetter.", blessed ? "much " : "");
+	    if (off(player, PERMBLIND))
+		sight();
+	}
+    when P_GAINABIL: {
+	    short ctype;
+
+	    if (blessed) {		/* add to all attributes */
+		add_intelligence(FALSE);
+		add_dexterity(FALSE);
+		add_strength(FALSE);
+		add_wisdom(FALSE);
+		add_const(FALSE);
 	    }
 	    else {
-		if (blessed) {	/* Make player immune for the whole game */
-		    extinguish(unclrhead);  /* If we have a fuse, put it out */
-		    msg("A strong blue aura surrounds your head.");
+		if (rnd(100) < 70) 	/* probably change own ability */
+		    ctype = player.t_ctype;
+		else switch (rnd(4)) {
+		    when 0: ctype = C_FIGHTER;
+		    when 1: ctype = C_MAGICIAN;
+		    when 2: ctype = C_CLERIC;
+		    when 3: ctype = C_THIEF;
 		}
-		else {	/* Just light a fuse for how long player is safe */
-		    if (off(player, ISCLEAR)) {
-			fuse(unclrhead, 0, CLRDURATION, AFTER);
-			msg("A faint blue aura surrounds your head.");
-		    }
-		    else {  /* If we have a fuse lengthen it, else we
-			     * are permanently clear.
-			     */
-		        if (find_slot(unclrhead) == NULL)
-			    msg("Your blue aura continues to glow strongly.");
-			else {
-			    lengthen(unclrhead, CLRDURATION);
-			    msg("Your blue aura brightens for a moment.");
-			}
-		    }
+
+		switch (ctype) {
+		when C_FIGHTER:	add_strength(cursed);
+		when C_PALADIN:	add_strength(cursed);
+		when C_RANGER:	add_strength(cursed);
+		when C_MAGICIAN: add_intelligence(cursed);
+		when C_ILLUSION: add_intelligence(cursed);
+		when C_CLERIC:	add_wisdom(cursed);
+		when C_DRUID:	add_wisdom(cursed);
+		when C_THIEF:	add_dexterity(cursed);
+		when C_ASSASIN:	add_dexterity(cursed);
+		when C_NINJA:	add_dexterity(cursed);
+		otherwise:	msg("You're a strange type!");
 		}
-		turn_on(player, ISCLEAR);
-		/* If player is confused, unconfuse him */
-		if (on(player, ISHUH)) {
-		    extinguish(unconfuse);
-		    unconfuse();
+
+	    }
+	    if (rnd(100) < 10) 		/* may change constitution also */
+		add_const(cursed);
+	    if (rnd(100) < 60)		/* may change skin ac */
+		curp->s_arm += (cursed ? 1 : -1);
+
+	    if (is_potion && !cursed)
+		p_know[P_GAINABIL] = TRUE;
+	}
+    when P_MONSTDET:
+	/*
+	 * Potion of monster detection, if there are monters, detect them
+	 */
+	if(cursed) {
+	    register int num = roll(3,6);
+	    register int i;
+	    register char ch;
+	    register struct room *rp;
+	    coord pos;
+
+	    msg("You begin to sense the presence of monsters.");
+	    wclear(hw);
+	    for (i = 1; i < num; i++) {
+		rp = &rooms[rnd_room()];
+		rnd_pos(rp, &pos);
+		if (rnd(2))
+		    ch = 'a' + rnd(26);
+		else
+		    ch = 'A' + rnd(26);
+		mvwaddch(hw, pos.y, pos.x, ch);
+	    }
+	    waddstr(cw, morestr);
+	    overlay(hw, cw);
+	    wrefresh(cw);
+	    wait_for(' ');
+	    msg("");
+	    if (is_potion) 
+		p_know[P_MONSTDET] = TRUE;
+	    break;
+	}
+	if (mlist != NULL) {
+	    msg("You begin to sense the presence of monsters.");
+	    waddstr(cw, morestr);
+	    overlay(mw, cw);
+	    wrefresh(cw);
+	    wait_for(' ');
+	    msg("");
+	    if (is_potion) 
+		p_know[P_MONSTDET] = TRUE;
+	    if (blessed)
+		turn_on(player, BLESSMONS);
+	}
+	else msg("You have a strange feeling, then it passes.");
+    when P_TREASDET:
+	/*
+	 * Potion of magic detection.  Show the potions and scrolls
+	 */
+	if (cursed) {
+	    register int num = roll(3,3);
+	    register int i;
+	    register char ch;
+	    register struct room *rp;
+	    coord pos;
+
+	    msg("You sense the presence of magic on this level.");
+	    wclear(hw);
+	    for (i = 1; i < num; i++) {
+		rp = &rooms[rnd_room()];
+		rnd_pos(rp, &pos);
+		if (rnd(9) == 0)
+		    ch = BMAGIC;
+		else if (rnd(9) == 0)
+		    ch = CMAGIC;
+		else
+		    ch = MAGIC;
+		mvwaddch(hw, pos.y, pos.x, ch);
+	    }
+	    waddstr(cw, morestr);
+	    overlay(hw, cw);
+	    wrefresh(cw);
+	    wait_for(' ');
+	    msg("");
+	    if (is_potion) 
+		p_know[P_TREASDET] = TRUE;
+	    break;
+	}
+	if (blessed)
+	    turn_on(player, BLESSMAGIC);
+	if (lvl_obj != NULL) {
+	    register struct linked_list *mobj;
+	    register struct object *tp;
+	    bool show;
+
+	    show = FALSE;
+	    wclear(hw);
+	    for (mobj = lvl_obj; mobj != NULL; mobj = next(mobj)) {
+		tp = OBJPTR(mobj);
+		if (is_magic(tp)) {
+		    char mag_type=MAGIC;
+
+		    if (tp->o_flags & ISCURSED) mag_type = CMAGIC;
+		    else if (tp->o_flags & ISBLESSED) mag_type = BMAGIC;
+		    show = TRUE;
+		    mvwaddch(hw, tp->o_pos.y, tp->o_pos.x, mag_type);
 		}
 	    }
-	when P_HEALING:
-	    if (cursed) {
-		if (!save(VS_POISON)) {
-		    msg("You feel very sick now.");
-		    pstats.s_hpt /= 2;
-		    if ((pstats.s_hpt -= 1) <= 0) {
-			death(D_POISON);
-			return;
+	    for (titem = mlist; titem != NULL; titem = next(titem)) {
+		register struct linked_list *pitem;
+
+		th = THINGPTR(titem);
+		for(pitem=th->t_pack; pitem!=NULL; pitem=next(pitem)) {
+		    if (is_magic(OBJPTR(pitem))) {
+			show = TRUE;
+			mvwaddch(hw, th->t_pos.y, th->t_pos.x, MAGIC);
 		    }
 		}
-		else msg("You feel momentarily sick.");
 	    }
-	    else {
-		if (blessed) {
-		    if ((pstats.s_hpt += roll(pstats.s_lvl, 8)) > 
-				max_stats.s_hpt)
-			pstats.s_hpt = max_stats.s_hpt += roll(1,8);
-		    if (on(player, ISHUH)) {
-			extinguish(unconfuse);
-			unconfuse();
-		    }
-		}
-		else {
-		    if ((pstats.s_hpt += roll(pstats.s_lvl, 4)) > 
-				max_stats.s_hpt)
-		    pstats.s_hpt = max_stats.s_hpt += roll(1,4);
-		}
-		msg("You begin to feel %sbetter.",
-			blessed ? "much " : "");
-		if (off(player, PERMBLIND))
-		    sight();
+	    if (show) {
+		msg("You sense the presence of magic on this level.");
 		if (is_potion) 
-		    p_know[P_HEALING] = TRUE;
-	    }
-	when P_ABIL: {
-		short ctype;
-
-		/*
-		 * if blessed then fix all attributes
-		 */
-		if (blessed) {
-		    add_intelligence(FALSE);
-		    add_dexterity(FALSE);
-		    add_strength(FALSE);
-		    add_wisdom(FALSE);
-		    add_const(FALSE);
-		    if (rnd(5) > 2)
-			pstats.s_arm--;
-		}
-		/* probably will be own ability */
-		else {
-		    if (rnd(100) < 70) 
-			ctype = player.t_ctype;
-		    else do {
-			ctype = rnd(4);
-			} while (ctype == player.t_ctype);
-
-		    /* Small chance of doing constitution instead */
-		    if (rnd(100) < 10) 
-			add_const(cursed);
-		    else switch (ctype) {
-			when C_FIGHTER: add_strength(cursed);
-			when C_PALADIN: add_strength(cursed);
-			when C_RANGER: add_strength(cursed);
-			when C_MAGICIAN: add_intelligence(cursed);
-			when C_ILLUSION: add_intelligence(cursed);
-			when C_CLERIC:	add_wisdom(cursed);
-			when C_DRUID:	add_wisdom(cursed);
-			when C_THIEF:	add_dexterity(cursed);
-			when C_ASSASIN:	add_dexterity(cursed);
-			when C_NINJA:	add_dexterity(cursed);
-			otherwise:	msg("You're a strange type!");
-		    }
-		}
-		if (is_potion) p_know[P_ABIL] = TRUE;
-	    }
-	when P_MFIND:
-	    /*
-	     * Potion of monster detection, if there are monters, detect them
-	     */
-	    if(cursed) {
-		register int num = roll(3,6);
-		register int i;
-		register char ch;
-		register struct room *rp;
-		coord pos;
-
-		msg("You begin to sense the presence of monsters.");
-		wclear(hw);
-		for (i = 1; i < num; i++) {
-		    rp = &rooms[rnd_room()];
-		    rnd_pos(rp, &pos);
-		    if (rnd(2))
-			ch = 'a' + rnd(26);
-		    else
-			ch = 'A' + rnd(26);
-		    mvwaddch(hw, pos.y, pos.x, ch);
-		}
+		    p_know[P_TREASDET] = TRUE;
 		waddstr(cw, morestr);
-		overlay(hw, cw);
-		draw(cw);
+		overlay(hw,cw);
+		wrefresh(cw);
 		wait_for(' ');
 		msg("");
-		if (is_potion) 
-		    p_know[P_MFIND] = TRUE;
 		break;
 	    }
-	    if (mlist != NULL) {
-		msg("You begin to sense the presence of monsters.");
-		waddstr(cw, morestr);
-		overlay(mw, cw);
-		draw(cw);
-		wait_for(' ');
-		msg("");
-		if (is_potion) 
-		    p_know[P_MFIND] = TRUE;
-		if (blessed)
-		    turn_on(player, BLESSMONS);
+	}
+	msg("You have a strange feeling for a moment, then it passes.");
+    when P_SEEINVIS:
+	if (cursed) {
+	    if (off(player, ISBLIND) && !is_wearing(R_SEEINVIS)) {
+		msg("A cloak of darkness falls around you.");
+		turn_on(player, ISBLIND);
+		fuse(sight, 0, SEEDURATION, AFTER);
+		look(FALSE);
 	    }
 	    else
-		msg("You have a strange feeling, then it passes.");
-	when P_TFIND:
-	    /*
-	     * Potion of magic detection.  Show the potions and scrolls
-	     */
-	    if (cursed) {
-		register int num = roll(3,3);
-		register int i;
-		register char ch;
-		register struct room *rp;
-		coord pos;
+		msg("Your eyes stop tingling for a moment.");
+	}
+	else if (off(player, PERMBLIND)) {
+	    if (off(player, CANSEE)) {
+		turn_on(player, CANSEE);
+		msg("Your eyes begin to tingle.");
+		fuse(unsee, 0, blessed ? SEEDURATION*3 :SEEDURATION, AFTER);
+		light(&hero);
+	    }
+	    else if (find_slot(unsee) != NULL)
+		lengthen(unsee, blessed ? SEEDURATION*3 : SEEDURATION);
+	    sight();
+	}
+    when P_PHASE:
+	if (cursed) {
+	    msg("You can't move.");
+	    no_command = HOLDTIME;
+	}
+	else {
+	    short duration = (blessed ? 3 : 1);
 
-		msg("You sense the presence of magic on this level.");
-		wclear(hw);
-		for (i = 1; i < num; i++) {
-		    rp = &rooms[rnd_room()];
-		    rnd_pos(rp, &pos);
-		    if (rnd(9) == 0)
-			ch = BMAGIC;
-		    else if (rnd(9) == 0)
-			ch = CMAGIC;
-		    else
-			ch = MAGIC;
-		    mvwaddch(hw, pos.y, pos.x, ch);
-		}
-		waddstr(cw, morestr);
-		overlay(hw, cw);
-		draw(cw);
-		wait_for(' ');
-		msg("");
-		if (is_potion) 
-		    p_know[P_TFIND] = TRUE;
-		break;
-	    }
-	    if (blessed)
-		turn_on(player, BLESSMAGIC);
-	    if (lvl_obj != NULL) {
-		register struct linked_list *mobj;
-		register struct object *tp;
-		bool show;
-
-		show = FALSE;
-		wclear(hw);
-		for (mobj = lvl_obj; mobj != NULL; mobj = next(mobj)) {
-		    tp = (struct object *) ldata(mobj);
-		    if (is_magic(tp)) {
-			char mag_type=MAGIC;
-
-			if (tp->o_flags & ISCURSED) mag_type = CMAGIC;
-			else if (tp->o_flags & ISBLESSED) mag_type = BMAGIC;
-			show = TRUE;
-			mvwaddch(hw, tp->o_pos.y, tp->o_pos.x, mag_type);
-		    }
-		}
-		for (titem = mlist; titem != NULL; titem = next(titem)) {
-		    register struct linked_list *pitem;
-
-		    th = (struct thing *) ldata(titem);
-		    for(pitem=th->t_pack; pitem!=NULL; pitem=next(pitem)) {
-			if (is_magic((struct thing *) ldata(pitem))) {
-			    show = TRUE;
-			    mvwaddch(hw, th->t_pos.y, th->t_pos.x, MAGIC);
-			}
-		    }
-		}
-		if (show) {
-		    msg("You sense the presence of magic on this level.");
-		    if (is_potion) 
-			p_know[P_TFIND] = TRUE;
-		    waddstr(cw, morestr);
-		    overlay(hw,cw);
-		    draw(cw);
-		    wait_for(' ');
-		    msg("");
-		    break;
-		}
-	    }
-	    msg("You have a strange feeling for a moment, then it passes.");
-	when P_SEEINVIS:
-	    if (cursed) {
-		if (off(player, ISBLIND) && !ISWEARING(R_SEEINVIS))
-		{
-		    msg("A cloak of darkness falls around you.");
-		    turn_on(player, ISBLIND);
-		    fuse(sight, 0, SEEDURATION, AFTER);
-		    look(FALSE);
-		}
-		else
-		    msg("Your eyes stop tingling for a moment.");
-	    }
-	    else if (off(player, PERMBLIND)) {
-		if (off(player, CANSEE)) {
-		    turn_on(player, CANSEE);
-		    msg("Your eyes begin to tingle.");
-		    fuse(unsee, 0, blessed ? SEEDURATION*3 :SEEDURATION, AFTER);
-		    light(&hero);
-		}
-		else if (find_slot(unsee) != NULL)
-		    lengthen(unsee, blessed ? SEEDURATION*3 : SEEDURATION);
-		sight();
-	    }
-	when P_PHASE:
-	    if (cursed) {
-		msg("You can't move.");
-		no_command = HOLDTIME;
-	    }
+	    if (on(player, CANINWALL))
+		lengthen(unphase, duration*PHASEDURATION);
 	    else {
-		short duration;
-
-		if (blessed) duration = 3;
-		else duration = 1;
-
-		if (on(player, CANINWALL))
-		    lengthen(unphase, duration*PHASEDURATION);
-		else {
-		    fuse(unphase, 0, duration*PHASEDURATION, AFTER);
-		    turn_on(player, CANINWALL);
-		}
-		msg("You feel %slight-headed!",
-		    blessed ? "very " : "");
+		fuse(unphase, 0, duration*PHASEDURATION, AFTER);
+		turn_on(player, CANINWALL);
 	    }
-	when P_RAISE:
-	    if (cursed) 
-		lower_level(D_POTION);
-	    else {
-		msg("You suddenly feel %smore skillful.",
-			blessed ? "much " : "");
-		p_know[P_RAISE] = TRUE;
+	    msg("You feel %slight-headed!",
+		blessed ? "very " : "");
+	}
+    when P_RAISELEVEL:
+	if (cursed) 
+	    lower_level(D_POTION);
+	else {
+	    msg("You suddenly feel %smore skillful.",
+		    blessed ? "much " : "");
+	    p_know[P_RAISELEVEL] = TRUE;
+	    raise_level();
+	    if (blessed) 
 		raise_level();
-		if (blessed) 
-		    raise_level();
+	}
+    when P_HASTE:
+	if (cursed) {	/* Slow player down */
+	    if (on(player, ISHASTE)) { /* Already sped up */
+		extinguish(nohaste);
+		nohaste();
 	    }
-	when P_HASTE:
-	    if (cursed) {	/* Slow player down */
+	    else {
+		msg("You feel yourself moving %sslower.",
+			on(player, ISSLOW) ? "even " : "");
+		if (on(player, ISSLOW))
+		    lengthen(noslow, rnd(4) + 4);
+		else if (!is_wearing(R_FREEDOM)) {
+		    turn_on(player, ISSLOW);
+		    player.t_turn = TRUE;
+		    fuse(noslow, 0, rnd(4)+4, AFTER);
+		}
+	    }
+	}
+	else {
+	    if (off(player, ISSLOW))
+		msg("You feel yourself moving %sfaster.",
+		    blessed ? "much " : "");
+	    add_haste(blessed);
+	}
+	if (is_potion) p_know[P_HASTE] = TRUE;
+    when P_RESTORE: {
+	register int i;
+
+	msg("Hey, this tastes great.  It make you feel warm all over.");
+
+	if (lost_str) {
+	    for (i=0; i<lost_str; i++)
+		extinguish(res_strength);
+	    lost_str = 0;
+	}
+	res_strength();
+
+	if (lost_dext) {
+	    for (i=0; i<lost_dext; i++)
+		extinguish(un_itch);
+	    lost_dext = 0;
+	}
+	res_dexterity();
+
+	res_wisdom();
+	res_intelligence();
+	curp->s_const = maxp->s_const;
+    }
+    when P_INVIS:
+	if (off(player, ISINVIS)) {
+	    turn_on(player, ISINVIS);
+	    if (on(player, ISDISGUISE)) {
+		turn_off(player, ISDISGUISE);
+		extinguish(undisguise);
+		msg("Your skin feels itchy for a moment.");
+	    }
+	    msg("You have a tingling feeling all over your body.");
+	    fuse(appear, 0, blessed ? WANDERTIME*3 : WANDERTIME, AFTER);
+	    PLAYER = IPLAYER;
+	    light(&hero);
+	}
+	else lengthen(appear, blessed ? WANDERTIME*3 : WANDERTIME);
+    when P_SMELL:
+	if (cursed) {
+	    if (on(player, CANSCENT)) {
+		turn_off(player, CANSCENT);
+		extinguish(unscent);
+		msg("You no longer smell monsters around you.");
+	    }
+	    else if (on(player, ISUNSMELL)) {
+		lengthen(scent, PHASEDURATION);
+		msg("You feel your nose tingle.");
+	    }
+	    else {
+		turn_on(player, ISUNSMELL);
+		fuse(scent, 0, PHASEDURATION, AFTER);
+		msg("You can't smell anything now.");
+	    }
+	}
+	else {
+	    short duration = (blessed ? 3 : 1);
+
+	    if (on(player, CANSCENT))
+		lengthen(unscent, duration*PHASEDURATION);
+	    else {
+		fuse(unscent, 0, duration*PHASEDURATION, AFTER);
+		turn_on(player, CANSCENT);
+	    }
+	    msg("You begin to smell monsters all around you.");
+	}
+    when P_HEAR:
+	if (cursed) {
+	    if (on(player, CANHEAR)) {
+		turn_off(player, CANHEAR);
+		extinguish(hear);
+		msg("You no longer hear monsters around you.");
+	    }
+	    else if (on(player, ISDEAF)) {
+		lengthen(hear, PHASEDURATION);
+		msg("You feel your ears burn.");
+	    }
+	    else {
+		fuse(hear, 0, PHASEDURATION, AFTER);
+		turn_on(player, ISDEAF);
+		msg("You are surrounded by a sudden silence.");
+	    }
+	}
+	else {
+	    short duration = (blessed ? 3 : 1);
+
+	    if (on(player, CANHEAR))
+		lengthen(unhear, duration*PHASEDURATION);
+	    else {
+		fuse(unhear, 0, duration*PHASEDURATION, AFTER);
+		turn_on(player, CANHEAR);
+	    }
+	    msg("You begin to hear monsters all around you.");
+	}
+    when P_SHERO:
+	if (cursed) {
+	    if (on(player, SUPERHERO)) {
+		msg("You feel ordinary again.");
+		turn_off(player, SUPERHERO);
+		extinguish(unshero);
+		extinguish(unbhero);
+	    }
+	    else if (on(player, ISUNHERO)) {
+		msg("Your feeling of vulnerability increases.");
+		lengthen(shero, 5 + rnd(5));
+	    }
+	    else {
+		msg("You feel suddenly vulnerable.");
+		if (curp->s_hpt == 1) {
+		    death(D_POTION);
+		    return;
+		}
+		curp->s_hpt /= 2;
+		chg_str(-2, FALSE, TRUE);
+		chg_dext(-2, FALSE, TRUE);
+		no_command = 3 + rnd(HEROTIME);
+		turn_on(player, ISUNHERO);
+		fuse(shero, 0, HEROTIME + rnd(HEROTIME), AFTER);
+	    }
+	}
+	else {
+	    if (on(player, ISFLEE)) {
+		turn_off(player, ISFLEE);
+		msg("You regain your composure.");
+	    }
+	    if (on(player, ISUNHERO)) {
+		extinguish(shero);
+		shero();
+	    }
+	    else if (on(player, SUPERHERO)) {
+		if (find_slot(unbhero)) 
+		    lengthen(unbhero, HEROTIME + 2*rnd(HEROTIME));
+		else if (find_slot(unshero) && !blessed) 
+		    lengthen(unshero, HEROTIME + 2*rnd(HEROTIME));
+		else {
+		    extinguish(unshero);
+		    unshero();
+		    fuse(unbhero, 0, 2 * (HEROTIME + rnd(HEROTIME)), AFTER);
+		}
+		msg("Your feeling of invulnerablity grows stronger.");
+	    }
+	    else {
+		turn_on(player, SUPERHERO);
+		chg_str(10, FALSE, FALSE);
+		chg_dext(5, FALSE, FALSE);
+		quaff(quaffer, P_HASTE, ISBLESSED);
+		quaff(quaffer, P_CLEAR, ISNORMAL);
+		if (blessed) {
+		    fuse(unbhero, 0, HEROTIME + rnd(HEROTIME), AFTER);
+		    msg("You suddenly feel invincible.");
+		}
+		else {
+		    fuse(unshero, 0, HEROTIME + rnd(HEROTIME), AFTER);
+		    msg("You suddenly feel invulnerable.");
+		}
+	    }
+	}
+    when P_DISGUISE:
+	if (off(player, ISDISGUISE) && off(player, ISINVIS)) {
+	    turn_on(player, ISDISGUISE);
+	    msg("Your body shimmers a moment and then changes.");
+	    fuse(undisguise, 0, blessed ? GONETIME*3 : GONETIME, AFTER);
+	    if (rnd(2))
+	       PLAYER = 'a' + rnd(26);
+	    else
+	       PLAYER = 'A' + rnd(26);
+	    light(&hero);
+	}
+	else if (off(player, ISINVIS))
+	    lengthen(undisguise, blessed ? GONETIME*3 : GONETIME);
+	else
+	    msg("You feel an itchy feeling under your skin.");
+    when P_FIRERESIST:
+	if (cursed) {
+	    if (!is_wearing(R_FIRERESIST))
+	    {
+		msg("Your teeth start clattering.");
 		if (on(player, ISHASTE)) { /* Already sped up */
 		    extinguish(nohaste);
 		    nohaste();
@@ -353,223 +561,190 @@ bool blessed;
 			    on(player, ISSLOW) ? "even " : "");
 		    if (on(player, ISSLOW))
 			lengthen(noslow, rnd(4) + 4);
-		    else if (!ISWEARING(R_FREEDOM)) {
+		    else if (!is_wearing(R_FREEDOM)) {
 			turn_on(player, ISSLOW);
 			player.t_turn = TRUE;
 			fuse(noslow, 0, rnd(4)+4, AFTER);
 		    }
 		}
 	    }
-	    else {
-		if (off(player, ISSLOW))
-		    msg("You feel yourself moving %sfaster.",
-			blessed ? "much " : "");
-		add_haste(blessed);
-	    }
-	    if (is_potion) p_know[P_HASTE] = TRUE;
-	when P_RESTORE: {
-	    register int i;
-
-	    msg("Hey, this tastes great.  It make you feel warm all over.");
-
-	    if (lost_str) {
-		for (i=0; i<lost_str; i++)
-		    extinguish(res_strength);
-		lost_str = 0;
-	    }
-	    res_strength();
-
-	    if (lost_dext) {
-		for (i=0; i<lost_dext; i++)
-		    extinguish(un_itch);
-		lost_dext = 0;
-	    }
-	    res_dexterity();
-
-	    res_wisdom();
-	    res_intelligence();
-	    pstats.s_const = max_stats.s_const;
-	}
-	when P_INVIS:
-	    if (off(player, ISINVIS)) {
-		turn_on(player, ISINVIS);
-		if (on(player, ISDISGUISE)) {
-		    turn_off(player, ISDISGUISE);
-		    extinguish(undisguise);
-		    msg("Your skin feels itchy for a moment.");
-		}
-		msg("You have a tingling feeling all over your body.");
-		fuse(appear, 0, blessed ? WANDERTIME*3 : WANDERTIME, AFTER);
-		PLAYER = IPLAYER;
-		light(&hero);
-	    }
-	    else lengthen(appear, blessed ? WANDERTIME*3 : WANDERTIME);
-	when P_SMELL:
-	    if (cursed) {
-		if (on(player, CANSCENT)) {
-		    turn_off(player, CANSCENT);
-		    extinguish(unscent);
-		    msg("You no longer smell monsters around you.");
-		}
-		else if (on(player, ISUNSMELL)) {
-		    lengthen(scent, PHASEDURATION);
-		    msg("You feel your nose tingle.");
-		}
-		else {
-		    turn_on(player, ISUNSMELL);
-		    fuse(scent, 0, PHASEDURATION, AFTER);
-		    msg("You can't smell anything now.");
-		}
-	    }
-	    else {
-		short duration;
-
-		if (blessed)
-		    duration = 3;
-		else
-		    duration = 1;
-		if (on(player, CANSCENT))
-		    lengthen(unscent, duration*PHASEDURATION);
-		else {
-		    fuse(unscent, 0, duration*PHASEDURATION, AFTER);
-		    turn_on(player, CANSCENT);
-		}
-		msg("You begin to smell monsters all around you.");
-	    }
-	when P_HEAR:
-	    if (cursed) {
-		if (on(player, CANHEAR)) {
-		    turn_off(player, CANHEAR);
-		    extinguish(hear);
-		    msg("You no longer hear monsters around you.");
-		}
-		else if (on(player, ISDEAF)) {
-		    lengthen(hear, PHASEDURATION);
-		    msg("You feel your ears burn.");
-		}
-		else {
-		    fuse(hear, 0, PHASEDURATION, AFTER);
-		    turn_on(player, ISDEAF);
-		    msg("You are surrounded by a sudden silence.");
-		}
-	    }
-	    else {
-		short duration;
-
-		if (blessed)
-		    duration = 3;
-		else
-		    duration = 1;
-		if (on(player, CANHEAR))
-		    lengthen(unhear, duration*PHASEDURATION);
-		else {
-		    fuse(unhear, 0, duration*PHASEDURATION, AFTER);
-		    turn_on(player, CANHEAR);
-		}
-		msg("You begin to hear monsters all around you.");
-	    }
-	when P_SHERO:
-	    if (cursed) {
-		if (on(player, SUPERHERO)) {
-		    msg("You feel ordinary again.");
-		    turn_off(player, SUPERHERO);
-		    extinguish(unshero);
-		    extinguish(unbhero);
-		}
-		else if (on(player, ISUNHERO)) {
-		    msg("Your feeling of vulnerability increases.");
-		    lengthen(shero, 5 + rnd(5));
-		}
-		else {
-		    msg("You feel suddenly vulnerable.");
-		    if (pstats.s_hpt == 1) {
-			death(D_POTION);
-			return;
-		    }
-		    pstats.s_hpt /= 2;
-		    chg_str(-2, FALSE, TRUE);
-		    chg_dext(-2, FALSE, TRUE);
-		    no_command = 3 + rnd(HEROTIME);
-		    turn_on(player, ISUNHERO);
-		    fuse(shero, 0, HEROTIME + rnd(HEROTIME), AFTER);
-		}
-	    }
-	    else {
-		if (on(player, ISFLEE)) {
-		    turn_off(player, ISFLEE);
-		    msg("You regain your composure.");
-		}
-		if (on(player, ISUNHERO)) {
-		    extinguish(shero);
-		    shero();
-		}
-		else if (on(player, SUPERHERO)) {
-		    if (find_slot(unbhero)) 
-			lengthen(unbhero, HEROTIME + 2*rnd(HEROTIME));
-		    else if (find_slot(unshero) && !blessed) 
-			lengthen(unshero, HEROTIME + 2*rnd(HEROTIME));
-		    else {
-			extinguish(unshero);
-			unshero();
-			fuse(unbhero, 0, 2 * (HEROTIME + rnd(HEROTIME)), AFTER);
-		    }
-		    msg("Your feeling of invulnerablity grows stronger.");
-		}
-		else {
-		    turn_on(player, SUPERHERO);
-		    chg_str(10, FALSE, FALSE);
-		    chg_dext(5, FALSE, FALSE);
-		    quaff(P_HASTE, TRUE);
-		    quaff(P_CLEAR, FALSE);
-		    if (blessed) {
-			fuse(unbhero, 0, HEROTIME + rnd(HEROTIME), AFTER);
-			msg("You suddenly feel invincible.");
-		    }
-		    else {
-			fuse(unshero, 0, HEROTIME + rnd(HEROTIME), AFTER);
-			msg("You suddenly feel invulnerable.");
-		    }
-		}
-	    }
-	when P_DISGUISE:
-	    if (off(player, ISDISGUISE) && off(player, ISINVIS)) {
-		turn_on(player, ISDISGUISE);
-		msg("Your body shimmers a moment and then changes.");
-		fuse(undisguise, 0, blessed ? GONETIME*3 : GONETIME, AFTER);
-		if (rnd(2))
-		   PLAYER = 'a' + rnd(26);
-		else
-		   PLAYER = 'A' + rnd(26);
-		light(&hero);
-	    }
-	    else if (off(player, ISINVIS))
-		lengthen(undisguise, blessed ? GONETIME*3 : GONETIME);
 	    else
-		msg("You feel an itchy feeling under your skin.");
-	otherwise:
-	    msg("What an odd tasting potion!");
-	    return;
+		msg("You feel a brief chill.");
+	}
+	else {
+	    if (blessed) {	/* Make player immune for the whole game */
+		extinguish(unhot);  /* If we have a fuse, put it out */
+		msg("You feel a strong continuous warm glow.");
+	    }
+	    else {	/* Just light a fuse for how long player is safe */
+		if (off(player, NOFIRE)) {
+		    fuse(unhot, 0, PHASEDURATION, AFTER);
+		    msg("You feel a warm glow.");
+		}
+		else {  /* lengthen an existing fuse, else permanently clear. */
+		    if (find_slot(unhot) == NULL)
+			msg("Your warm glow continues.");
+		    else {
+			lengthen(unhot, PHASEDURATION);
+			msg("Your feel a hot flush.");
+		    }
+		}
+	    }
+	    turn_on(player, NOFIRE);
+	    /* If player has cold resistance, silently remove it */
+	    if (on(player, NOCOLD)) {
+		turn_off(player, NOCOLD);
+		extinguish(uncold);
+	    }
+	}
+    when P_COLDRESIST:
+	if (cursed) {
+	    if (!is_wearing(R_COLDRESIST))
+	    {
+		msg("Your feel feverishly hot.");
+		if (on(player, ISHASTE)) { /* Already sped up */
+		    extinguish(nohaste);
+		    nohaste();
+		}
+		else {
+		    msg("You feel yourself moving %sslower.",
+			    on(player, ISSLOW) ? "even " : "");
+		    if (on(player, ISSLOW))
+			lengthen(noslow, rnd(4) + 4);
+		    else if (!is_wearing(R_FREEDOM)) {
+			turn_on(player, ISSLOW);
+			player.t_turn = TRUE;
+			fuse(noslow, 0, rnd(4)+4, AFTER);
+		    }
+		}
+	    }
+	    else
+		msg("You feel a brief touch of heat rash.");
+	}
+	else {
+	    if (blessed) {	/* Make player immune for the whole game */
+		extinguish(uncold);  /* If we have a fuse, put it out */
+		msg("You feel a strong continuous cool breeze.");
+	    }
+	    else {	/* Just light a fuse for how long player is safe */
+		if (off(player, NOCOLD)) {
+		    fuse(uncold, 0, PHASEDURATION, AFTER);
+		    msg("You feel a cool breeze.");
+		}
+		else {  /* lengthen an existing fuse, else permanently clear. */
+		    if (find_slot(uncold) == NULL)
+			msg("Your cool feeling continues.");
+		    else {
+			lengthen(uncold, PHASEDURATION);
+			msg("The cool breeze blows more strongly.");
+		    }
+		}
+	    }
+	    turn_on(player, NOCOLD);
+	    /* If player has fire resistance, silently remove it */
+	    if (on(player, NOFIRE)) {
+		extinguish(unhot);
+		turn_off(player, NOFIRE);
+	    }
+	}
+    when P_HASOXYGEN:
+	if (cursed) {
+	    if (!is_wearing(R_BREATHE)) {
+		msg("You can't breathe.");
+		/* Future additons - confuse, str loss, etc */
+		no_command = HOLDTIME;
+	    }
+	    else {
+		msg("You feel a momentary shortness of breath.");
+	    }
+	}
+	else {
+	    short duration = (blessed ? 3 : 1);
+
+	    if (on(player, HASOXYGEN))
+		lengthen(unbreathe, duration*PHASEDURATION);
+	    else {
+		fuse(unbreathe, 0, duration*PHASEDURATION, AFTER);
+		turn_on(player, HASOXYGEN);
+	    }
+	if (!is_wearing(R_BREATHE))
+	    msg("The air seems %sless polluted.",
+		blessed ? "much " : "");
+	}
+    when P_LEVITATION:
+	if (cursed) {
+	    msg("You can't move.");
+	    no_command = HOLDTIME;
+	}
+	else {
+	    short duration = (blessed ? 3 : 1);
+
+	    if (on(player, CANFLY))
+		lengthen(unfly, duration*PHASEDURATION);
+	    else {
+		fuse(unfly, 0, duration*PHASEDURATION, AFTER);
+		turn_on(player, CANFLY);
+	    }
+	if (!is_wearing(R_LEVITATION))
+	    msg("You %sbegin to float in the air!",
+		blessed ? "quickly " : "");
+	}
+    when P_REGENERATE:
+	if (cursed) {
+	    quaff(quaffer, P_HEALING, ISCURSED);
+	    quaff(quaffer, P_HASTE, ISCURSED);
+	}
+	else {
+	    short duration = (blessed ? 3 : 1) * HUHDURATION;
+
+	    if (on(player, SUPEREAT))
+		lengthen(unsupereat, duration);
+	    else {
+		fuse(unsupereat, 0, duration, AFTER);
+		turn_on(player, SUPEREAT);
+	    }
+	    if (on(player, ISREGEN))
+		lengthen(unregen, duration);
+	    else {
+		fuse(unregen, 0, duration, AFTER);
+		turn_on(player, ISREGEN);
+	    }
+	if (!is_wearing(R_REGEN))
+	    msg("You feel %shealthier!",
+		blessed ? "much " : "");
+	}
+    when P_SHIELD:	/* deal with blessed/cursed later */
+	if (on(player, HASSHIELD)) {
+	    msg("Your skin stiffens for an instant");
+	    lengthen(unshield, (blessed ? 3 : 1)*PHASEDURATION);
+	}
+	else {
+	    msg("Your skin hardens.");
+	    turn_on(player, HASSHIELD);
+	    pstats.s_arm -= 2;
+	    fuse(unshield, 0, (blessed ? 3 : 1)*PHASEDURATION, AFTER);
+	}
+	if (is_potion) 
+	    p_know[P_SHIELD] = TRUE;
+    otherwise:
+	msg("What an odd tasting potion!");
+	return;
     }
     status(FALSE);
-    if (is_potion && p_know[which] && p_guess[which])
-    {
-	cfree(p_guess[which]);
-	p_guess[which] = NULL;
-    }
-    else if (is_potion && 
-	     !p_know[which] && 
-	     askme &&
-	     p_guess[which] == NULL)
-    {
-	msg(terse ? "Call it: " : "What do you want to call it? ");
-	if (get_str(buf, cw) == NORM)
-	{
-	    p_guess[which] = new((unsigned int) strlen(buf) + 1);
-	    strcpy(p_guess[which], buf);
+    if (is_potion) {
+	if (!cursed && p_know[which] && p_guess[which]) {
+	    free(p_guess[which]);
+	    p_guess[which] = NULL;
 	}
+	else if (askme && !p_know[which] && p_guess[which] == NULL) {
+	    msg(terse ? "Call it: " : "What do you want to call it? ");
+	    if (get_str(buf, cw) == NORM) {
+		p_guess[which] = new((unsigned int) strlen(buf) + 1);
+		strcpy(p_guess[which], buf);
+	    }
+	}
+	food_left += (blessed ? rnd(100) : (cursed ? -rnd(100) : rnd(50) ));
     }
-    if (is_potion) discard(item);
-    updpack(TRUE);
 }
 
 /* Lower a level of experience */
@@ -807,4 +982,79 @@ bool cursed;
     /* Adjust the maximum */
     if (max_stats.s_const < pstats.s_const - (on(player, POWERCONST) ? 10 : 0))
 	max_stats.s_const = pstats.s_const;
+}
+
+/*
+ * monster_quaff - monster gets the effect
+ */
+monster_quaff(quaffer, which, flags)
+struct thing *quaffer;
+int which;
+int flags;
+{
+    register struct object *obj;
+    register struct thing *th;
+    register struct stats *curp = &(quaffer->t_stats);
+    register struct stats *maxp = &(quaffer->maxstats);
+    bool blessed = flags & ISBLESSED;
+    bool cursed  = flags & ISCURSED;
+
+    switch(which) {
+    when P_SEEINVIS:
+	if (cursed)
+	     turn_on(*quaffer, ISHUH);
+	else turn_on(*quaffer, CANSEE);
+    when P_GAINABIL:
+	if (cursed)
+	     curp->s_intel /= 2;
+	else curp->s_power = maxp->s_power;
+    when P_CLEAR:
+	if (cursed)
+	     turn_on(*quaffer, ISHUH);
+	else turn_on(*quaffer, ISHUH);
+    when P_HEALING:
+	if (cursed) {
+	    curp->s_hpt /= 2;
+	    curp->s_power /= 2;
+	}
+	else {
+	    register int nsides = (blessed ? 8 : 4);
+	    register int hpt_gain = roll(curp->s_lvl, nsides);
+	    register int power_gain = roll(curp->s_lvl, nsides);
+
+	    curp->s_hpt   = min(curp->s_hpt+hpt_gain, maxp->s_hpt);
+	    curp->s_power = min(curp->s_power+power_gain, maxp->s_power);
+	}
+    when P_HASTE:
+	if (cursed) {
+	    if (on(*quaffer, ISHASTE))
+		 turn_off(*quaffer, ISHASTE);
+	    else turn_on(*quaffer, ISSLOW);
+	}
+	else turn_on(*quaffer, ISHASTE);
+    when P_INVIS:
+	turn_on(*quaffer, ISINVIS);
+	/* if can_see msg("The monster dissappears!"); */
+    when P_REGENERATE:
+	if (cursed) {
+	    quaff(quaffer, P_HEALING, ISCURSED);
+	    quaff(quaffer, P_HASTE, ISCURSED);
+	}
+	else turn_on(*quaffer, ISREGEN);
+    when P_SHERO:
+	if (on(*quaffer, ISFLEE))
+	    turn_off(*quaffer, ISFLEE);
+	else {
+	    turn_on(*quaffer, SUPERHERO);
+	    quaff(quaffer, P_HASTE, ISBLESSED);
+	    quaff(quaffer, P_CLEAR, ISNORMAL);
+	}
+    when P_PHASE:
+	if (cursed)
+	     quaffer->t_no_move += HOLDTIME;
+	else turn_on(*quaffer, CANINWALL);
+    otherwise:
+	debug("'%s' is a strange potion for a monster to quaff!",
+	    p_magic[which].mi_name);
+    }
 }

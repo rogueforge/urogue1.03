@@ -1,7 +1,6 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/05/86
  */
-#include "curses.h"
 #include "rogue.h"
 
 /*
@@ -14,7 +13,7 @@ ring_on()
     register struct object *obj;
     register struct linked_list *item;
     register int ring;
-    char buf[LINELEN];
+    char buf[2*LINELEN];
 
     item = get_item("put on", RING);
     /*
@@ -22,7 +21,7 @@ ring_on()
      */
     if (item == NULL)
 	return;
-    obj = (struct object *) ldata(item);
+    obj = OBJPTR(item);
     if (obj->o_type != RING) {
 	msg("You can't put that on!");
 	return;
@@ -91,9 +90,8 @@ ring_on()
 	    }
     }
     status(FALSE);
-    if (r_know[obj->o_which] && r_guess[obj->o_which])
-    {
-	cfree(r_guess[obj->o_which]);
+    if (r_know[obj->o_which] && r_guess[obj->o_which]) {
+	free(r_guess[obj->o_which]);
 	r_guess[obj->o_which] = NULL;
     }
     else if (!r_know[obj->o_which] && 
@@ -102,8 +100,7 @@ ring_on()
 	     r_guess[obj->o_which] == NULL) {
 	mpos = 0;
 	msg(terse ? "Call it: " : "What do you want to call it? ");
-	if (get_str(buf, cw) == NORM)
-	{
+	if (get_str(buf, cw) == NORM) {
 	    r_guess[obj->o_which] = new((unsigned int) strlen(buf) + 1);
 	    strcpy(r_guess[obj->o_which], buf);
 	}
@@ -221,6 +218,8 @@ register struct object *obj;
 ring_value(type)
 {
     int result = 0;
+
+#define	ISRING(h, r) (cur_ring[h] != NULL && cur_ring[h]->o_which == r)
 
     if (ISRING(LEFT_1, type))  result += cur_ring[LEFT_1]->o_ac;
     if (ISRING(LEFT_2, type)) result += cur_ring[LEFT_2]->o_ac;

@@ -1,45 +1,33 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/12/86
  */
 /*
  * File with various monster functions in it
  *
  */
 
-#include "curses.h"
-#include "rogue.h"
 #include <ctype.h>
+#include "rogue.h"
 #include "mach_dep.h"
+#include "stepok.h"
+#include "death.h"
 
 /*
  * summon_monster:
  *     Summon a monster.
  */
 struct linked_list *
-summon_monster(type,familiar,quiet)
-short
-    type; 
-bool
-    familiar,quiet;
+summon_monster(type,familiar,print_message)
+short type; 
+bool familiar,print_message;
 {
-register struct linked_list
-    *mp;
-register struct thing
-    *tp;
-short
-    monster;
+    register struct linked_list *mp;
+    register struct thing *tp;
+    short monster;
 
-    if (type == 0) {	/* Summon a random monster modified by level */
-    register int
-	index;
-
-	index = pstats.s_lvl + rnd(pstats.s_lvl);
-	if (index >= 100)
-	    index = 100 + rnd(25);
-
-	monster = index;
-    } else
-	monster = type;
+    if (type == 0)			/* Random monster modified by level */
+	 monster = roll(min(pstats.s_lvl, (nummonst - NUMSUMMON) / 8), 8);
+    else monster = type;
 
     turn_on(player, SUMMONING);
     if ( !(mp = creat_mons(&player, monster, FALSE))) {
@@ -47,70 +35,88 @@ short
 	turn_off(player, SUMMONING);
 	return(NULL);
     }
-    else {
-	if (!quiet) {
-	    msg("A %s appears out of nowhere!",monsters[monster].m_name);
-	    if (familiar)
-	        msg("I am here to do your bidding master.");
-	    else
-		msg("Oh my goodness!  Are you Larry? ");
+    if (print_message == MESSAGE) {
+	msg("A %s appears out of nowhere!",monsters[monster].m_name);
+	if (familiar)
+	    msg("I am here to serve %s.", whoami);
+	else {
+	    msg("My goodness, are you Yendor?");
+	    ++mons_summoned;
+	    debug("%d monsters now summoned.", mons_summoned);
 	}
-	tp = THINGPTR(mp);
-	turn_on(*tp,ISCHARMED); /* Summoned monsters are always charmed */
-	if (familiar) {
-	    if (familiar_ptr)
-		killed(NULL, familiar_ptr, FALSE, FALSE);
-	    turn_on(*tp, ISREGEN); 	/* Familiars can regenerate */
-	    turn_on(*tp, ISSCAVENGE);   /* and pick up things */
-	    turn_on(*tp, ISFAMILIAR);
-	    familiar_ptr = mp;
-	    familiar_type = monster;
-	}
-	turn_off(player, SUMMONING);
-	return(mp);
     }
+    tp = THINGPTR(mp);
+    turn_on(*tp,ISCHARMED); /* Summoned monsters are always charmed */
+
+    if (familiar) {
+	long ff_on;
+	long ff_off;
+
+	ff_on = ISREGEN | CANSHOOT | CANWIELD | HASARMOR | ISFAMILIAR;
+	ff_off = ISMEAN | ISHUH | ISINVIS | CANSURPRISE | NOMOVE | ISSHADOW | ISGREED | ISFAST | CANFLY;
+	turn_on(*tp, ff_on);
+	turn_off(*tp, ff_off);
+
+	if (fam_ptr != NULL)
+	    killed(NULL, fam_ptr, NOMESSAGE, NOPOINTS);
+	fam_ptr = mp;
+	fam_type = monster;
+
+	/* improve their abilities a bit */
+	tp->t_stats.s_hpt += roll(2,pstats.s_lvl);
+	tp->t_stats.s_lvl += roll(2,(pstats.s_lvl/4)+1);
+	tp->t_stats.s_arm -= roll(2,(pstats.s_lvl/4)+1);
+	tp->t_stats.s_str += roll(2,(pstats.s_lvl/4)+1);
+	tp->t_stats.s_wisdom += roll(2,(pstats.s_lvl/4)+1);
+	tp->t_stats.s_dext += roll(2,(pstats.s_lvl/4)+1);
+	tp->t_stats.s_const += roll(2,(pstats.s_lvl/4)+1);
+	tp->t_stats.s_charisma += roll(2,(pstats.s_lvl/4)+1);
+	tp->maxstats = tp->t_stats;		/* structure assignment */
+    }
+    turn_off(player, SUMMONING);
+    return(mp);
 }
 
 /*
  * randmonster:
+ *	wander - wandering monster allowed 
+ *	grab - a throne room monster allowed
  *	Pick a monster to show up.  The lower the level,
  *	the meaner the monster.
  */
 
 short
-randmonster(wander, no_summon)
-register bool wander, no_summon;
+randmonster(wander, grab)
+register bool wander, grab;
 {
-    register int d, cur_level, range, i; 
+    register int mons_number, cur_level, range, i; 
 
-    /* 
-     * Do we want a merchant? Merchant is always in place 'NUMMONST' 
-     */
-    if (wander && monsters[NUMMONST].m_wander && rnd(100) < 3) return NUMMONST;
+    /* Do we want a merchant? */
+    if (wander==WANDER && monsters[nummonst].m_wander && rnd(100) < 3)
+	return(nummonst);
 
     cur_level = level;
     range = 4*NLEVMONS;
     i = 0;
-    do
-    {
+    do {
 	if (i++ > range*10) { /* just in case all have be genocided */
 	    i = 0;
 	    if (--cur_level <= 0)
 		fatal("Rogue could not find a monster to make");
 	}
-	d = NLEVMONS*(cur_level - 1) + (rnd(range) - (range - 1 - NLEVMONS));
-	if (d < 1)
-	    d = rnd(NLEVMONS) + 1;
-	if (d > NUMMONST - NUMSUMMON - 1) {
-	    if (no_summon)
-		d = rnd(range) + (NUMMONST - NUMSUMMON - 1) - (range - 1);
-	    else if (d > NUMMONST - 1)
-		d = rnd(range+NUMSUMMON) + (NUMMONST-1) - (range+NUMSUMMON-1);
+	mons_number = NLEVMONS*(cur_level-1) + (rnd(range) - (range-1-NLEVMONS));
+	if (mons_number < 1)
+	    mons_number = rnd(NLEVMONS) + 1;
+	else if (mons_number > nummonst-NUMSUMMON-1) {
+	    if (grab==GRAB)
+		mons_number = rnd(range+NUMSUMMON) + (nummonst-1) - (range+NUMSUMMON-1);
+	    else if (mons_number > nummonst - 1)
+		mons_number = rnd(range) + (nummonst-NUMSUMMON-1) - (range-1);
 	}
     }
-    while  ( wander ? !monsters[d].m_wander || !monsters[d].m_normal 
-		   : !monsters[d].m_normal);
-    return d;
+    while (wander==WANDER ? !monsters[mons_number].m_wander || !monsters[mons_number].m_normal 
+		   : !monsters[mons_number].m_normal);
+    return(mons_number);
 }
 
 /*
@@ -154,7 +160,7 @@ bool max_monster;
 	    num_extra = atoi(++hitp);
     }
 
-    if (max_monster)
+    if (max_monster==MAXSTATS)
 	tp->t_stats.s_hpt = num_dice * num_sides + num_extra;
     else
 	tp->t_stats.s_hpt = roll(num_dice, num_sides) + num_extra;
@@ -169,6 +175,7 @@ bool max_monster;
 	tp->t_stats.s_lvl += roll(4,(max_level-60)/8);
 	tp->t_stats.s_arm -= roll(2,(max_level-60)/8);
 	tp->t_stats.s_str += roll(2,(max_level-60)/12);
+	tp->t_stats.s_exp += roll(4,(max_level-60)*2) * mp->m_add_exp;
     }
 
     /*
@@ -192,14 +199,27 @@ bool max_monster;
     if (!max_monster && on(*tp, CANSURPRISE) && rnd(100) < 20)
 	    turn_off(*tp, CANSURPRISE);
 
-    /* If this monster is unique, gen it */
-    if (on(*tp, ISUNIQUE)) mp->m_normal = FALSE;
+    /* If this monster is unique, genocide it */
+    if (on(*tp, ISUNIQUE)) 
+	mp->m_normal = FALSE;
+
+    /* gods automatically get special abilities */
+    if (on(*tp, ISGOD)) {
+	turn_on(*tp, CANFRIGHTEN);
+	turn_on(*tp, CANCAST);
+	turn_on(*tp, CANFLY);
+	turn_on(*tp, CANBARGAIN);
+	turn_on(*tp, ISLARGE);
+	turn_on(*tp, CANTELEPORT);
+	turn_on(*tp, CANSPEAK);
+	turn_on(*tp, CANDARKEN);
+	turn_on(*tp, CANSEE);
+	turn_on(*tp, CANLIGHT);
+	turn_on(*tp, BMAGICHIT);
+    }
 
     tp->t_turn = TRUE;
     tp->t_pack = NULL;
-
-    /* Normally scared monsters have a chance to not be scared */
-    if (on(*tp, ISFLEE) && (rnd(4) == 0)) turn_off(*tp, ISFLEE);
 
     /* Figure intelligence */
     min_intel = atoi(mp->m_intel);
@@ -212,86 +232,168 @@ bool max_monster;
 	else
 	    tp->t_stats.s_intel = min_intel + rnd(max_intel - min_intel);
     }
-    tp->maxstats = tp->t_stats;
+    /* Spell points = INT * LVL, for now */
+    tp->t_stats.s_power = tp->t_stats.s_intel * tp->t_stats.s_lvl;
+
+    /* Set up maxstats */
+    tp->maxstats = tp->t_stats;		/* structure assignment */
 
     /* If the monster can shoot, it may have a weapon */
-    if (on(*tp, CANSHOOT) && (rnd(9) < 6 || max_monster)) {
-	struct linked_list *item, *item1;
-	register struct object *cur, *cur1;
+    if (on(*tp, CANSHOOT) && (max_monster || rnd(9)<6)) {
+	struct linked_list *thrower_item, *missile_item;
+	register struct object *thrower, *missile;
 
-	item = new_item(sizeof *cur);
-	item1 = new_item(sizeof *cur1);
-	cur = OBJPTR(item);
-	cur1 = OBJPTR(item1);
-	cur->o_hplus = (rnd(4) < 3) ? 0
-				    : (rnd(3) + 1) * ((rnd(3) < 2) ? 1 : -1);
-	cur->o_dplus = (rnd(4) < 3) ? 0
-				    : (rnd(3) + 1) * ((rnd(3) < 2) ? 1 : -1);
-	cur1->o_hplus = (rnd(4) < 3) ? 0
-				    : (rnd(3) + 1) * ((rnd(3) < 2) ? 1 : -1);
-	cur1->o_dplus = (rnd(4) < 3) ? 0
-				    : (rnd(3) + 1) * ((rnd(3) < 2) ? 1 : -1);
-	cur->o_damage = cur->o_hurldmg =
-		cur1->o_damage = cur1->o_hurldmg = "0d0";
-	cur->o_ac = cur1->o_ac = 11;
-	cur->o_count = cur1->o_count = 1;
-	cur->o_group = cur1->o_group = 0;
-	if ((cur->o_hplus <= 0) && (cur->o_dplus <= 0)) cur->o_flags = ISCURSED;
-	if ((cur1->o_hplus <= 0) && (cur1->o_dplus <= 0))
-	    cur1->o_flags = ISCURSED;
-	cur->o_flags = cur1->o_flags = 0;
-	cur->o_type = cur1->o_type = WEAPON;
-	cur->o_mark[0] = cur1->o_mark[0] = '\0';
+	thrower_item = new_item(sizeof *thrower);
+	thrower = OBJPTR(thrower_item);
+	carried_weapon(tp, thrower);
+
+	missile_item = new_item(sizeof *missile);
+	missile = OBJPTR(missile_item);
+	carried_weapon(tp, missile);
 
 	/* The monster may use a crossbow, sling, footbow, or an arrow */
-	i = rnd(100);
-	if (i < 9) {
-	    cur->o_which = CROSSBOW;
-	    cur1->o_which = BOLT;
-	    init_weapon(cur, CROSSBOW);
-	    init_weapon(cur1, BOLT);
+	/* Take racial preferences into account */
+	if ((strcmp(mp->m_name,"elf")==0) || (strcmp(mp->m_name,"noldor elf")==0)) {
+	    thrower->o_which = BOW;
+	    if (rnd(5) == 0)
+		 missile->o_which = SILVERARROW;
+	    else missile->o_which = ARROW;
 	}
-	else if (i < 20) {
-	    cur->o_which = FOOTBOW;
-	    cur1->o_which = FBBOLT;
-	    init_weapon(cur, FOOTBOW);
-	    init_weapon(cur1, FBBOLT);
+	else 
+	if ((strcmp(mp->m_name,"dwarf")==0) || (strcmp(mp->m_name,"kazad dwarf")==0)) {
+	    thrower->o_which = CROSSBOW;
+	    missile->o_which = BOLT;
 	}
-	else if (i < 65) {
-	    cur->o_which = BOW;
-	    init_weapon(cur, BOW);
-	    if (strcmp(mp->m_name,"elf") == 0 && rnd(10) < 1) {
-		cur1->o_which = SILVERARROW;
-		init_weapon(cur1, SILVERARROW);
+	else 
+	if (on(*tp, ISSMALL)) {
+	    switch(rnd(3)) {
+	    when 0:
+		thrower->o_which = SLING;
+		missile->o_which = BULLET;
+	    otherwise:
+		thrower->o_which = SLING;
+		missile->o_which = ROCK;
 	    }
-	    else {
-		cur1->o_which = ARROW;
-		init_weapon(cur1, ARROW);
-            }
+	}
+	else 
+	if (on(*tp, ISLARGE)) {
+	    switch(rnd(4)) {
+	    when 0:
+		thrower->o_which = CROSSBOW;
+		missile->o_which = BOLT;
+	    when 1:
+		thrower->o_which = FOOTBOW;
+		missile->o_which = FBBOLT;
+	    otherwise:
+		thrower->o_which = BOW;
+		if (rnd(5) == 0)
+		     missile->o_which = FLAMEARROW;
+		else missile->o_which = ARROW;
+	    }
 	}
 	else {
-	    cur->o_which = SLING;
-	    cur1->o_which = ROCK;
-	    init_weapon(cur, SLING);
-	    init_weapon(cur1, ROCK);
+	    switch(rnd(6)) {
+	    when 1:
+		thrower->o_which = SLING;
+		missile->o_which = ROCK;
+	    when 2:
+		thrower->o_which = CROSSBOW;
+		missile->o_which = BOLT;
+	    when 3:
+		thrower->o_which = FOOTBOW;
+		missile->o_which = FBBOLT;
+	    when 4:
+		thrower->o_which = BOW;
+		missile->o_which = ARROW;
+	    otherwise:
+		thrower->o_which = SLING;
+		missile->o_which = BULLET;
+	    }
 	}
 
-	attach(tp->t_pack, item);
-	attach(tp->t_pack, item1);
+	init_weapon(thrower, thrower->o_which);
+	init_weapon(missile, missile->o_which);
+
+	attach(tp->t_pack, thrower_item);
+	attach(tp->t_pack, missile_item);
+    }
+
+    /* monsters that wield weapons */
+    if (on(*tp, CANWIELD) && (rnd(9) < 5 || max_monster)) {
+	struct linked_list *wield_item;
+	register struct object *wielded;
+
+	wield_item = new_item(sizeof *wielded);
+	wielded = OBJPTR(wield_item);
+	carried_weapon(tp, wielded);
+
+	i = rnd(tp->t_stats.s_lvl);
+	switch (i) {
+	    when 0: wielded->o_which = CLUB;
+	    when 1: wielded->o_which = SHORT_SPEAR;
+	    when 2: wielded->o_which = SHORT_SWORD;
+	    when 3: wielded->o_which = LIGHT_MACE;
+	    when 4: wielded->o_which = MORNINGSTAR;
+	    when 5: wielded->o_which = BROAD_SWORD;
+	    when 6: wielded->o_which = LONG_SWORD;
+	    when 7: wielded->o_which = LANCE;
+	    when 8: wielded->o_which = HEAVY_MACE;
+	    when 9: wielded->o_which = BAST_SWORD;
+	    otherwise:
+		wielded->o_which = TWO_SWORD;
+	}
+	init_weapon(wielded, wielded->o_which);
+
+	/* Is it too heavy? */
+	if (itemweight(wielded) > 8 * tp->t_stats.s_str)
+	     discard(wield_item);
+	else attach(tp->t_pack, wield_item);
     }
 
 
-    if (ISWEARING(R_AGGR))
+    if (is_wearing(R_AGGR)) {
 	runto(cp, &hero);
-    if (on(*tp, ISDISGUISE))
-    {
-	char mch;
+    }
+    else {
+	/* Normally scared monsters have a chance to not be scared */
+	if (on(*tp, ISFLEE) && (rnd(4) == 0)) turn_off(*tp, ISFLEE);
 
-	if (tp->t_pack != NULL)
-	    mch = (OBJPTR(tp->t_pack))->o_type;
-	else
-	    switch (rnd(level > arts[0].ar_level ? 10 : 9))
-	    {
+	/* LOWFRIENDLY monsters might be friendly */
+	if (on(*tp, LOWFRIENDLY) && rnd(43) < 4)
+	    turn_on(*tp, ISFRIENDLY);
+
+	/* MEDFRIENDLY monsters might be friendly */
+	if (on(*tp, MEDFRIENDLY) && rnd(43) < 18)
+	    turn_on(*tp, ISFRIENDLY);
+
+	/* HIGHFRIENDLY monsters probably will be friendly */
+	if (on(*tp, HIGHFRIENDLY) && rnd(43) < 30)
+	    turn_on(*tp, ISFRIENDLY);
+
+	if (on(*tp, ISFRIENDLY))
+	    turn_off(*tp, ISMEAN);
+
+	/* LOWCAST monsters might use spells */
+	if (on(*tp, LOWCAST) && rnd(43) < 4)
+	    turn_on(*tp, CANCAST);
+
+	/* MEDCAST monsters might use spells */
+	if (on(*tp, MEDCAST) && rnd(43) < 18)
+	    turn_on(*tp, CANCAST);
+
+	/* HIGHFRIENDLY monsters probably will use spells */
+	if (on(*tp, HIGHCAST) && rnd(43) < 30)
+	    turn_on(*tp, CANCAST);
+
+	turn_off(*tp, ISRUN);		/* start the monster off right */
+
+	if (on(*tp, ISDISGUISE)) {
+	    char mch;
+
+	    if (tp->t_pack != NULL)
+		mch = (OBJPTR(tp->t_pack))->o_type;
+	    else
+		switch (rnd(level > arts[0].ar_level ? 10 : 9)) {
 		when 0: mch = GOLD;
 		when 1: mch = POTION;
 		when 2: mch = SCROLL;
@@ -300,10 +402,11 @@ bool max_monster;
 		when 5: mch = ARMOR;
 		when 6: mch = RING;
 		when 7: mch = STICK;
-		when 8: mch = monsters[randmonster(FALSE, FALSE)].m_appear;
+		when 8: mch = monsters[randmonster(NOWANDER, NOGRAB)].m_appear;
 		when 9: mch = ARTIFACT;
-	    }
-	tp->t_disguise = mch;
+		}
+	    tp->t_disguise = mch;
+	}
     }
 }
 
@@ -328,7 +431,7 @@ wanderer()
 	    count++;
 	    i = rnd_room();
 	} until(hr != &rooms[i] || levtype == MAZELEV 
-			|| levtype == THRONE || count > 500);
+			|| levtype == THRONE || count > 5000);
 	rnd_pos(&rooms[i], &cp);
     } until (step_ok(cp.y, cp.x, NOMONST, (struct thing *) NULL));
 
@@ -351,8 +454,30 @@ wanderer()
     else
 	count = 0;
 
-    for (i = 1; i <= count; i++)
-	creat_mons(tp, which, FALSE);
+    for (i = 1; i <= count; i++) {
+	register struct linked_list *ip;
+	register struct thing *mp;
+
+	
+	if ((ip = creat_mons(tp, which, FALSE)) != NULL) {
+	    mp = THINGPTR(ip);
+	    if (on(*tp, ISFRIENDLY))
+		turn_on(*mp, ISFRIENDLY);
+	    else
+		turn_off(*mp, ISFRIENDLY);
+	}
+    }
+
+    if (count > 0) {
+	if (on(*tp, LOWCAST) || on(*tp, MEDCAST) || on(*tp, HIGHCAST))
+	    turn_on(*tp, CANCAST);
+	tp->t_stats.s_hpt += roll(2,8);
+	tp->t_stats.s_lvl += roll(2,3);
+	tp->t_stats.s_arm -= roll(1,6);
+	tp->t_stats.s_str += roll(2,3);
+	tp->t_stats.s_intel += roll(2,3);
+	tp->t_stats.s_exp += roll(2,8) * monsters[which].m_add_exp;
+    }
 
     i = DISTANCE(cp.x, cp.y, hero.x, hero.y);
 
@@ -363,12 +488,12 @@ wanderer()
     else
 	loc = "in the distance";
 
-    if (on(player, CANSCENT) || (player.t_ctype == C_THIEF && rnd(40) == 0)) 
-	msg("You smell a new %s %s.", monsters[tp->t_index].m_name, loc);
-    if (on(player, CANHEAR) || (player.t_ctype == C_THIEF && rnd(40) == 0)) 
+    if (wizard)
+	msg("Started a wandering %s.", monsters[tp->t_index].m_name);
+    else if (on(player, CANHEAR) || (player.t_ctype == C_THIEF && rnd(20) == 0)) 
 	msg("You hear a new %s moving %s.", monsters[tp->t_index].m_name, loc);
-
-    debug("Started a wandering %s.", monsters[tp->t_index].m_name);
+    else if (on(player, CANSCENT) || (player.t_ctype == C_THIEF && rnd(20) == 0)) 
+	msg("You smell a new %s %s.", monsters[tp->t_index].m_name, loc);
 }
 
 /*
@@ -433,8 +558,7 @@ int y, x;
      */
     if (on(*tp, ISUNIQUE) || rnd(100) > 33 && on(*tp, ISMEAN) && 
 	off(*tp, ISHELD) && off(*tp, ISRUN) && !is_stealth(&player) &&
-	(off(player, ISINVIS) || on(*tp, CANSEE)))
-    {
+	(off(player, ISINVIS) || on(*tp, CANSEE))) {
 	tp->t_dest = &hero;
 	turn_on(*tp, ISRUN);
 	turn_off(*tp, ISDISGUISE);
@@ -482,7 +606,7 @@ int y, x;
 	if (no_command == 0 && !save(VS_PARALYZATION)) {
  	    if (on(player, ISINVIS))
 		msg("The gaze of the %s has no effect.", mname);
-	    else if (ISWEARING(R_ALERT))
+	    else if (is_wearing(R_ALERT))
 		msg("You feel slightly drowsy for a moment.");
 	    else {
 		msg("The %s's gaze puts you to sleep.", mname);
@@ -501,7 +625,9 @@ int y, x;
 	        turn_off(*tp, CANFRIGHTEN);
 	        if (!save(VS_WAND) &&
 	            !(on(player, ISFLEE) && (player.t_dest == &tp->t_pos))) {
-		        if (off(player, SUPERHERO) && off(player, ISINVIS)) {
+		        if (off(player, SUPERHERO) 
+				&& (player.t_ctype != C_PALADIN)
+				&& off(player, ISINVIS)) {
 			    turn_on(player, ISFLEE);
 			    player.t_dest = &tp->t_pos;
 			    msg("The sight of the %s terrifies you.", mname);
@@ -532,7 +658,7 @@ int y, x;
 			    on(player, ISSLOW) ? "even " : "");
 		    if (on(player, ISSLOW))
 			lengthen(noslow, rnd(4) + 4);
-		    else if (!ISWEARING(R_FREEDOM)) {
+		    else if (!is_wearing(R_FREEDOM)) {
 			turn_on(player, ISSLOW);
 			player.t_turn = TRUE;
 			fuse(noslow, 0, rnd(4)+4, AFTER);
@@ -549,7 +675,7 @@ int y, x;
 	    msg("The %s is blinded !!!", mname);
 	    turn_on(*tp, ISHUH);
 	} else
-	if (off(player, ISBLIND) && !ISWEARING(R_SEEINVIS)
+	if (off(player, ISBLIND) && !is_wearing(R_SEEINVIS)
 		&& off(player, ISINVIS)
 		&& !save(VS_WAND)) {
 	    msg("The gaze of the %s blinds you.", mname);
@@ -563,7 +689,7 @@ int y, x;
 	if (on(player, CANREFLECT)) {
 	    msg("You reflect the gaze of the %s.", mname);
 	    msg("The %s is turned to stone !!!", mname);
-	    killed(player, it, FALSE, TRUE);
+	    killed(&player, it, NOMESSAGE, POINTS);
         } else {
 
 	    turn_off(*tp, LOOKSTONE);
@@ -609,7 +735,12 @@ int y, x;
     return it;
 }
 
-genocide()
+/*
+ * genocide - wipe out hated monsters
+ * flags:	ISBLESSED, ISCURSED
+ */
+genocide(flags)
+int flags;
 {
     register struct linked_list *ip;
     register struct thing *mp;
@@ -617,24 +748,26 @@ genocide()
     register struct linked_list *nip;
     register int pres_monst=1, num_lines=LINES-3;
     register short which_monst;
-    char monst_name[LINELEN*2];
+    char monst_name[2*LINELEN];
+    bool blessed = flags & ISBLESSED;
+    bool cursed  = flags & ISCURSED;
 
     /* Print out the monsters */
-    while (pres_monst < NUMMONST) {
+    while (pres_monst < nummonst) {
 	wclear(hw);
 	touchwin(hw);
 
 	wmove(hw, 2, 0);
-	for (i=0; i<num_lines && pres_monst < NUMMONST; i++) {
+	for (i=0; i<num_lines && pres_monst < nummonst; i++) {
 	    sprintf(monst_name, "[%d] %s\n",
 				pres_monst, monsters[pres_monst].m_name);
 	    waddstr(hw, monst_name);
 	    pres_monst++;
 	}
 
-	if (pres_monst < NUMMONST) {
+	if (pres_monst < nummonst) {
 	    mvwaddstr(hw, LINES-1, 0, morestr);
-	    draw(hw);
+	    wrefresh(hw);
 	    wait_for(' ');
 	}
 
@@ -642,16 +775,16 @@ genocide()
 	    mvwaddstr(hw, 0, 0, "Which monster");
 	    if (!terse) waddstr(hw, " do you wish to wipe out");
 	    waddstr(hw, "? ");
-	    draw(hw);
+	    wrefresh(hw);
 	}
     }
 
 get_monst:
     get_str(monst_name, hw);
     which_monst = atoi(monst_name);
-    if ((which_monst < 1 || which_monst > NUMMONST-1)) {
+    if ((which_monst < 1 || which_monst > nummonst-1)) {
 	mvwaddstr(hw, 0, 0, "Please enter a number in the displayed range -- ");
-	draw(hw);
+	wrefresh(hw);
 	goto get_monst;
     }
 
@@ -659,6 +792,16 @@ get_monst:
     clearok(cw, TRUE);
     touchwin(cw);
 
+    if (cursed) {					/* oops... */
+	extern int throne_monster;
+
+	throne_monster = which_monst;			/* hack, kludge */
+	new_level(THRONE);
+	msg("What's this I hear about you trying to wipe me out?");
+	fighting = running = after = FALSE;
+	return;
+    }
+ 
     /* Remove this monster from the present level */
     for (ip = mlist; ip; ip = nip) {
 	mp = THINGPTR(ip);
@@ -689,7 +832,7 @@ register char monster;
 {
     register int i;
 
-    for (i = 1; i <= NUMMONST+2; i++)
+    for (i = 1; i <= nummonst+2; i++)
 	if (monsters[i].m_appear == monster)
 	    add_line("A %s ", monsters[i].m_name);
     end_line();
@@ -702,6 +845,13 @@ register char monster;
 check_residue(tp)
 register struct thing *tp;
 {
+   /*
+    * Flag the monster as dead to prevent multiple moves in this round.
+    * (Done for the benefit of do_chase())
+    */
+ 
+  monst_dead = TRUE;
+ 
     /*
      * Take care of special abilities
      */
@@ -738,8 +888,8 @@ register struct thing *tp;
     register struct linked_list *item;
     register int i, j, min_worth, nitems, goods, chance, which_item, w;
     register struct object *obj;
-    char buffer[LINELEN];
-    char dbuf[LINELEN];
+    char buffer[2*LINELEN];
+    char dbuf[2*LINELEN];
     struct {
 	int which;
 	int plus1, plus2;
@@ -748,6 +898,8 @@ register struct thing *tp;
 	int flags;
 	char *name;
     } selection[10];
+    register int effective_purse = ( (player.t_ctype==C_PALADIN) ?
+		(9 * purse/10) : purse);
 
     min_worth = -1; 		/* hope item is never worth less than this */
     item = find_mons(tp->t_pos.y, tp->t_pos.x); /* Get pointer to monster */
@@ -761,10 +913,10 @@ register struct thing *tp;
 	    goods = ARMOR;
 	    for (i=0; i<nitems; i++) {
 		chance = rnd(100);
-		for (j = 0; j < MAXARMORS; j++)
+		for (j = 0; j < maxarmors; j++)
 		    if (chance < armors[j].a_prob)
 			break;
-		if (j == MAXARMORS) {
+		if (j == maxarmors) {
 		    debug("Picked a bad armor %d", chance);
 		    j = 0;
 		}
@@ -802,7 +954,7 @@ register struct thing *tp;
 	case 3:
 	    goods = WEAPON;
 	    for (i=0; i<nitems; i++) {
-		selection[i].which = rnd(MAXWEAPONS);
+		selection[i].which = rnd(maxweapons);
 		selection[i].count = 1;
 		if (rnd(100) < 35) {
 		    selection[i].plus1 = rnd(3);
@@ -844,7 +996,7 @@ register struct thing *tp;
 	case 4:
 	    goods = STICK;
 	    for (i=0; i<nitems; i++) {
-		selection[i].which = pick_one(ws_magic, MAXSTICKS);
+		selection[i].which = pick_one(ws_magic, maxsticks);
 		selection[i].plus1 = rnd(11) + 5;	/* Charges */
 		selection[i].count = 1;
 		selection[i].name = ws_magic[selection[i].which].mi_name;
@@ -874,7 +1026,7 @@ register struct thing *tp;
 	case 5:
 	    goods = RING;
 	    for (i=0; i<nitems; i++) {
-		selection[i].which = pick_one(r_magic, MAXRINGS);
+		selection[i].which = pick_one(r_magic, maxrings);
 		selection[i].plus1 = rnd(2) + 1;  /* Armor class */
 		selection[i].count = 1;
 		if (rnd(100) < r_magic[selection[i].which].mi_bless + 10)
@@ -917,20 +1069,20 @@ register struct thing *tp;
     }
 
     /* See if player can afford an item */
-    if (min_worth > purse) {
+    if (min_worth > effective_purse) {
 	msg("The %s eyes your small purse and departs.",
-			monsters[NUMMONST].m_name);
+			monsters[nummonst].m_name);
 	/* Get rid of the monster */
-	killed(NULL, item, FALSE, FALSE);
+	killed(NULL, item, NOMESSAGE, NOPOINTS);
 	return;
     }
 
     /* Display the goods */
-    msg("The %s shows you his wares.", monsters[NUMMONST].m_name);
+    msg("The %s shows you his wares.", monsters[nummonst].m_name);
     wstandout(cw);
     mvwaddstr(cw, 0, mpos, morestr);
     wstandend(cw);
-    draw(cw);
+    wrefresh(cw);
     wait_for(' ');
     msg("");
     clearok(cw, TRUE);
@@ -939,7 +1091,7 @@ register struct thing *tp;
     wclear(hw);
     touchwin(hw);
     for (i=0; i < nitems; i++) {
-	if (selection[i].worth > purse)
+	if (selection[i].worth > effective_purse)
 	    continue;
 	wmove(hw, i+2, 0);
 	sprintf(dbuf,"[%c] ", (char) ((short) 'a' + i));
@@ -969,17 +1121,17 @@ register struct thing *tp;
     sprintf(buffer, "Purse:  %d", purse);
     mvwaddstr(hw, nitems+3, 0, buffer);
     mvwaddstr(hw, 0, 0, "How about one of the following goods? ");
-    draw(hw);
+    wrefresh(hw);
     /* Get rid of the monster */
-    killed(NULL, item, FALSE, FALSE);
+    killed(NULL, item, NOMESSAGE, NOPOINTS);
 
     which_item = (short) ((getchar() & 0177) - 'a');
-    while (which_item < 0 || which_item >= nitems) {
+    while (which_item < 0 || which_item >= nitems || selection[which_item].worth > effective_purse) {
 	if (which_item == (short) ESCAPE - (short) 'a') {
 	    return;
 	}
 	mvwaddstr(hw, 0, 0, "Please enter one of the listed items: ");
-	draw(hw);
+	wrefresh(hw);
 	which_item = (short) ((getchar() & 0177) - 'a');
     }
 
@@ -991,12 +1143,7 @@ register struct thing *tp;
     obj = OBJPTR(item);
     if (selection[which_item].count > 1) {
 	obj->o_count = selection[which_item].count;
-	obj->o_group = newgrp();
-    }
-
-    if (selection[i].flags) {
-	obj->o_flags |= ISCURSED;
-	obj->o_flags &= ~ISBLESSED;
+	obj->o_group = ++group;
     }
 
     /* If a stick or ring, let player know the type */
@@ -1009,4 +1156,23 @@ register struct thing *tp;
 	obj->o_pos = hero;
 	fall(&player, item, TRUE);
     }
+}
+
+carried_weapon(owner, weapon)
+register struct thing *owner;
+register struct object *weapon;
+{
+    weapon->o_hplus = (rnd(4)<3)? 0 : (rnd(3)+1) * ((rnd(3)<2)? 1 : -1);
+    weapon->o_dplus = (rnd(4)<3)? 0 : (rnd(3)+1) * ((rnd(3)<2)? 1 : -1);
+    weapon->o_hplus += rnd(owner->t_stats.s_lvl/3 + 1);
+    weapon->o_hplus += rnd(owner->t_stats.s_lvl/3 + 1);
+    weapon->o_damage = weapon->o_hurldmg = "0d0";
+    weapon->o_ac = 11;
+    weapon->o_count = 1;
+    weapon->o_group = 0;
+    if ((weapon->o_hplus <= 0) && (weapon->o_dplus <= 0))
+	weapon->o_flags = ISCURSED;
+    weapon->o_flags = 0;
+    weapon->o_type = WEAPON;
+    weapon->o_mark[0] = '\0';
 }

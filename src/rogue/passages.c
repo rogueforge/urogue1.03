@@ -1,5 +1,5 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 06/25/86
  */
 /*
  * Draw the connecting passages
@@ -7,8 +7,9 @@
  * @(#)passages.c	3.4 (Berkeley) 6/15/81
  */
 
-#include "curses.h"
 #include "rogue.h"
+
+#define cmov(xy) move((xy).y, (xy).x)
 
 /*
  * do_passages:
@@ -20,8 +21,7 @@ do_passages()
     register struct rdes *r1, *r2;
     register int i, j;
     register int roomcount;
-    static struct rdes
-    {
+    static struct rdes {
 	bool	conn[MAXROOMS];		/* possible to connect to room i? */
 	bool	isconn[MAXROOMS];	/* connection been made to room i? */
 	bool	ingraph;		/* this room in graph already? */
@@ -40,8 +40,7 @@ do_passages()
     /*
      * reinitialize room graph description
      */
-    for (r1 = rdes; r1 < &rdes[MAXROOMS]; r1++)
-    {
+    for (r1 = rdes; r1 < &rdes[MAXROOMS]; r1++) {
 	for (j = 0; j < MAXROOMS; j++)
 	    r1->isconn[j] = FALSE;
 	r1->ingraph = FALSE;
@@ -54,8 +53,7 @@ do_passages()
     roomcount = 1;
     r1 = &rdes[rnd(MAXROOMS)];
     r1->ingraph = TRUE;
-    do
-    {
+    do {
 	/*
 	 * find a room to connect with
 	 */
@@ -67,8 +65,7 @@ do_passages()
 	 * if no adjacent rooms are outside the graph, pick a new room
 	 * to look from
 	 */
-	if (j == 0)
-	{
+	if (j == 0) {
 	    do
 		r1 = &rdes[rnd(MAXROOMS)];
 	    until (r1->ingraph);
@@ -77,8 +74,7 @@ do_passages()
 	 * otherwise, connect new room to the graph, and draw a tunnel
 	 * to it
 	 */
-	else
-	{
+	else {
 	    r2->ingraph = TRUE;
 	    i = r1 - rdes;
 	    j = r2 - rdes;
@@ -93,8 +89,7 @@ do_passages()
      * attempt to add passages to the graph a random number of times so
      * that there isn't just one unique passage through it.
      */
-    for (roomcount = rnd(5); roomcount > 0; roomcount--)
-    {
+    for (roomcount = rnd(5); roomcount > 0; roomcount--) {
 	r1 = &rdes[rnd(MAXROOMS)];	/* a random room to look from */
 	/*
 	 * find an adjacent room not already connected
@@ -107,8 +102,7 @@ do_passages()
 	 * if there is one, connect it and look for the next added
 	 * passage
 	 */
-	if (j != 0)
-	{
+	if (j != 0) {
 	    i = r1 - rdes;
 	    j = r2 - rdes;
 	    conn(i, j);
@@ -133,16 +127,14 @@ int r1, r2;
     register char direc;
     coord delta, curr, turn_delta, spos, epos;
 
-    if (r1 < r2)
-    {
+    if (r1 < r2) {
 	rm = r1;
 	if (r1 + 1 == r2)
 	    direc = 'r';
 	else
 	    direc = 'd';
     }
-    else
-    {
+    else {
 	rm = r2;
 	if (r2 + 1 == r1)
 	    direc = 'r';
@@ -154,8 +146,7 @@ int r1, r2;
      * Set up the movement variables, in two cases:
      * first drawing one down.
      */
-    if (direc == 'd')
-    {
+    if (direc == 'd') {
 	rmt = rm + 3;				/* room # of dest */
 	rpt = &rooms[rmt];			/* room pointer of dest */
 	delta.x = 0;				/* direction of move */
@@ -164,8 +155,7 @@ int r1, r2;
 	spos.y = rpf->r_pos.y;
 	epos.x = rpt->r_pos.x;			/* end of move */
 	epos.y = rpt->r_pos.y;
-	if (!(rpf->r_flags & ISGONE))		/* if not gone pick door pos */
-	{
+	if (!(rpf->r_flags & ISGONE)) {		/* if not gone pick door pos */
 	    spos.x += rnd(rpf->r_max.x-2)+1;
 	    spos.y += rpf->r_max.y-1;
 	}
@@ -177,8 +167,7 @@ int r1, r2;
 	turn_distance = abs(spos.x - epos.x);	/* how far to turn */
 	turn_spot = rnd(distance-1) + 1;		/* where turn starts */
     }
-    else if (direc == 'r')			/* setup for moving right */
-    {
+    else if (direc == 'r') {			/* setup for moving right */
 	rmt = rm + 1;
 	rpt = &rooms[rmt];
 	delta.x = 1;
@@ -187,8 +176,7 @@ int r1, r2;
 	spos.y = rpf->r_pos.y;
 	epos.x = rpt->r_pos.x;
 	epos.y = rpt->r_pos.y;
-	if (!(rpf->r_flags & ISGONE))
-	{
+	if (!(rpf->r_flags & ISGONE)) {
 	    spos.x += rpf->r_max.x-1;
 	    spos.y += rnd(rpf->r_max.y-2)+1;
 	}
@@ -206,15 +194,15 @@ int r1, r2;
      * Draw in the doors on either side of the passage or just put #'s
      * if the rooms are gone.
      */
-    if (!(rpf->r_flags & ISGONE)) door(rpf, &spos);
-    else
-    {
+    if (!(rpf->r_flags & ISGONE)) 
+	door(rpf, &spos);
+    else {
 	cmov(spos);
 	addch('#');
     }
-    if (!(rpt->r_flags & ISGONE)) door(rpt, &epos);
-    else
-    {
+    if (!(rpt->r_flags & ISGONE)) 
+	door(rpt, &epos);
+    else {
 	cmov(epos);
 	addch('#');
     }
@@ -223,8 +211,7 @@ int r1, r2;
      */
     curr.x = spos.x;
     curr.y = spos.y;
-    while(distance)
-    {
+    while(distance) {
 	/*
 	 * Move to new position
 	 */
@@ -234,8 +221,7 @@ int r1, r2;
 	 * Check if we are at the turn place, if so do the turn
 	 */
 	if (distance == turn_spot && turn_distance > 0)
-	    while(turn_distance--)
-	    {
+	    while(turn_distance--) {
 		cmov(curr);
 		addch(PASSAGE);
 		curr.x += turn_delta.x;

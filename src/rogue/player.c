@@ -1,13 +1,12 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/12/86
  */
 /*
  * This file contains functions for dealing with special player abilities
- * @(#)player.c	7.0 (Indian Hill) 10/5/82
  */
 
-#include "curses.h"
 #include "rogue.h"
+#include <ctype.h>
 
 /* Constitution bonus */
 
@@ -22,22 +21,47 @@ const_bonus()	/* Hit point adjustment for changing levels */
     return(-2);
 }
 
-/* Routines for everyone */
-
-prayer() 	/* Pray to a deity */
+/*
+ * Pray to a deity
+ *
+ * 00-10 Good stuff happens
+ * 11-40 A good deity answers
+ * 41-60 Nothing happens
+ * 61-90 A bad deity answers, but with good results
+ * 91-99 You were better off before
+ */
+prayer()
 {
-register int
-    chance, i, times;
-char
-    ch, num_str[20];
-struct linked_list 
-    *item;
-struct thing 
-    *tp;
-bool
-    got_one = FALSE;
+    register int chance, i, times;
+    char ch, num_str[20];
+    struct linked_list *item, *f_mons_a();
+    struct thing *tp;
+    bool got_one = FALSE;
+    bool is_godly;
+    static int times_prayed = 0;
 
-    ++times_prayed;
+    if (times_prayed > pstats.s_lvl) {
+	msg("Are you sure you want to bother the gods?");
+	ch = readchar();
+	if (tolower(ch) != 'y') {
+	    after = FALSE;
+	    return;
+	}
+	else msg("Here goes...");
+    }
+    msg("You are surrounded by orange smoke...");	/* from adventure(6) */
+    pstats.s_hpt   = max_stats.s_hpt;
+    pstats.s_power = max_stats.s_power;
+
+    if (is_wearing(R_PIETY) || (rnd(luck)==0 &&
+	(player.t_ctype==C_DRUID || player.t_ctype==C_CLERIC ||
+	((player.t_ctype==C_PALADIN || player.t_ctype==C_RANGER) && pstats.s_lvl>8))))
+	 is_godly = ISBLESSED;
+    else is_godly = ISNORMAL;
+
+    if (is_wearing(R_PIETY))
+	 times_prayed += rnd(1);
+    else times_prayed++;
 
     if (wizard) {
 	msg("What roll?[0..%d] ",99);
@@ -47,19 +71,19 @@ bool
 	    return;
 	}
 	chance = atoi(num_str);
-    } else {
-        if (times_prayed > pstats.s_lvl && (!(player.t_ctype == C_DRUID ||
-                                              player.t_ctype == C_CLERIC))) {
-	    chance = 100;
-        } else 
-            chance = rnd(100);
     }
+    else {
+	chance = rnd(100) + roll(10, luck) - 5;
+        if (times_prayed > pstats.s_lvl)
+	    chance += 50;
+        if (is_godly)
+	    chance -= 50;
+    }
+    chance = max(0, min(chance, 100));
 
-    switch (chance) {
-
-    case 0:
-        msg("Your prayers are answered.");	
-	if (PRAYER_ABILITY) 
+    if (chance == 0) {
+        msg("The heavens open and glorious radiance surrounds you!");
+	if (is_godly) 
 	    times = 8;
 	else 
 	    times = 1;
@@ -70,98 +94,102 @@ bool
 	 * the monster will be killed.
 	 */
 	 for (i = 0; i < times ; i++) { 
-	    item = find_mons_around(player.t_pos.y, player.t_pos.x, TRUE);
+	    item = f_mons_a(player.t_pos.y, player.t_pos.x, TRUE);
 	    if (item) {
 	        tp = THINGPTR(item);
-	        msg("A bolt of eldritch energy strikes down the %s!!!",
-	        monsters[tp->t_index].m_name);
-	        killed(NULL, item, FALSE, FALSE);
-		got_one = TRUE;
+	        msg("A bolt of eldritch energy strikes down the %s!",
+		    monsters[tp->t_index].m_name);
+	        killed(NULL, item, NOMESSAGE, POINTS);
 	    }
 	} 
-	if (!got_one)
-	   msg("Unfortunately, you can't determine just what was done.");
+    }
+    else if (chance == 2) {
+	msg("Aule, Lord of Crafts, hears your call.");
+	read_scroll(&player, S_MAKEITEMEM, is_godly);
+    }
 
-    when 10:
-	msg("Your prayers are answered");
-	if (find_mons_around(player.t_pos.y, player.t_pos.x, TRUE))
-            read_scroll(S_SUMMON, PRAYER_ABILITY);
-	else
-	    msg("Unfortunately, you can't determine just what was done.");
+    /* Save 3-9 for other wonderful stuff */
+    else if (chance < 15) {
+	msg("Orome, Lord of Forests, hears your call.");
+	read_scroll(&player, S_SUMMON, is_godly);
+    }
+    else if (chance < 20) {
+	msg("Hermes, the Winged Messenger, hears your call.");
+	quaff(&player, P_HASTE, is_godly);
+    }
+    else if (chance < 25) {
+	msg("Lorien, Master of Dreams, hears your call.");
+	read_scroll(&player, S_SLEEP, is_godly);
+    }
+    else if (chance < 30) {
+	msg("Este, Lady of Healing, hears your call.");
+	quaff(&player, P_RESTORE, is_godly);
+	quaff(&player, P_HEALING, is_godly);
+    }
+    else if (chance < 35) {
+	msg("Thor, God of Thunder, hears your call.");
+	msg("A bolt of lighting strikes you!");
+	read_scroll(&player, S_ELECTRIFY, is_godly);
+    }
+    else if (chance < 40) {
+        msg("Lorien, Master of Illusion, hears your call.");
+	quaff(&player, P_DISGUISE, is_godly);
+    }
 
-    when 20:
-	msg("Your prayers are answered");
-	if (find_mons_around(player.t_pos.y, player.t_pos.x, TRUE))
-	    read_scroll(S_TELEP, PRAYER_ABILITY);
-	else
-	    msg("Unfortunately, you can't determine just what was done.");
+    /*
+     * Nothing happens
+     */
+    else if (chance < 60) {
+	msg("Boccob, the Uncaring, ignores you.");
+    }
 
-    when 30:
-	msg("Your prayers are answered");
-	if (find_mons_around(player.t_pos.y, player.t_pos.x, TRUE))
-            read_scroll(S_SLEEP, PRAYER_ABILITY);
-	else
-	    msg("Unfortunately, you can't determine just what was done.");
+    /*
+     * You don't really want one of these gods answering your call
+     */
+    else if (chance < 65) {
+	msg("Jubilex, Master of Slimes and Oozes, hears your call.");
+	read_scroll(&player, S_HOLD, is_godly);
+	luck++;
+    }
+    else if (chance < 70) {
+	msg("Sauron, Lord of the Ring, hears your call.");
+	quaff(&player, P_INVIS, is_godly);
+	luck++;
+    }
+    else if (chance < 75) {
+	msg("Orcus, Lord of Undead, hears your call.");
+	quaff(&player, P_PHASE, is_godly);
+	luck++;
+    }
+    else if (chance < 80) {
+	msg("Incabulos, God of Evil Sendings, hears your call.");
+	quaff(&player, P_CLEAR, is_godly);
+	luck++;
+    }
+    else if (chance < 85) {
+	msg("Raxivort, Night Flutterer, hears your call.");
+	quaff(&player, P_SEEINVIS, is_godly);
+	luck++;
+    }
+    else if (chance < 90) {
+	msg("Morgoth, Lord of Fire, hears your call.");
+	quaff(&player, P_FIRERESIST, is_godly);
+	luck++;
+    }
 
-    when 40:
-	msg("Your prayers are answered");
-     	if (find_mons_around(player.t_pos.y, player.t_pos.x, TRUE)) {
-	    if (pstats.s_hpt <= max_stats.s_hpt) {
-	        msg("You feel someone opening your mouth.");
-	        quaff(P_RESTORE, PRAYER_ABILITY);
-	        quaff(P_HEALING, PRAYER_ABILITY);
-	    }
-	} else
-	    msg("Unfortunately, you can't determine just what was done.");
-
-    when 50:
-	msg("Your prayers are answered");
-     	if (find_mons_around(player.t_pos.y, player.t_pos.x, TRUE)) {
-	    msg("A bolt of lighting strikes you.");
-            msg("But for some reason, you aren't harmed");
-	    read_scroll(S_ELECTRIFY, PRAYER_ABILITY);
-	} else
-	    msg("Unfortunately, you can't determine just what was done.");
-
-    when 60:
-	msg("Your prayers are answered");
-     	if (find_mons_around(player.t_pos.y, player.t_pos.x, TRUE)) 
-	    read_scroll(S_HOLD, PRAYER_ABILITY);
-	else
-	    msg("Unfortunately, you can't determine just what was done.");
-	
-    when 70:
-	msg("Your prayers are answered");
-	if (find_mons_around(player.t_pos.y, player.t_pos.x, TRUE))
-	    read_scroll(S_MAKEIT, PRAYER_ABILITY);
-	else
-	    msg("Unfortunately, you can't determine just what was done.");
-
-    when 80:
-        msg("Your prayers are answered");
-     	if (find_mons_around(player.t_pos.y, player.t_pos.x, TRUE)) 
-	    quaff(P_DISGUISE, PRAYER_ABILITY);
-	else
-	    msg("Unfortunately, you can't determine just what was done.");
-	    
-    when 90:
-	if (pstats.s_hpt<5) {
-	    msg("I have been sent to protect you on this level.");
-	    summon_monster(NUMMONST+2, FALSE, FALSE);
-	}
-	else
-	    msg("Nothing happens");
-
-    when 100:
-	msg("A bolt of lighting zaps you");
+    /*
+     * You are in for it now!
+     */
+    else if (chance < 100) {
+	msg("You fall into a horrible trance-like state.");
+	no_command += SLEEPTIME;
+    }
+    if (chance == 100) {
+        msg("The heavens open - but wait!");
+	msg("A bolt of eldritch energy strikes you!");
 	if (pstats.s_hpt > 1)
-	    pstats.s_hpt >>= 1;
-    break;
-
-    default:
-	msg("Nothing happens");
-
-
+	    pstats.s_hpt /= 2;
+	msg("The gods must be angry with you.");
     }
 }
 
@@ -181,7 +209,7 @@ gsense()
 
 	wclear(hw);
 	for (gitem = lvl_obj; gitem != NULL; gitem = next(gitem)) {
-	    cur = (struct object *) ldata(gitem);
+	    cur = OBJPTR(gitem);
 	    if (cur->o_type == GOLD) {
 		gtotal += cur->o_count;
 		mvwaddch(hw, cur->o_pos.y, cur->o_pos.x, GOLD);
@@ -199,6 +227,19 @@ gsense()
 
 
 /*
+ * is_stealth:
+ *	is player quiet about something
+ */
+
+bool
+is_stealth(tp)
+register struct thing *tp;
+{
+    return (rnd(25) < tp->t_stats.s_dext || 
+		(tp == &player && is_wearing(R_STEALTH)));
+}
+
+/*
  * steal:
  *	Steal in direction given in delta
  */
@@ -209,7 +250,10 @@ steal()
     register struct thing *tp;
     register char *mname;
     coord new_pos;
-    short thief_bonus = -50;
+    short thief_bonus;
+    char *unsuccess = "";
+    char *gain = "";
+    char *notice = "is not";
 
     new_pos.y = hero.y + delta.y;
     new_pos.x = hero.x + delta.x;
@@ -218,20 +262,23 @@ steal()
     if (new_pos.y < 0 || new_pos.y > LINES-3 ||
 	new_pos.x < 0 || new_pos.x > COLS-1 ||
 	mvwinch(mw, new_pos.y, new_pos.x) == ' ') {
-	msg("Nothing to steal from.");
+	msg("%so one to steal from.", (terse) ? "N" : "There is n");
 	return;
     }
 
-    if ((item = find_mons(new_pos.y, new_pos.x)) == NULL) {
-	debug("Steal from what @ %d,%d?", new_pos.y, new_pos.x);
-	return;
-    }
+    if ((item = find_mons(new_pos.y, new_pos.x)) == NULL) return;
     tp = THINGPTR(item);
     mname = monsters[tp->t_index].m_name;
 
     /* Can player steal something unnoticed? */
-    if (player.t_ctype == C_THIEF) thief_bonus = 10;
-
+    if (player.t_ctype == C_THIEF || player.t_ctype == C_NINJA)
+	 thief_bonus = 10;
+    else thief_bonus = -50;
+    if (rnd(50) >= 3*pstats.s_dext + thief_bonus) {
+	runto(&new_pos, &hero);
+	turn_off(*tp, ISFRIENDLY);
+	notice = "is";
+    }
     if (rnd(100) <
 	(thief_bonus + 2*pstats.s_dext + 5*pstats.s_lvl -
 	 5*(tp->t_stats.s_lvl - 3))) {
@@ -241,251 +288,41 @@ steal()
 	s_item = NULL;	/* Start stolen goods out as nothing */
 
 	/* Find a good item to take */
-	for (pack_ptr=tp->t_pack; pack_ptr != NULL; pack_ptr=next(pack_ptr))
-	    if (rnd(++count) == 0) s_item = pack_ptr;
+	if (tp->t_pack != NULL) {
+	    /* Count up the number of items in the monster's pack */
+	    for (pack_ptr=tp->t_pack; pack_ptr != NULL; pack_ptr=next(pack_ptr))
+		count++;
 
-	/* if we have a merchant, get an item */
-	if (s_item == NULL && tp->t_index == NUMMONST)
-	    s_item = new_thing();
+	    /* Pick one */
+	    count = rnd(count);
 
+	    /* Take it from the monster */
+	    for (pack_ptr=tp->t_pack; --count == 0; pack_ptr=next(pack_ptr))
+		;
+	    s_item = pack_ptr;
+	    detach(tp->t_pack, s_item);
 
-	/* Find anything? */
-	if (s_item == NULL) {
-	    msg("The %s has nothing to steal.", mname);
-	    return;
-	}
-
-	/* Take it from monster */
-	if (tp->t_pack) detach(tp->t_pack, s_item);
-
-	/* Give it to player */
-	if (add_pack(s_item, FALSE) == FALSE) {
-	   (OBJPTR(s_item))->o_pos = hero;
-	   fall(&player, s_item, TRUE);
-	}
-
-	/* Get points for stealing */
-	pstats.s_exp += tp->t_stats.s_exp/2;
-
-	/*
-	 * Do adjustments if player went up a level
-	 */
-	check_level();
-    }
-
-    else {
-	msg("Your attempt fails.");
-
-	/* Annoy monster (maybe) */
-	if (rnd(35) >= pstats.s_dext + thief_bonus) runto(&new_pos, &hero);
-    }
-}
-
-
-/* Routines for clerics */
-
-
-cleric_pray()
-{
-    register short i, num_prayers, which_prayer, avail_points;
-    register bool nohw = FALSE;
-
-    /* Get the number of avilable prayers */
-    if (pstats.s_wisdom > 16) 
-	num_prayers = (pstats.s_wisdom - 15) / 2;
-    else 
-	num_prayers = 0;
-
-    if (player.t_ctype == C_CLERIC || player.t_ctype == C_DRUID) 
-	num_prayers += pstats.s_lvl;
-    else if (player.t_ctype == C_PALADIN && pstats.s_lvl > 8)
-	num_prayers += pstats.s_lvl - 5;
-
-    if (player.t_ctype != C_MAGICIAN && player.t_ctype != C_CLERIC &&
-	player.t_ctype != C_DRUID && ISWEARING(R_WIZARD))
-		num_prayers *= 2;
-
-    if (num_prayers > MAXPRAYERS_C) 
-	num_prayers = MAXPRAYERS_C;
-
-    avail_points = pstats.s_wisdom * pstats.s_lvl;
-    if(ISWEARING(R_WIZARD))
-	avail_points *= 2;
-
-    /* Prompt for prayer */
-    msg(""); /* Kludge to rid us of irritating -- More -- */
-    msg("Which prayer are you offering [%d points left] (* for list)? ",
-			avail_points - spell_power);
-    mpos=0;
-
-    which_prayer = (short) ((getchar() & 0177) - 'a');
-    if (which_prayer == (short) ESCAPE - (short) 'a') {
-	after = FALSE;
-	return;
-    }
-    if (which_prayer >= 0 && which_prayer < num_prayers) 
-	nohw = TRUE;
-    else {
-	register char c;
-	char buf[LINELEN];
-	char *buf2;
-
-	for (i=0; i<num_prayers; i++) {
-	    sprintf(buf, "[%c, %d/%d] %s", 
-		        (char) ((short) 'a' + i),
-		        cleric_spells[i].s_cost,
-			avail_points - spell_power,
-			(terse) ? "" : "A prayer for ");
-	    if (cleric_spells[i].s_type == TYP_POTION)
-		buf2 = p_magic[cleric_spells[i].s_which].mi_name;
-	    else if (cleric_spells[i].s_type == TYP_SCROLL)
-		buf2 = s_magic[cleric_spells[i].s_which].mi_name;
-	    else if (cleric_spells[i].s_type == TYP_STICK)
-		buf2 = ws_magic[cleric_spells[i].s_which].mi_name;
-	    strcat(buf, buf2);
-	    if(num_prayers == 1)
-		msg(buf);
-	    else
-		add_line(buf);
-	}
-	if(num_prayers != 1)
-		end_line();
-        msg(""); /* Kludge to rid us of irritating -- More -- */
-	msg("Which prayer are you offering? ");
-    }
-
-    if (!nohw) {
-	which_prayer = (short) ((getchar() & 0177) - 'a');
-	while (which_prayer < 0 || which_prayer >= num_prayers) {
-	    if (which_prayer == (short) ESCAPE - (short) 'a') {
-		after = FALSE;
-		return;
+	    /* Give it to player */
+	    if (add_pack(s_item, FALSE) == FALSE) {
+	       (OBJPTR(s_item))->o_pos = hero;
+	       fall(&player, s_item, TRUE);
 	    }
-	    msg("Please enter one of the listed prayers: ");
-	    which_prayer = (short) ((getchar() & 0177) - 'a');
+
+	    /* Get points for stealing */
+	    if (player.t_ctype == C_THIEF)
+		 pstats.s_exp += tp->t_stats.s_exp/2;
+	    else pstats.s_exp += tp->t_stats.s_exp/min(pstats.s_lvl, 10);
+	    check_level();
+	}
+	else {
+	    gain = " gains you nothing and";
 	}
     }
-
-
-    if ((cleric_spells[which_prayer].s_cost + spell_power) > avail_points) {
-	msg("Your prayer fails.");
-	return;
-    }
-
-    msg("Your prayer is successful.");
-    if (cleric_spells[which_prayer].s_type == TYP_POTION)
-	quaff(	cleric_spells[which_prayer].s_which,
-		cleric_spells[which_prayer].s_blessed);
-    else
-	read_scroll(	cleric_spells[which_prayer].s_which,
-			cleric_spells[which_prayer].s_blessed);
-
-    spell_power += cleric_spells[which_prayer].s_cost;
-}
-
-
-
-/*
- * Routines for Druids
- */
-druid_pray()
-{
-    register short i, num_prayers, which_prayer, avail_points;
-    register bool nohw = FALSE;
-
-    /* Get the number of avilable prayers */
-    if (pstats.s_wisdom > 16) 
-	num_prayers = (pstats.s_wisdom - 15) / 2;
-    else 
-	num_prayers = 0;
-
-    if (player.t_ctype == C_DRUID) 
-	num_prayers += pstats.s_lvl;
-    else if (player.t_ctype == C_PALADIN && pstats.s_lvl > 8)
-	num_prayers += pstats.s_lvl - 5;
-
-    if (player.t_ctype != C_MAGICIAN && player.t_ctype != C_CLERIC &&
-	player.t_ctype != C_DRUID && ISWEARING(R_WIZARD))
-		num_prayers *= 2;
-
-    if (num_prayers > MAXPRAYERS_D) 
-	num_prayers = MAXPRAYERS_D;
-
-    avail_points = pstats.s_wisdom * pstats.s_lvl;
-    if(ISWEARING(R_WIZARD))
-	avail_points *= 2;
-
-    /* Prompt for prayer */
-    msg(""); /* Kludge to rid us of irritating -- More -- */
-    msg("Which prayer are you offering [%d points left] (* for list)? ",
-			avail_points - spell_power);
-    mpos=0;
-
-    which_prayer = (short) ((getchar() & 0177) - 'a');
-    if (which_prayer == (short) ESCAPE - (short) 'a') {
-	after = FALSE;
-	return;
-    }
-    if (which_prayer >= 0 && which_prayer < num_prayers) 
-	nohw = TRUE;
     else {
-	register char c;
-	char buf[LINELEN];
-	char *buf2;
-
-	for (i=0; i<num_prayers; i++) {
-	    sprintf(buf, "[%c, %d/%d] %s", 
-		        (char) ((short) 'a' + i),
-		        druid_spells[i].s_cost,
-			avail_points - spell_power,
-			(terse) ? "" : "A prayer for ");
-	    if (druid_spells[i].s_type == TYP_POTION)
-		buf2 = p_magic[druid_spells[i].s_which].mi_name;
-	    else if (druid_spells[i].s_type == TYP_SCROLL)
-		buf2 = s_magic[druid_spells[i].s_which].mi_name;
-	    else if (druid_spells[i].s_type == TYP_STICK)
-		buf2 = ws_magic[druid_spells[i].s_which].mi_name;
-	    strcat(buf, buf2);
-	    if(num_prayers == 1)
-		msg(buf);
-	    else
-		add_line(buf);
-	}
-	if(num_prayers != 1)
-		end_line();
-        msg(""); /* Kludge to rid us of irritating -- More -- */
-	msg("Which prayer are you offering? ");
+	unsuccess = " unsuccessful";
     }
-
-    if (!nohw) {
-	which_prayer = (short) ((getchar() & 0177) - 'a');
-	while (which_prayer < 0 || which_prayer >= num_prayers) {
-	    if (which_prayer == (short) ESCAPE - (short) 'a') {
-		after = FALSE;
-		return;
-	    }
-	    msg("Please enter one of the listed prayers: ");
-	    which_prayer = (short) ((getchar() & 0177) - 'a');
-	}
-    }
-
-
-    if ((druid_spells[which_prayer].s_cost + spell_power) > avail_points) {
-	msg("Your prayer fails.");
-	return;
-    }
-
-    msg("Your prayer is successful.");
-    if (druid_spells[which_prayer].s_type == TYP_POTION)
-	quaff(	druid_spells[which_prayer].s_which,
-		druid_spells[which_prayer].s_blessed);
-    else
-	read_scroll(	druid_spells[which_prayer].s_which,
-			druid_spells[which_prayer].s_blessed);
-
-    spell_power += druid_spells[which_prayer].s_cost;
+    msg("Your%s attempt%s %s noticed.", unsuccess, gain, notice);
 }
-
 
 /*
  * affect:
@@ -498,11 +335,19 @@ affect()
     register struct thing *tp;
     register char *mname;
     coord new_pos;
+    bool is_godly;
+    int effective_level;
 
-    if (player.t_ctype != C_CLERIC && player.t_ctype != C_PALADIN) {
+    if (player.t_ctype != C_CLERIC && player.t_ctype != C_PALADIN &&
+	!is_wearing(R_PIETY) ) {
 	msg("Only clerics and paladins can affect undead.");
 	return;
     }
+
+    is_godly = (player.t_ctype == C_CLERIC || player.t_ctype == C_PALADIN);
+    if (is_godly && is_wearing(R_PIETY))
+	 effective_level = 2 * pstats.s_lvl;
+    else effective_level = pstats.s_lvl;
 
     new_pos.y = hero.y + delta.y;
     new_pos.x = hero.x + delta.x;
@@ -519,30 +364,32 @@ affect()
 	debug("Affect what @ %d,%d?", new_pos.y, new_pos.x);
 	return;
     }
-    tp = (struct thing *) ldata(item);
+    tp = THINGPTR(item);
     mname = monsters[tp->t_index].m_name;
 
-    if (off(*tp, ISUNDEAD) || on(*tp, WASTURNED)) goto annoy;
+    if (off(*tp, ISUNDEAD)) {
+	msg("Your holy symbol has no effect on the %s.", mname);
+	goto annoy;
+    }
+    if (on(*tp, WASTURNED)) {
+	msg("Your holy symbol merely enrages the %s.", mname);
+	goto annoy;
+    }
 
-    /* Can cleric kill it? */
-    if (pstats.s_lvl >= 3 * tp->t_stats.s_lvl) {
+    /* Can cleric destroy it? */
+    if (effective_level >= 3 * tp->t_stats.s_lvl) {
 	msg("You have destroyed the %s.", mname);
-	killed(&player, item, FALSE, TRUE);
+	killed(&player, item, NOMESSAGE, POINTS);
 	return;
     }
 
     /* Can cleric turn it? */
     if (rnd(100) + 1 >
-	 (100 * ((2 * tp->t_stats.s_lvl) - pstats.s_lvl)) / pstats.s_lvl) {
-	/* Make the monster flee */
+	(100 * ((2*tp->t_stats.s_lvl) - effective_level)) / effective_level) {
+
+	msg("You have turned the %s.", mname);
 	turn_on(*tp, WASTURNED);	/* No more fleeing after this */
 	turn_on(*tp, ISFLEE);
-
-	/* Let player know */
-	msg("You have turned the %s.", mname);
-
-	/* get points for turning monster */
-	pstats.s_exp += tp->t_stats.s_exp/2;
 
 	/* If monster was suffocating, stop it */
 	if (on(*tp, DIDSUFFOCATE)) {
@@ -557,224 +404,7 @@ affect()
 	return;
     }
 
-    /* Otherwise -- no go */
 annoy:
-    msg("You do not affect the %s.", mname);
-
-    /* Annoy monster */
    if (off(*tp, WASTURNED)) runto(&new_pos, &hero);
 }
 
-
-/* Routines for magicians */
-
-
-magician_cast()
-{
-    register short i, num_spells, which_spell, avail_points;
-    register bool nohw = FALSE;
-
-    /* Get the number of avilable spells */
-    if (pstats.s_intel >= 16) 
-	num_spells = pstats.s_intel - 15;
-    else 
-	num_spells = 0;
-
-    if (player.t_ctype == C_MAGICIAN) 
-	num_spells += pstats.s_lvl;
-
-    if (player.t_ctype != C_MAGICIAN && player.t_ctype != C_CLERIC
- 		&& player.t_ctype != C_ILLUSION && player.t_ctype != C_DRUID
-		&& ISWEARING(R_WIZARD))
-	num_spells *= 2;
-
-    if (num_spells > MAXSPELLS_M) 
-	num_spells = MAXSPELLS_M;
-
-    avail_points = pstats.s_intel * pstats.s_lvl;
-    if (ISWEARING(R_WIZARD))
-	avail_points *= 2;
-
-    /* Prompt for spells */
-    msg(""); /* Kludge to rid us of irritating -- More -- */
-    msg("Which spell are you casting [%d points left] (* for list)? ",
-			avail_points - spell_power);
-
-    which_spell = (short) ((getchar() & 0177) - 'a');
-    if (which_spell == (short) ESCAPE - (short) 'a') {
-	after = FALSE;
-	return;
-    }
-    if (which_spell >= 0 && which_spell < num_spells) 
-	nohw = TRUE;
-    else {
-	register char c;
-	char buf[LINELEN];
-	char *buf2;
-
-	for (i=0; i<num_spells; i++) {
-	    sprintf(buf, "[%c, %d/%d] %s", 
-		        (char) ((short) 'a' + i),
-		        magic_spells[i].s_cost,
-			avail_points - spell_power,
-			(terse) ? "" : "A spell of ");
-	    if (magic_spells[i].s_type == TYP_POTION)
-		buf2 = p_magic[magic_spells[i].s_which].mi_name;
-	    else if (magic_spells[i].s_type == TYP_SCROLL)
-		buf2 = s_magic[magic_spells[i].s_which].mi_name;
-	    else if (magic_spells[i].s_type == TYP_STICK)
-		buf2 = ws_magic[magic_spells[i].s_which].mi_name;
-	    strcat(buf, buf2);
-	    if(num_spells == 1)
-		msg(buf);
-	    else
-		add_line(buf);
-	}
-	if(num_spells != 1)
-		end_line();
-        msg(""); /* Kludge to rid us of irritating -- More -- */
-	msg("Which spell are you casting? ");
-    }
-
-    if (!nohw) {
-	which_spell = (short) ((getchar() & 0177) - 'a');
-	while (which_spell < 0 || which_spell >= num_spells) {
-	    if (which_spell == (short) ESCAPE - (short) 'a') {
-		after = FALSE;
-		return;
-	    }
-	    msg("Please enter one of the listed spells: ");
-	    which_spell = (short) ((getchar() & 0177) - 'a');
-	}
-    }
-
-    if ((spell_power + magic_spells[which_spell].s_cost) > avail_points) {
-	msg("Your attempt fails.");
-	return;
-    }
-
-    msg("Your spell is successful.");
-    if (magic_spells[which_spell].s_type == TYP_POTION)
-        quaff(	magic_spells[which_spell].s_which,
-        	magic_spells[which_spell].s_blessed);
-    else if (magic_spells[which_spell].s_type == TYP_SCROLL)
-        read_scroll(	magic_spells[which_spell].s_which,
-        		magic_spells[which_spell].s_blessed);
-    else if (magic_spells[which_spell].s_type == TYP_STICK) {
-	 if (get_dir())
-	      do_zap(	TRUE, 
-			magic_spells[which_spell].s_which,
-			magic_spells[which_spell].s_blessed);
-	 else
-	      return;
-    }
-    spell_power += magic_spells[which_spell].s_cost;
-}
-
-
-/*
- * Routines for illusionists
- */
-
-
-illusion_cast()
-{
-    register short i, num_spells, which_spell, avail_points;
-    register bool nohw = FALSE;
-
-    /* Get the number of avilable spells */
-    if (pstats.s_intel >= 16) 
-	num_spells = pstats.s_intel - 15;
-    else 
-	num_spells = 0;
-
-    if (player.t_ctype == C_ILLUSION) 
-	num_spells += pstats.s_lvl;
-
-    if (player.t_ctype != C_MAGICIAN && player.t_ctype != C_CLERIC
- 		&& player.t_ctype != C_ILLUSION && player.t_ctype != C_DRUID
-		&& ISWEARING(R_WIZARD))
-	num_spells *= 2;
-
-    if (num_spells > MAXSPELLS_I) 
-	num_spells = MAXSPELLS_I;
-
-    avail_points = pstats.s_intel * pstats.s_lvl;
-    if (ISWEARING(R_WIZARD))
-	avail_points *= 2;
-
-    /* Prompt for spells */
-    msg(""); /* Kludge to rid us of irritating -- More -- */
-    msg("Which spell are you casting [%d points left] (* for list)? ",
-			avail_points - spell_power);
-
-    which_spell = (short) ((getchar() & 0177) - 'a');
-    if (which_spell == (short) ESCAPE - (short) 'a') {
-	after = FALSE;
-	return;
-    }
-    if (which_spell >= 0 && which_spell < num_spells) 
-	nohw = TRUE;
-    else {
-	register char c;
-	char buf[LINELEN];
-	char *buf2;
-
-	for (i=0; i<num_spells; i++) {
-	    sprintf(buf, "[%c, %d/%d] %s", 
-		        (char) ((short) 'a' + i),
-		        illusion_spells[i].s_cost,
-			avail_points - spell_power,
-			(terse) ? "" : "A spell of ");
-	    if (illusion_spells[i].s_type == TYP_POTION)
-		buf2 = p_magic[illusion_spells[i].s_which].mi_name;
-	    else if (illusion_spells[i].s_type == TYP_SCROLL)
-		buf2 = s_magic[illusion_spells[i].s_which].mi_name;
-	    else if (illusion_spells[i].s_type == TYP_STICK)
-		buf2 = ws_magic[illusion_spells[i].s_which].mi_name;
-	    strcat(buf, buf2);
-	    if(num_spells == 1)
-		msg(buf);
-	    else
-		add_line(buf);
-	}
-	if(num_spells != 1)
-		end_line();
-        msg(""); /* Kludge to rid us of irritating -- More -- */
-	msg("Which spell are you casting? ");
-    }
-
-    if (!nohw) {
-	which_spell = (short) ((getchar() & 0177) - 'a');
-	while (which_spell < 0 || which_spell >= num_spells) {
-	    if (which_spell == (short) ESCAPE - (short) 'a') {
-		after = FALSE;
-		return;
-	    }
-	    msg("Please enter one of the listed spells: ");
-	    which_spell = (short) ((getchar() & 0177) - 'a');
-	}
-    }
-
-    if ((spell_power + illusion_spells[which_spell].s_cost) > avail_points) {
-	msg("Your attempt fails.");
-	return;
-    }
-
-    msg("Your spell is successful.");
-    if (illusion_spells[which_spell].s_type == TYP_POTION)
-        quaff(	illusion_spells[which_spell].s_which,
-        	illusion_spells[which_spell].s_blessed);
-    else if (illusion_spells[which_spell].s_type == TYP_SCROLL)
-        read_scroll(	illusion_spells[which_spell].s_which,
-        		illusion_spells[which_spell].s_blessed);
-    else if (illusion_spells[which_spell].s_type == TYP_STICK) {
-	 if (get_dir())
-	      do_zap(	TRUE, 
-			illusion_spells[which_spell].s_which,
-			illusion_spells[which_spell].s_blessed);
-	 else
-	      return;
-    }
-    spell_power += illusion_spells[which_spell].s_cost;
-}

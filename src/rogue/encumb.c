@@ -1,13 +1,11 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/05/86
  */
 /*
  * Stuff to do with encumberence
  *
- * @(#)encumb.c	7.0	(Bell Labs)	10/08/82
  */
 
-#include "curses.h"
 #include "rogue.h"
 
 /*
@@ -27,7 +25,8 @@ int getmax;
 	if(curcarry > 4 * topcarry) {
 	    if(rnd(100) < 80)
 		foodlev = 3;			/* > 80% of pack */
-	} else if(curcarry > 3 * topcarry) {
+	} 
+	else if(curcarry > 3 * topcarry) {
 	    if(rnd(100) < 60)
 		foodlev = 2;			/* > 60% of pack */
 	} else
@@ -51,8 +50,6 @@ packweight()
 	    obj = OBJPTR(pc);
 	    weight += itemweight(obj) * obj->o_count;
 	}
-	if(ISWEARING(R_CARRYING))
-	    weight -= (ring_value(R_CARRYING) * weight) / 4;
 	if(weight < 0)		/* in case of artifacts and stuff */
 	     weight = 0;
 
@@ -95,10 +92,19 @@ reg struct object *wh;
 /*
  * playenc:
  *	Get hero's carrying ability above norm
+ *	  50 units per point of STR over 8
+ *	 150 units per plus on R_CARRYING
+ *	1000 units for TR_PURSE
  */
 playenc()
 {
-	return ((pstats.s_str-8)*50);
+	register int ret_val = (pstats.s_str - 8) * 50;
+
+	if(is_wearing(R_CARRYING))
+	    ret_val += (ring_value(R_CARRYING) * 150);
+	if (is_carrying(TR_PURSE))
+	    ret_val += 1000;
+	return(ret_val);
 }
 
 
@@ -110,7 +116,7 @@ totalenc()
 {
 	reg int wtotal;
 
-	wtotal = NORMENCB + playenc();
+	wtotal = 1500 + playenc();
 	switch(hungry_state) {
 		case F_OK:
 		case F_HUNGRY:	;			/* no change */

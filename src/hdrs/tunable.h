@@ -1,5 +1,5 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 06/22/86
  */
 extern	int	UID;
 extern	char	PERMOK[];
@@ -14,6 +14,7 @@ extern	char	LOADAV_SCAN[];
 extern	char	OPTIONS[];
 extern	char	UTMP[];
 extern	char	PAGER[];
+extern	char	ROGUE_SAVE[];
 extern	char	ROGDEFS[];
 extern	int	MAXLOAD;
 extern	int	MAXUSERS;

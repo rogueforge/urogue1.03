@@ -16,7 +16,5 @@
  * 		for SCO5, use the -LARGE and -Ml2 flags as well
  *
  * define NRANDOM if your system does not have random() and srandom()
-#define USGV5
-#define RTU3
  */
 #define BSD4

@@ -1041,4 +1041,394 @@
 3)	fixed save throw test for monster and hero differentiation
 4)	monster is not allowed to hit itself
 
-------- End of File ------
+1.03 Alpha, May 29, 86
+1)	fixed pointer to struct bug save_throw() in fight.c
+
+1.03 Alpha, June 4, 86
+1)	check for NULL pointer when zapping with wand
+2)	potions have some food value
+3)	fix body AC for ninja
+4)	fix ucount for RTU3
+	obove fixes by Carl Hommel
+5)	including files in wrong order in main.c and rip.c pointed
+	out by Mike Cooper
+
+1.03 Alpha, June 5, 86
+1)	new program to replace all the print_* commands by Mike Cooper
+2)	fixed bug in urprint to use right flag word size and to use
+	correct number of flag words in monster initialization structure
+3)	experiment with allowing many familiars but only one at a time
+
+1.03 Alpha, June 6, 86
+1)	fixed format of scorefile output
+2)	familiars are never confused
+3)	changed algorithm for generating a summoned familiar
+
+1.03 Alpha, June 7, 86
+1)	yet another change to generating summoned familiar
+2)	not clearing familiar_ptr when familiar is killed
+3)	handling of monsters that may be friendly with some
+	probability
+4)	handling of monsters that do not breathe air
+5)	algorithm for blessed scroll of charm monster changed
+6)	groups of monsters will all be friendly or none
+7)	all familiars can use armor and weapons
+8)	familiars have extra hit point and better ability scores
+	based upon the hero's experience level
+9)	fixed up a few messages here and there
+
+1.03 Alpha, June 9, 86
+1)	handling of quartermaster selling stuff that is overpriced fixed
+2)	enchanting a stick might bless/curse it
+3)	new potions and powers to go with them and other misc. modifications
+	such as food value for potions, change in damage done by a firetrap,
+	and other miscellaneous stuff
+	above by Carl Hommel
+4)	set familiar_ptr to NULL when going to a new level
+5)	use ISGOD flag in monsdata.c to give special abilities to gods
+	dynamically
+6)	move trading post and throne rooms display lower on screen
+7)	changed ISBIG flag to ISTWOH for weapons
+8)	added various degrees of friendliness into monster table
+9)	make temporary buffer in inventory() bigger
+
+1.03 Alpha, June 10, 86
+1)	added yet another fix for summoning when scroll of charm monster 
+	been read and monsters are still alive
+2)	handle passing of pack to next familiar when going to a new level
+3)	CANWIELD and CANSHOOT monsters pick up things on the dungeon
+	floor too if they are weapons or armor
+
+1.03 Alpha, June 11, 86
+1)	ISSCAVENGE is not turned on automatically for familiars
+2)	monsters created by a normal and cursed scroll of create monster
+	are not friendly
+3)	monsters summoned by another monster are never friendly
+4)	normal and blessed wand of polymorph leave friendly monsters
+	friendly
+
+1.03 Alpha, June 11, 86
+1)	fix for updating mw correctly by Pat Place
+2)	remove Dr. C. reference in vers.c
+3)	remove extra turn wizard message from do_chase()
+4)	fixed rogue/Makefile to find hdrs correctly for lint
+
+1.03 Alpha, June 13, 86
+1)	potion of continuous breathing R_BREATHE, turns on HASOXYGEN
+2)	potion of flying CANFLY. hero is levitated, and have rnd(2)
+	of getting an extra attack
+3)	CANFLY means never setting off non-fire traps
+4)	HASOXYGEN means never getting zapped by a pool or gas trap,
+	or breath weapons
+5)	NOSHARP not affected by arrow or dart damage but affected poison
+6)	ISUNDEAD and CANPOISON not affected by dart poison
+7)	you don't automatically know what cursed potions are
+8)	wizards get a higher chance to ressurect
+9)	prayer command changed
+	above by Carl Hommel
+
+1.03 Alpha, June 14, 86
+1)	wearing a ring of wizardry gives spell abilities no matter what
+	intelligence or wisdom ability is
+2)	implemented armor and weapon restrictions by player class
+3)	preparations for having shield/cloak/charms and eventually
+	rings as all objects to wear
+4)	renamed short pike to ranseur and long pike to pike to be more
+	historically accurate
+5)	corrected testing of genocided monsters in summon()
+6)	create lots of monsters when making them standing still in
+	the dungeon
+7)	use killed() to throw away the monster list when generating a
+	new level of the dungeon because it recovers storage from
+	objects that monsters are carrying
+
+1.03 Alpha, June 15, 86
+1)	changed startup procedure to enforce armor and weapon restrictions
+2)	hero goes through trading post at startup to outfit pack
+3)	no more rolling of player characteristics
+4)	druid charm monster prayer now a very early and cheap spell
+5)	hero may have more things in pack depending upon player class
+6)	charm monster depends slightly on hero experience level too
+
+1.03 Alpha, June 16, 86
+1)	fixed up pointer usage in discarding monster list
+2)	increased purse that hero starts up with
+3)	fixed up format of display of saved heros and new ones at startup
+4)	increased maximum number of saved heros
+5)	changed how wizard commands are started up to get around
+	all the control character restrictions (Mike Cooper)
+6)	added keypad support for terminals that have them (Mike Cooper)
+
+1.03 Alpha, June 17, 86
+1)	fixed up a lot of bugs in handling familiars (Nick Flor)
+2)	improved steal() routine from Carl Hommel
+
+1.03 Alpha, June 18, 86
+1)	fixed up garbage display on screen left over from throwing away 
+	monsters using killed()
+2)	fixed multiple messages for killing only one gas spore
+3)	added HASOXYGEN flags to monsters that are not affected by 
+	gas breath weapons
+
+1.03 Alpha, June 19, 86
+1)	removed code to curse all things bought from a quartermaster
+2)	fixed up FRIENDLY and CHARMED monsters not moving
+3)	fixed up monsters picking up things and their display
+4)	killed() called with NULL killer from shoot_bolt() shouldn't be
+5)	hopefully fixed up stuff for killing Friendly Fiend in new_level()
+6)	allow more than 1 digit to indicate saved player number
+
+1.03 Alpha, June 22, 86
+1)	check order of inclusion of rogue.h and mach_dep.h and curses.h
+2)	fixed up message in Friendly Fiend's place
+3)	simplified expression too complex in move.c
+4)	fixed up display of objects picked up by monsters
+5)	probability of major side effect of artifacts reduced
+6)	urogue save file name made definable by installer
+7)	prompting to save character done only when new one rolled
+8)	friendly monsters next to hero run around when '.' is being hit
+9)	character displayed when monster killed updated from dungeon
+	level map instead of using abritrary character '.'
+10)	lighting of room when monsters and weapons are just outside
+	doorway fixed
+11)	paladin's get better saving throws against anything
+12)	rangers and ninjas are hardly ever surprised
+13)	paladins never get diseases or infections
+	other misc player class enhancements by Carl Hommel
+
+1.03 Alpha June 24, 86
+1)	yet another null pointer usage bug when monster can't be found
+	fixed by Pat Place
+2)	when a missile fired by a monster misses another one, it wakes
+	up anyways
+3)	garbage characters when killing a monster are displayed using
+	unctrl() in wizard message
+4)	paladin's have no fear
+5)	fixed up setting of hero AC during startup
+6)	fixed up range of numbers testing in geta_player() and puta_player()
+7)	don't add anything to familiar's pack if there is nothing to add
+8)	& no longer used as suspend in BSD versions
+9)	more cash given to heros at startup time
+
+1.03 Alpha, June 25, 86
+1)	deleted some macros from rogue.h that are used only in a few places
+2)	turn off ISMEAN flag from familiars and friendly monsters
+
+1.03 Alpha, June 26, 86
+1)	changed deletion of monster in killed() to after monster's pack
+	has been deleted
+2)	fixed up room lighting problem permanently
+3)	minor bug fixes
+4)	yet more removal of macros
+
+1.03 Alpha, June 28, 86
+1)	created new include files and deleted some macros
+2)	implementation of ring of carrying changed to reduce weight
+	by 150 gold pieces per enchantment
+3)	amount of gold generated increased
+4)	backstabbing for thief, ninja and assassin character classes
+5)	monsters can wield weapons against hero
+6)	amount of gold that hero starts with increased again
+7)	initialization of sticks for hero at startup fixed
+8)	frequency of monster creation reduced
+9)	pluses of weapons used by monsters increased by a random
+	function of the experience level of the monster
+
+1.03 Alpha, June 29, 86
+1)	fixed fighting of monster carrying no weapons
+2)	message in wrong place for monster thrown weapon that misses
+3)	more fixing of room lighting and darkening bugs
+4)	fixed lighting of rooms during new level creation
+5)	increased starting gold once again
+
+1.03 Alpha, June 30, 86
+1)	changed monster that Friendly Fiend summons
+2)	monsters that CANSHOOT pick from a wider variety of weapons
+3)	monsters that CANWIELD don't always
+4)	monsters zapped run toward the hero
+5)	split creat_mons() into creat_mons() and place_mons() routines
+	so that other programs can use it too
+6)	renamed familiar_* to fam_*
+7)	reduced probability of monsters in a given room when level is
+	generated
+
+1.03 Alpha, July 1, 86
+1)	algorithm for assignment of wielded weapons changed
+2)	fixed stupid typo error in place_mons() in scrolls.c
+3)	monsters that CANTELEPORT do so when running away
+
+1.03 Alpha, July 2, 86
+1)	electricity zapping a friendly or charmed monster loses the
+	hero a friend
+2)	fixed bug in place_mons() in scrolls.c; stupid typo
+
+1.03 Alpha, July 5, 86
+1)	undid changes in killed() in fight.c to discard monster pack
+2)	corrected setting of fighting in killed()
+3)	removed useless variables in rogue.c
+4)	fixed initialization of character type in geta_player()
+5)	fixed typo in secretdoor() in misc.c causing them to show as 'p'
+6)	all remaining usage of cfree replaced with free
+7)	make a group of monsters all friendly or all non-friendly
+8)	removed debugging message in place_mons() in scrolls.c
+
+1.03 Alpha, July 6, 86
+1)	fixed up more bad pointer references in wanderer() in monsters.c
+2)	fixed bad test for player class in wield_ok() in weapons.c
+3)	make sure every new monster starts with ISRUN off
+
+1.03 Alpha, July 8, 86
+1)	new magic system installed.  magic.c, magic_item.c files.  Still buggy.
+2)	rogue.c and rogue.h worked over
+3)	various formatting improved
+4)	new wear_ok() that allows players to wear anything, but
+	penalizes their class-specific special abilities.  wield_ok() coming up.
+5)	scroll of regeneration duplicates monster's regenerative abilities
+6)	familiar summoning made a scroll
+7)	quaff(), read_scroll(), do_zap() calling changed.
+8)	the Artifacts of Might do something if you just have them
+9)	ring of piety analogous to ring of wizardry introduced
+	above by Carl Hommel
+
+1.03 Alpha, July 9, 86
+1)	changed format of status lines
+2)	fixed bug in increasing the hero's power and hpt in quaff()
+
+1.03 Alpha, July 10, 86
+1)	spiffed up message for familiar nearly hitting hero
+2)	changed when familiars are gotten rid of when changing dungeon levels
+3)	fix monsters getting attacks when dead
+	above by Henry Chai
+4)	fix nonagressive familiars to beat on unfriendly monsters
+5)	changed some weapons for ninja and ranger at startup
+
+1.03 Alpha, July 11, 86
+1)	some fixes for casting of spells for non-MU player classes by
+	Carl Hommel
+2)	fixed up replacement of familiar when going to a new dungeon
+	level by Henry Chai
+
+1.03 Alpha, July 12, 86
+1)	increased spell point regeneration rate
+2)	replaced testing code for whether hero wants to try a hard spell
+3)	fixed up the ranger's starting kit a bit
+4)	improved ninja capabilities slightly
+5)	increase duration of disguise spell
+6)	attempt to fix monsters and heros in same spot
+7)	moving through a friendly monster wakes it up
+
+1.03 Alpha, July 13, 86
+1)	fixed misc monster movement problems moving onto hero
+2)	some tidying up of formats
+3)	fixed up names of things carried by ranger
+4)	improved ninja character abilities and make experience level change
+	point higher
+
+1.03 Alpha, July 14, 86
+1)	fighters can stun their opponents by doing greater than 1/3 of
+	remaining hit points in one blow
+2)	fixed up messages in new hit() routine
+
+1.03 Alpha, July 24, 86
+1)	Change NUMMONST, MAXPOTIONS, etc to variables
+2)	Change some potion, stick, wand define names for spellcasting
+3)	P_SHIELD, S_MSHIELD WS_KNOCK, WS_CLOSE added
+4)	WS_MDEG changed to WS_XENOHEAL
+5)	Added defines to replace TRUE and FALSE values passed
+	to various subroutines)
+6)	Made P_REGEN cause SUPEREAT.  Made it fusable.
+7)	The usual formatting changes to artifact.c, maze.c, monsters.c, wizard.c
+8)	Dropping armor and weapon to avoid artifact major 
+	effects	is no longer so good an idea
+9)	PHIAL does total healing, not light spell
+10)	Low-level monsters might break a hold spell
+11)	Everyone gets their hpts/pow changed against their armor/weapon,
+	not just paladins
+12)	Changed summon() to summon_help(), and added FORCE flag
+13)	Reordered hpt/pow regeneration in doctor()
+14)	Changed effect of R_CARRYING  - still buggy
+15)	PURSE intinsically allows more carrying
+16)	Reworked logic in fight()
+17)	Reordered status line to put Pow after Hpt
+18)	Some monster spell casting implemented
+19)	Created nothing_message() to print cryptic failure messages
+20)	Twiddled do_throne() to create just UNIQUE monster + attendants
+21)	Clerics get bonus exp. for turning/destroying undead
+22)	do_zap() logic changed
+23)	D_GODWRATH, D_CLUMSY deaths added
+	above by Carl Hommel
+
+1.03 Alpha, July 27, 86
+1)	added wizard debug message flag as well as wizard mode (Henry Chai)
+2)	stunning of monsters only when struck for 1/3 or more of
+	max hpt in one blow
+3)	various bug fixes by Mike Laman and Mike Cooper
+4)	saving a game clears the screen after prompt
+
+1.03 Alpha, July 29, 86
+1)	checking for penalties for wrong armor and weapons fixed
+	by Carl Hommel
+
+1.03 Alpha, July 30, 86
+1)	monsters now have probabilities of being a MU
+2)	fixed up readchar() to handle errors in a saner way
+3)	a monster type that is capable of using magic and is part
+	of a group will always use have magical abilities
+4)	the leader of a group of monsters will always be a bit better 
+	than the run of the mill monster
+5)	patches by Mike Cooper to shorten names of variables and
+	various defines to support ATT 7300
+
+1.03 Alpha, Aug 5, 86
+1)	Len Picard's bag code is ready
+2)	changed ISWEARING to a function instead of a macro
+3)	fixed minor bugs in sticks.c
+
+1.03 Alpha, Aug 9, 86
+1)	yet another attempt at fixing monster killing flag fixes by Mike Laman
+2)	applied fix by Carl Hommel to magic casting code
+3)	changed inventory command display format
+4)	updated readchar() handling of read() system call
+
+1.03 Alpha, Aug 10, 86
+1)	added flag for summoned monsters that disappear
+2)	fixed up mapping of internal types of objects to things structure
+	in create_obj()
+3)	correct loop to pick object type to select in create_obj()
+4)	yet another attempt at getting rid of "invalid command ^@" message
+
+1.03 Alpha, Aug 11, 86
+1)	"leaders" of a group of monsters not so improved over others
+2)	remove last reference to namefinder in Makefile.INST
+
+1.03 Alpha, Aug 12, 86
+1)	The usual formatting changes in command.c, fight.c
+2)	Implemented '~' experience-to-next-level command.
+	Has next_exp_level() called from check_level)	
+3)	is_carrying(TR_AMULET) protects vs CANDRAIN.
+4)	Made more "hit" and "miss" messages.
+5)	Moved extra exp code for clerics from affect() to killed().
+6)	Reworked spell costs.
+7)	Give MUs extra exp for casting spells.
+8)	Made fumbles less frequent.
+9)	Created feel_message().
+10)	Renamed spell abbreviations.
+11)	Corrected R_PIETY ordering.
+12)	Made some extra-planar monsters undead, fixed some monster letters.
+13)	Thieves get extra exp for picking up gold.
+14)	'p'raying asks if you really want to, and always maxes your hpt 
+	and pow to max)	
+15)	Casting 'HEAL' no longer increases pow.
+16)	Reworked P_GAINABIL as they occur less frequently.
+17)	Fixed S_SUMFAMILIAR.
+18)	Prelim fix to helpful monsters casting spells.
+	above by Carl Hommel
+19)	upgraded leaders of packs a bit more and also added experience
+	points for killing them
+20)	BMAGICHIT now requires only a +3 weapon, not a +4
+21)	druids can wield silver weapons even if they are metallic
+
+1.03 Alpha, Aug 13, 86
+1)	fix up keypad code to allow daemons to run after each turn
+
+-------	End of File ------

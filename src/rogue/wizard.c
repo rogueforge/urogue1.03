@@ -1,18 +1,17 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/10/86
  */
 /*
  * Special wizard commands (some of which are also non-wizard commands
  * under strange circumstances)
  */
 
-#include "curses.h"
+#include <ctype.h>
+#include "rogue.h"
 #include "mach_dep.h"
 #if defined(attron)
 #include <term.h>
 #endif attron
-#include <ctype.h>
-#include "rogue.h"
 
 /*
  * whatis:
@@ -31,38 +30,33 @@ struct linked_list *what;
     }
     else
 	item = what;
-    obj = (struct object *) ldata(item);
+    obj = OBJPTR(item);
     obj->o_flags |= ISKNOW;
-    switch (obj->o_type)
-    {
+    switch (obj->o_type) {
         when SCROLL:
 	    s_know[obj->o_which] = TRUE;
-	    if (s_guess[obj->o_which])
-	    {
-		cfree(s_guess[obj->o_which]);
+	    if (s_guess[obj->o_which]) {
+		free(s_guess[obj->o_which]);
 		s_guess[obj->o_which] = NULL;
 	    }
         when POTION:
 	    p_know[obj->o_which] = TRUE;
-	    if (p_guess[obj->o_which])
-	    {
-		cfree(p_guess[obj->o_which]);
+	    if (p_guess[obj->o_which]) {
+		free(p_guess[obj->o_which]);
 		p_guess[obj->o_which] = NULL;
 	    }
 	when STICK:
 	    ws_know[obj->o_which] = TRUE;
-	    if (ws_guess[obj->o_which])
-	    {
-		cfree(ws_guess[obj->o_which]);
+	    if (ws_guess[obj->o_which]) {
+		free(ws_guess[obj->o_which]);
 		ws_guess[obj->o_which] = NULL;
 	    }
         when WEAPON:
         case ARMOR:
         when RING:
 	    r_know[obj->o_which] = TRUE;
-	    if (r_guess[obj->o_which])
-	    {
-		cfree(r_guess[obj->o_which]);
+	    if (r_guess[obj->o_which]) {
+		free(r_guess[obj->o_which]);
 		r_guess[obj->o_which] = NULL;
 	    }
     }
@@ -72,10 +66,10 @@ struct linked_list *what;
 
 /*
  * create_obj:
- *	Create any object for wizard, scroll, magician, or cleric
+ *	Create any object.
  */
-create_obj(which_item, which_type, cursed)
-bool cursed;
+create_obj(which_item, which_type, flags)
+int flags;
 int which_item, which_type;
 {
     reg struct linked_list *item;
@@ -85,95 +79,82 @@ int which_item, which_type;
     WINDOW *thiswin;
     int tsize;
     int pres_item = 1;
+    bool cursed  = flags & ISCURSED;
 
     thiswin = cw;
     if (which_item == 0) {
 	bool nogood = TRUE;
-	char buf[LINELEN];
+	char buf[2*LINELEN];
 	thiswin = hw;
 	msg("What do you want to create (* for list)? ");
 	do {
-		ch = readchar();
-		if (ch == '*') {
-			sprintf(buf,"ITEM\tKEY");
-			add_line(buf);
-			sprintf(buf,"%s\t %c",
-				things[TYP_RING].mi_name,RING);
-			add_line(buf);
-			sprintf(buf,"%s\t %c",
-				things[TYP_STICK].mi_name,STICK);
-			add_line(buf);
-			sprintf(buf,"%s\t %c",
-				things[TYP_POTION].mi_name,POTION);
-			add_line(buf);
-			sprintf(buf,"%s\t %c",
-				things[TYP_SCROLL].mi_name,SCROLL);
-			add_line(buf);
-			sprintf(buf,"%s\t %c",
-				things[TYP_ARMOR].mi_name,ARMOR);
-			add_line(buf);
-			sprintf(buf,"%s\t %c",
-				things[TYP_WEAPON].mi_name,WEAPON);
-			add_line(buf);
-			sprintf(buf,"%s\t %c",things[TYP_FOOD].mi_name,FOOD);
-			add_line(buf);
-			if (wizard) {
-			    sprintf(buf,"%s %c",
-				things[TYP_ARTIFACT].mi_name, ARTIFACT);
-			    add_line(buf);
-			    sprintf(buf,"monster\t m");
-			    add_line(buf);
-			}
-			end_line();
-			msg("");
-			msg("What do you want to create (* for list) ? ");
+	    ch = readchar();
+	    if (ch == '*') {
+		sprintf(buf,"ITEM\tKEY");
+		add_line(buf);
+		sprintf(buf,"%s\t %c", things[TYP_RING].mi_name,RING);
+		add_line(buf);
+		sprintf(buf,"%s\t %c", things[TYP_STICK].mi_name,STICK);
+		add_line(buf);
+		sprintf(buf,"%s\t %c", things[TYP_POTION].mi_name,POTION);
+		add_line(buf);
+		sprintf(buf,"%s\t %c", things[TYP_SCROLL].mi_name,SCROLL);
+		add_line(buf);
+		sprintf(buf,"%s\t %c", things[TYP_ARMOR].mi_name,ARMOR);
+		add_line(buf);
+		sprintf(buf,"%s\t %c", things[TYP_WEAPON].mi_name,WEAPON);
+		add_line(buf);
+		sprintf(buf,"%s\t %c",things[TYP_FOOD].mi_name,FOOD);
+		add_line(buf);
+		if (wizard) {
+		    sprintf(buf,"%s %c", things[TYP_ARTIFACT].mi_name, ARTIFACT);
+		    add_line(buf);
+		    sprintf(buf,"monster\t m");
+		    add_line(buf);
 		}
-		if(ch == ESCAPE) 
-			return;
-	        switch (ch) {
-			case RING:
-			case STICK:	
-			case POTION:
-			case SCROLL:	
-			case ARMOR:	
-			case WEAPON:
-			case FOOD:
-			    nogood = FALSE;
-			    break;
-			case 'm':
-			    if (wizard) 
-				nogood = FALSE;
-			    break;
-			case ARTIFACT:
-			    if (wizard)
-				nogood = FALSE;
-			    break;
-			default:
-			    nogood = TRUE;
-		}
-	} while (nogood);
+		end_line();
+		msg("");
+		msg("What do you want to create (* for list) ? ");
+	    }
+	    if(ch == ESCAPE) 
+		return;
+	    switch (ch) {
+	    when RING:
+	    case STICK:	
+	    case POTION:
+	    case SCROLL:	
+	    case ARMOR:	
+	    case WEAPON:
+	    case FOOD:
+		nogood = FALSE;
+	    when 'm':
+	    case ARTIFACT:
+		if (wizard)
+		    nogood = FALSE;
+	    otherwise:
+		nogood = TRUE;
+	    }
+	} while (nogood == TRUE);
 	newitem = ch;
     }
-    else
-	newitem = which_item;
+    else newitem = which_item;
 
     pt = "those";
     msz = 0;
-    if(newitem == 'm') {
-	makemon();		/* make monster and be done with it */
-	return;
-    }
-    if(newitem == GOLD)
-	pt = "gold";
     switch(newitem) {
-	case POTION:	whc = TYP_POTION;	tsize = msz = MAXPOTIONS;
-	when SCROLL:	whc = TYP_SCROLL;	tsize = msz = MAXSCROLLS;
-	when FOOD:	whc = TYP_FOOD;		tsize = msz = MAXFOODS;
-	when WEAPON:	whc = TYP_WEAPON;	tsize = msz = MAXWEAPONS;
-	when ARMOR:	whc = TYP_ARMOR;	tsize = msz = MAXARMORS;
-	when RING:	whc = TYP_RING;		tsize = msz = MAXRINGS;
-	when STICK:	whc = TYP_STICK;	tsize = msz = MAXSTICKS;
-	when ARTIFACT:	whc = TYP_ARTIFACT;	tsize = msz = MAXARTIFACT;
+    	when 'm':
+	    makemon();		/* make monster and be done with it */
+	    return;
+	when GOLD:
+	    pt = "gold";
+	when POTION:	whc = TYP_POTION;	tsize = msz = maxpotions;
+	when SCROLL:	whc = TYP_SCROLL;	tsize = msz = maxscrolls;
+	when FOOD:	whc = TYP_FOOD;		tsize = msz = maxfoods;
+	when WEAPON:	whc = TYP_WEAPON;	tsize = msz = maxweapons;
+	when ARMOR:	whc = TYP_ARMOR;	tsize = msz = maxarmors;
+	when RING:	whc = TYP_RING;		tsize = msz = maxrings;
+	when STICK:	whc = TYP_STICK;	tsize = msz = maxsticks;
+	when ARTIFACT:	whc = TYP_ARTIFACT;	tsize = msz = maxartifact;
 	otherwise:
 	    if (thiswin == hw)
 		restscr(cw);
@@ -181,14 +162,13 @@ int which_item, which_type;
 	    msg("Even wizards can't create %s !!",pt);
 	    return;
     }
-    if(msz == 1) {		/* if only one type of item */
+    if(msz == 1)		/* if only one type of item */
 	ch = 1;
-    }
     else if (which_type == 0) {
 	struct magic_item *wmi;
 	struct init_artifact *war;
 	char wmn;
-	char buf[LINELEN];
+	char buf[2*LINELEN];
 	int ii;
 	char numstr[20];
 
@@ -197,32 +177,32 @@ int which_item, which_type;
 	war = NULL;
 	wmn = 0;
 	switch(newitem) {
-		when POTION:	wmi = &p_magic[0];
-		when SCROLL:	wmi = &s_magic[0];
-		when RING:	wmi = &r_magic[0];
-		when STICK:	wmi = &ws_magic[0];
-		when FOOD:	wmi = &fd_data[0];
-		when ARTIFACT:	war = &arts[0];
-		when WEAPON:	wmn = 1;
-		when ARMOR:	wmn = 2;
+	    when POTION:	wmi = p_magic;
+	    when SCROLL:	wmi = s_magic;
+	    when RING:		wmi = r_magic;
+	    when STICK:		wmi = ws_magic;
+	    when FOOD:		wmi = fd_data;
+	    when ARTIFACT:	war = arts;
+	    when WEAPON:	wmn = 1;
+	    when ARMOR:		wmn = 2;
 	}
 	thiswin = hw;
 	for (ii = 0 ; ii < msz && pres_item <= tsize; ii++) {
-		sprintf(buf,"%d) ", pres_item);
-		if (wmi != NULL) {
-	            strcat(buf, wmi->mi_name);
-	            wmi++;
-		}
-		else if (war != NULL) {
-		    strcat(buf, war->ar_name);
-		    war++;
-		}
-	        else if(wmn == 1)
-		    strcat(buf, weaps[pres_item - 1].w_name);
-	        else if(wmn == 2)
-		    strcat(buf, armors[pres_item - 1].a_name);
-		add_line(buf);
-		pres_item++;
+	    sprintf(buf,"%d) ", pres_item);
+	    if (wmi != NULL) {
+		strcat(buf, wmi->mi_name);
+		wmi++;
+	    }
+	    else if (war != NULL) {
+		strcat(buf, war->ar_name);
+		war++;
+	    }
+	    else if(wmn == 1)
+		strcat(buf, weaps[pres_item - 1].w_name);
+	    else if(wmn == 2)
+		strcat(buf, armors[pres_item - 1].a_name);
+	    add_line(buf);
+	    pres_item++;
 	}
 	end_line();
 	msg("");
@@ -239,8 +219,7 @@ int which_item, which_type;
 	    }
 	} until (newtype >= 0 && newtype < tsize);
     }
-    else 
-	newtype = which_type;
+    else newtype = which_type;
     item = new_item(sizeof *obj);	/* get some memory */
     obj = OBJPTR(item);
     if (newitem == ARTIFACT) {
@@ -261,48 +240,38 @@ int which_item, which_type;
     obj->o_weight = 0;
     wh = obj->o_which;
     mpos = 0;
-    if (!wizard)
-	whc = (cursed ? -1 : 1) * rnd(4);
-    else			/* wizard gets to choose */
-	whc = getbless();
+    if (wizard)					/* wizard gets to choose */
+	 whc = getbless();
+    else whc = (cursed ? -1 : 1) * rnd(4);
     if (whc < 0)
 	obj->o_flags |= ISCURSED;
+    else if (whc > 0 && obj->o_type != WEAPON && obj->o_type != ARMOR)
+	obj->o_flags |= ISBLESSED;
+    obj->o_flags |= ISKNOW;
+
     switch (obj->o_type) {
-	case WEAPON:
-	case ARMOR:
-	    if (obj->o_type == WEAPON) {
-		init_weapon(obj, wh);
-		obj->o_hplus += whc;
-		obj->o_dplus += whc;
-	    }
-	    else {				/* armor here */
-		obj->o_weight = armors[wh].a_wght;
-		obj->o_ac = armors[wh].a_class - whc;
-	    }
-	when RING:
-	    if (whc > 0)
-		obj->o_flags |= ISBLESSED;
-	    r_know[wh] = TRUE;
-	    obj->o_ac = whc;
-	    obj->o_weight = things[TYP_RING].mi_wght;
-	when STICK:
-	    if (whc > 0)
-		obj->o_flags |= ISBLESSED;
-	    ws_know[wh] = TRUE;
-	    fix_stick(obj);
-	when SCROLL:
-	    if (whc > 0)
-		obj->o_flags |= ISBLESSED;
-	    obj->o_weight = things[TYP_SCROLL].mi_wght;
-	    s_know[wh] = TRUE;
-	when POTION:
-	    if (whc > 0)
-		obj->o_flags |= ISBLESSED;
-	    obj->o_weight = things[TYP_POTION].mi_wght;
-	    p_know[wh] = TRUE;
+    when WEAPON:
+	init_weapon(obj, wh);
+	obj->o_hplus += whc;
+	obj->o_dplus += whc;
+    when ARMOR:
+	obj->o_weight = armors[wh].a_wght;
+	obj->o_ac = armors[wh].a_class - whc;
+    when RING:
+	r_know[wh] = TRUE;
+	obj->o_ac = whc;
+	obj->o_weight = things[TYP_RING].mi_wght;
+    when STICK:
+	ws_know[wh] = TRUE;
+	fix_stick(obj);
+    when SCROLL:
+	obj->o_weight = things[TYP_SCROLL].mi_wght;
+	s_know[wh] = TRUE;
+    when POTION:
+	obj->o_weight = things[TYP_POTION].mi_wght;
+	p_know[wh] = TRUE;
     }
     mpos = 0;
-    obj->o_flags |= ISKNOW;
     if (add_pack(item, FALSE) == FALSE) {
 	obj->o_pos = hero;
 	fall(&player, item, TRUE);
@@ -315,16 +284,18 @@ int which_item, which_type;
  */
 getbless()
 {
-	reg char bless;
+    register char reply;
 
-	msg("Blessing? (+,-,n)");
-	bless = readchar();
-	if (bless == '+')
-		return (rnd(3) + 1);
-	else if (bless == '-')
-		return (-rnd(3) - 1);
-	else
-		return (0);
+    msg("Blessing? (+,-,n)");
+    reply = readchar();
+    switch (reply) {
+    when '+':
+	return (3);
+    when '-':
+	return (-3);
+    otherwise:
+	return (0);
+    }
 }
 
 /*
@@ -335,24 +306,24 @@ makemon()
     register int i;
     register short which_monst;
     register int pres_monst=1, num_lines=LINES-3;
-    char monst_name[LINELEN*2];
+    char monst_name[2*LINELEN];
 
     /* Print out the monsters */
-    while (pres_monst <= NUMMONST+2) {
+    while (pres_monst <= nummonst+2) {
 	wclear(hw);
 	touchwin(hw);
 
 	wmove(hw, 2, 0);
-	for (i=0; i<num_lines && pres_monst <= NUMMONST+2; i++) {
+	for (i=0; i<num_lines && pres_monst <= nummonst+2; i++) {
 	    sprintf(monst_name, "[%d] %s\n",
 				pres_monst, monsters[pres_monst].m_name);
 	    waddstr(hw, monst_name);
 	    pres_monst++;
 	}
 
-	if (pres_monst <= NUMMONST+2) {
+	if (pres_monst <= nummonst+2) {
 	    mvwaddstr(hw, LINES-1, 0, morestr);
-	    draw(hw);
+	    wrefresh(hw);
 	    wait_for(' ');
 	}
 
@@ -360,7 +331,7 @@ makemon()
 	    mvwaddstr(hw, 0, 0, "Which monster");
 	    if (!terse) waddstr(hw, " do you wish to create");
 	    waddstr(hw, "? ");
-	    draw(hw);
+	    wrefresh(hw);
 	}
     }
 
@@ -372,11 +343,11 @@ makemon()
 	    return;
 	}
 	which_monst = atoi(monst_name);
-	if (which_monst < 1 || which_monst > NUMMONST+2) {
+	if (which_monst < 1 || which_monst > nummonst+2) {
 	    mvwaddstr(hw, 0, 0, "Please enter a number in the displayed range: ");
-	    draw(hw);
+	    wrefresh(hw);
 	}
-    } until (which_monst > 0 && which_monst <= NUMMONST+2);
+    } until (which_monst > 0 && which_monst <= nummonst+2);
     restscr(cw);
     creat_mons (&player, which_monst, TRUE);
     touchwin(cw);
@@ -397,32 +368,31 @@ teleport()
 
     c = hero;
     mvwaddch(cw, hero.y, hero.x, mvwinch(stdscr, hero.y, hero.x));
-    if (ISWEARING(R_TELCONTROL)) {
+    if (is_wearing(R_TELCONTROL)) {
 	msg("Where do you wish to teleport to? (* for help)");
 	wmove(cw, hero.y, hero.x);
-	draw(cw);
+	wrefresh(cw);
 	which = (short) (getchar() & 0177);
-	while (which != (short)ESCAPE 
-		&& which != (short)LINEFEED
-		&& which != (short)CARRIAGE_RETURN) {
+	while (which != (short)ESCAPE && which != (short)LINEFEED &&
+					 which != (short)CARRIAGE_RETURN) {
 	    switch(which) {
-		when 'h': c.x--;
-		when 'j': c.y++;
-		when 'k': c.y--;
-		when 'l': c.x++;
-		when 'y': c.x--; c.y--;
-		when 'u': c.x++; c.y--;
-		when 'b': c.x--; c.y++;
-		when 'n': c.x++; c.y++;
-		when '*':
-		    msg("Use h,j,k,l,y,u,b,n to position cursor, then hit return.");
+	    when 'h': c.x--;
+	    when 'j': c.y++;
+	    when 'k': c.y--;
+	    when 'l': c.x++;
+	    when 'y': c.x--; c.y--;
+	    when 'u': c.x++; c.y--;
+	    when 'b': c.x--; c.y++;
+	    when 'n': c.x++; c.y++;
+	    when '*':
+		msg("Use h,j,k,l,y,u,b,n to position cursor, then hit return.");
 	    }
 	    c.y = max(c.y, 1);
 	    c.y = min(c.y, LINES - 3);
 	    c.x = max(c.x, 1);
 	    c.x = min(c.x, COLS - 1);
 	    wmove(cw, c.y, c.x);
-	    draw(cw);
+	    wrefresh(cw);
 	    which = (short) (getchar() & 0177);
 	} 
 	which = winat(c.y, c.x);
@@ -434,8 +404,7 @@ teleport()
 	    hero = c;
 	    new_rp = roomin(&hero);
 	}
-	if (rand_position)
-	    msg("Your attempt fails.");
+	else msg("Your attempt fails.");
     }
     if (rand_position) {
 	do {
@@ -457,7 +426,6 @@ teleport()
 
     /*
      * turn off ISHELD in case teleportation was done while fighting
-     * a Fungi
      */
     if (on(player, ISHELD)) {
 	register struct linked_list *ip, *nip;
@@ -466,21 +434,18 @@ teleport()
 	turn_off(player, ISHELD);
 	hold_count = 0;
 	for (ip = mlist; ip; ip = nip) {
-	    mp = (struct thing *) ldata(ip);
+	    mp = THINGPTR(ip);
 	    nip = next(ip);
 	    if (on(*mp, DIDHOLD)) {
 		turn_off(*mp, DIDHOLD);
 		turn_on(*mp, CANHOLD);
 	    }
-	    turn_off(*mp, DIDSUFFOCATE); /* Suffocation -- see below */
+	    turn_off(*mp, DIDSUFFOCATE);
 	}
     }
 
-    /* Make sure player does not suffocate */
     extinguish(suffocate);
-
-    /* not trapped anymore */
-    player.t_no_move = 0;
+    player.t_no_move = 0;			/* not trapped anymore */
 
     count = 0;
     running = FALSE;
@@ -496,7 +461,7 @@ teleport()
 passwd()
 {
     register char *sp, c;
-    char buf[LINELEN], *crypt();
+    char buf[2*LINELEN], *crypt();
 
     msg("Wizard's Password:");
     mpos = 0;

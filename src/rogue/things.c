@@ -1,5 +1,5 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/05/86
  */
 /*
  * Contains functions for dealing with things like
@@ -7,7 +7,6 @@
  *
  */
 
-#include "curses.h"
 #include <ctype.h>
 #include "rogue.h"
 
@@ -52,9 +51,11 @@ register bool drop;
 			obj->o_flags & CANRETURN ? "claimed " : "", 
 			blesscurse(obj->o_flags));
 	    pb = &prbuf[strlen(prbuf)];
-	    if (p_know[obj->o_which] || (obj->o_flags & ISPOST))
+	    if (p_know[obj->o_which])
 		sprintf(pb, "of %s(%s)", p_magic[obj->o_which].mi_name,
 		    p_colors[obj->o_which]);
+	    else if (obj->o_flags & ISPOST)
+		sprintf(pb, "of %s", p_magic[obj->o_which].mi_name);
 	    else if (p_guess[obj->o_which])
 		sprintf(pb, "called %s(%s)", p_guess[obj->o_which],
 		    p_colors[obj->o_which]);
@@ -128,9 +129,12 @@ register bool drop;
 		obj->o_flags & CANRETURN ? "claimed " : "", 
 		blesscurse(obj->o_flags), ws_type[obj->o_which]);
 	    pb = &prbuf[strlen(prbuf)];
-	    if (ws_know[obj->o_which] || (obj->o_flags & ISPOST))
+	    if (ws_know[obj->o_which])
 		sprintf(pb, "of %s%s(%s)", ws_magic[obj->o_which].mi_name,
 		    charge_str(obj), ws_made[obj->o_which]);
+	    else if (obj->o_flags & ISPOST)
+		sprintf(pb, "of %s%s", ws_magic[obj->o_which].mi_name,
+		    charge_str(obj));
 	    else if (ws_guess[obj->o_which])
 		sprintf(pb, "called %s(%s)", ws_guess[obj->o_which],
 		    ws_made[obj->o_which]);
@@ -140,10 +144,14 @@ register bool drop;
 		    ws_made[obj->o_which],
 		    ws_type[obj->o_which]);
         when RING:
-	    if (r_know[obj->o_which] || (obj->o_flags & ISPOST))
+	    if (r_know[obj->o_which])
 		sprintf(prbuf, "A%s%s ring of %s(%s)", 
 		    obj->o_flags & CANRETURN ? " claimed" : "", ring_num(obj),
 		    r_magic[obj->o_which].mi_name, r_stones[obj->o_which]);
+	    else if (obj->o_flags & ISPOST)
+		sprintf(prbuf, "A%s%s ring of %s", 
+		    obj->o_flags & CANRETURN ? " claimed" : "", ring_num(obj),
+		    r_magic[obj->o_which].mi_name);
 	    else if (r_guess[obj->o_which])
 		sprintf(prbuf, "A %sring called %s(%s)",
 		    obj->o_flags & CANRETURN ? "claimed " : "",
@@ -153,6 +161,9 @@ register bool drop;
 		    obj->o_flags & CANRETURN ? "claimed " : 
 		    vowelstr(r_stones[obj->o_which]),
 		    r_stones[obj->o_which]);
+	when GOLD:
+	    sprintf(prbuf, "%d gold pieces", obj->o_count);
+
 	otherwise:
 	    debug("Picked up something funny.");
 	    sprintf(prbuf, "Something bizarre %s", unctrl(obj->o_type));
@@ -210,7 +221,7 @@ struct linked_list *item;
     else {
 	obj = item;
     }
-    op = (struct object *) ldata(obj);
+    op = OBJPTR(obj);
     if (!dropcheck(op))
 	return(FALSE);
 
@@ -229,15 +240,13 @@ struct linked_list *item;
     if (op->o_count >= 2 && op->o_group == NULL) {
 	nobj = new_item(sizeof *op);
 	op->o_count--;
-	op = (struct object *) ldata(nobj);
-	*op = *((struct object *) ldata(obj));
+	op = OBJPTR(nobj);
+	*op = *(OBJPTR(obj));
 	op->o_count = 1;
 	obj = nobj;
     }
     else {
-	detach(pack, obj);
-        inpack--;
-	freeletter(obj);
+      rem_pack(op);
     }
     if(ch == POOL) {
 	msg("Your %s sinks out of sight.",inv_name(op,TRUE));
@@ -353,7 +362,7 @@ new_thing()
     short blesschance, cursechance;
 
     item = new_item(sizeof *cur);
-    cur = (struct object *) ldata(item);
+    cur = OBJPTR(item);
     cur->o_hplus = cur->o_dplus = 0;
     cur->o_damage = cur->o_hurldmg = "0d0";
     cur->o_ac = 11;
@@ -368,10 +377,10 @@ new_thing()
      */
     blesschance = rnd(100);
     cursechance = rnd(100);
-    switch (no_food > 3 ? 2 : pick_one(things, NUMTHINGS)) {
+    switch (no_food > 3 ? 2 : pick_one(things, numthings)) {
 	when 0:
 	    cur->o_type = POTION;
-	    cur->o_which = pick_one(p_magic, MAXPOTIONS);
+	    cur->o_which = pick_one(p_magic, maxpotions);
 	    cur->o_weight = things[TYP_POTION].mi_wght;
 	    if (cursechance < p_magic[cur->o_which].mi_curse)
 		cur->o_flags |= ISCURSED;
@@ -379,7 +388,7 @@ new_thing()
 		cur->o_flags |= ISBLESSED;
 	when 1:
 	    cur->o_type = SCROLL;
-	    cur->o_which = pick_one(s_magic, MAXSCROLLS);
+	    cur->o_which = pick_one(s_magic, maxscrolls);
 	    cur->o_weight = things[TYP_SCROLL].mi_wght;
 	    if (cursechance < s_magic[cur->o_which].mi_curse)
 		cur->o_flags |= ISCURSED;
@@ -388,12 +397,12 @@ new_thing()
 	when 2:
 	    no_food = 0;
 	    cur->o_type = FOOD;
-	    cur->o_which = pick_one(fd_data, MAXFOODS);
+	    cur->o_which = pick_one(fd_data, maxfoods);
 	    cur->o_weight = 2;
 	    cur->o_count += extras();
 	when 3:
 	    cur->o_type = WEAPON;
-	    cur->o_which = rnd(MAXWEAPONS);
+	    cur->o_which = rnd(maxweapons);
 	    init_weapon(cur, cur->o_which);
 	    if (cursechance < 10) {
 		short bad=(rnd(10) < 1) ? 2 : 1;
@@ -410,10 +419,10 @@ new_thing()
 	    }
 	when 4:
 	    cur->o_type = ARMOR;
-	    for (j = 0; j < MAXARMORS; j++)
+	    for (j = 0; j < maxarmors; j++)
 		if (blesschance < armors[j].a_prob)
 		    break;
-	    if (j == MAXARMORS) {
+	    if (j == maxarmors) {
 		debug("Picked a bad armor %d", blesschance);
 		j = 0;
 	    }
@@ -430,7 +439,7 @@ new_thing()
 	    cur->o_weight = armors[j].a_wght;
 	when 5:
 	    cur->o_type = RING;
-	    cur->o_which = pick_one(r_magic, MAXRINGS);
+	    cur->o_which = pick_one(r_magic, maxrings);
 	    cur->o_weight = things[TYP_RING].mi_wght;
 	    if (cursechance < r_magic[cur->o_which].mi_curse)
 		cur->o_flags |= ISCURSED;
@@ -463,7 +472,7 @@ new_thing()
 	    }
 	when 6:
 	    cur->o_type = STICK;
-	    cur->o_which = pick_one(ws_magic, MAXSTICKS);
+	    cur->o_which = pick_one(ws_magic, maxsticks);
 	    fix_stick(cur);
 	    if (cursechance < ws_magic[cur->o_which].mi_curse)
 		cur->o_flags |= ISCURSED;
@@ -597,13 +606,84 @@ long flags;
  */
 extras()
 {
-	reg int i;
+    reg int i;
 
-	i = rnd(100);
-	if (i < 4)		/* 4% for 2 more */
-	    return (2);
-	else if (i < 11)	/* 7% for 1 more */
-	    return (1);
-	else			/* otherwise no more */
-	    return (0);
+    i = rnd(100);
+    if (i < 4)		/* 4% for 2 more */
+	return (2);
+    else if (i < 11)	/* 7% for 1 more */
+	return (1);
+    else			/* otherwise no more */
+	return (0);
+}
+/*
+ * name_type
+ *
+ * Returns a string identifying a pack item's type
+ */
+
+char *
+name_type(type)
+
+char type;
+{
+switch(type)
+  {
+  case ARMOR:
+    return("armor");
+  case WEAPON:
+    return("weapons");
+  case SCROLL:
+    return("scrolls");
+  case RING:
+    return("rings");
+  case STICK:
+    return("staffs");
+  case POTION:
+    return("potions");
+  case FOOD:
+    return("food");
+  case GOLD:
+    return("gold");
+  default:
+    return("items");
+  }
+}
+/*
+ * make_item
+ *
+ * adds a linked_list structure to the top of an object for
+ * interfacing with other routines
+ */
+
+linked_list *
+make_item(obj_p)
+ 
+register object *obj_p;
+{
+register linked_list *item_p;
+
+item_p = (linked_list *) ur_alloc(sizeof(linked_list));
+next(item_p) = prev(item_p) = NULL;
+item_p->l_data = (char *) obj_p;
+return(item_p);
+}
+/*
+ * is_member
+ *
+ * Checks to see if a character is a member of an array
+ */
+
+is_member(list_p, member)
+
+register char *list_p;
+register char member;
+
+{
+while (*list_p != NULL)
+  {
+    if (*list_p++ == member)
+      return(TRUE);
+  }
+return(FALSE);
 }

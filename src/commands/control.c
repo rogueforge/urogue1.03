@@ -75,7 +75,7 @@ char **argv;
 		cflag = 1;
 		break;
 	default:
-		fprintf(stderr, "usage: %s -{capid}\n", *argv);
+		fprintf(stderr, "usage: %s -{capids}\n", *argv);
 		exit(1);
 	}
 

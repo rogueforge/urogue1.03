@@ -1,5 +1,5 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 07/09/86
  */
 /*
  * This file has all the code for the option command.
@@ -8,16 +8,15 @@
  *
  */
 
+#include "rogue.h"
 #include "mach_dep.h"
-#include "curses.h"
 #if defined(attron)
 #include <term.h>
 #endif attron
 #include <ctype.h>
-#include "rogue.h"
 
 #define	NUM_OPTS	(sizeof optlist / sizeof (OPTION))
-
+#define	EQSTR(a, b, c)	(strncmp(a, b, c) == 0)
 
 /*
  * description of an option and what to do with it
@@ -73,8 +72,7 @@ option()
     /*
      * Display current values of options
      */
-    for (op = optlist; op < &optlist[NUM_OPTS]; op++)
-    {
+    for (op = optlist; op < &optlist[NUM_OPTS]; op++) {
 	waddstr(hw, op->o_prompt);
 	(*op->o_putfunc)(op->o_opt, hw);
 	waddch(hw, '\n');
@@ -83,8 +81,7 @@ option()
      * Set values
      */
     wmove(hw, 0, 0);
-    for (op = optlist; op < &optlist[NUM_OPTS]; op++)
-    {
+    for (op = optlist; op < &optlist[NUM_OPTS]; op++) {
 	waddstr(hw, op->o_prompt);
 	if ((retval = (*op->o_getfunc)(op->o_opt, hw)))
 	    if (retval == QUIT)
@@ -93,8 +90,7 @@ option()
 		wmove(hw, (op - optlist) - 1, 0);
 		op -= 2;
 	    }
-	    else	/* trying to back up beyond the top */
-	    {
+	    else {	/* trying to back up beyond the top */
 		putchar('\007');
 		wmove(hw, 0, 0);
 		op--;
@@ -104,7 +100,7 @@ option()
      * Switch back to original screen
      */
     mvwaddstr(hw, LINES-1, 0, spacemsg);
-    draw(hw);
+    wrefresh(hw);
     wait_for(' ');
     clearok(cw, TRUE);
     touchwin(cw);
@@ -192,12 +188,10 @@ WINDOW *win;
     op_bad = TRUE;
     getyx(win, oy, ox);
     waddstr(win, *bp ? "True" : "False");
-    while(op_bad)	
-    {
+    while (op_bad) {
 	wmove(win, oy, ox);
-	draw(win);
-	switch (readchar())
-	{
+	wrefresh(win);
+	switch (readchar()) {
 	    case 't':
 	    case 'T':
 		*bp = TRUE;
@@ -237,9 +231,9 @@ WINDOW *win;
 {
     register char *sp;
     register int c, oy, ox;
-    char buf[LINELEN];
+    char buf[2*LINELEN];
 
-    draw(win);
+    wrefresh(win);
     getyx(win, oy, ox);
     /*
      * loop reading in the string, and put it in a temporary buffer
@@ -250,8 +244,7 @@ WINDOW *win;
 	c != '\033'			&& 
 	c != '\007'			&&
 	sp < &buf[LINELEN-1];
-	wclrtoeol(win), draw(win))
-    {
+	wclrtoeol(win), wrefresh(win)) {
 	if (c == -1)
 	    continue;
 #if (defined(USGV3) || defined(USGV5) || defined(attron)) && !defined(SCO5)
@@ -261,8 +254,7 @@ WINDOW *win;
 	else if (c == _tty.sg_erase) /* process erase character */
 #endif
 	{
-	    if (sp > buf)
-	    {
+	    if (sp > buf) {
 		register int i;
 
 		sp--;
@@ -285,8 +277,7 @@ WINDOW *win;
 	else if (sp == buf)
 	    if (c == '-' && win == hw)	/* To move back a line in hw */
 		break;
-	    else if (c == '~')
-	    {
+	    else if (c == '~') {
 		strcpy(buf, home);
 		waddstr(win, home);
 		sp += strlen(home);
@@ -301,7 +292,7 @@ WINDOW *win;
     wmove(win, oy, ox);
     waddstr(win, opt);
     waddch(win, '\n');
-    draw(win);
+    wrefresh(win);
     if (win == cw)
 	mpos += sp - buf;
     if (c == '-')
@@ -326,12 +317,10 @@ WINDOW *win;
     getyx(win, oy, ox);
     put_abil(abil, win);
     getyx(win, ny, nx);
-    while(op_bad)	
-    {
+    while(op_bad) {
 	wmove(win, oy, ox);
-	draw(win);
-	switch (readchar())
-	{
+	wrefresh(win);
+	switch (readchar()) {
 	    case '\n':
 	    case '\r':
 		op_bad = FALSE;
@@ -368,8 +357,7 @@ register char *str;
     register OPTION *op;
     register int len;
 
-    while (*str)
-    {
+    while (*str) {
 	/*
 	 * Get option name
 	 */
@@ -380,12 +368,10 @@ register char *str;
 	 * Look it up and deal with it
 	 */
 	for (op = optlist; op < &optlist[NUM_OPTS]; op++)
-	    if (EQSTR(str, op->o_name, len))
-	    {
+	    if (EQSTR(str, op->o_name, len)) {
 		if (op->o_putfunc == put_bool)	/* if option is a boolean */
 		    *(bool *)op->o_opt = TRUE;
-		else				/* string option */
-		{
+		else {			/* string option */
 		    register char *start;
 		    char value[80];
 
@@ -394,8 +380,7 @@ register char *str;
 		     */
 		    for (str = sp + 1; *str == '='; str++)
 			continue;
-		    if (*str == '~')
-		    {
+		    if (*str == '~') {
 			strcpy((char *) value, home);
 			start = (char *) value + strlen(home);
 			while (*++str == '/')
@@ -458,8 +443,7 @@ register char *str;
 	     * check for "noname" for booleans
 	     */
 	    else if (op->o_putfunc == put_bool
-	      && EQSTR(str, "no", 2) && EQSTR(str + 2, op->o_name, len - 2))
-	    {
+	      && EQSTR(str, "no", 2) && EQSTR(str + 2, op->o_name, len - 2)) {
 		*(bool *)op->o_opt = FALSE;
 		break;
 	    }
@@ -528,12 +512,10 @@ WINDOW *win;
     getyx(win, oy, ox);
     put_inv(inv, win);
     getyx(win, ny, nx);
-    while(op_bad)	
-    {
+    while(op_bad) {
 	wmove(win, oy, ox);
-	draw(win);
-	switch (readchar())
-	{
+	wrefresh(win);
+	switch (readchar()) {
 	    case '\n':
 	    case '\r':
 		op_bad = FALSE;

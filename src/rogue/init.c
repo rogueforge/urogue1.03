@@ -1,12 +1,11 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 07/13/86
  */
 /*
  * global variable initializaton
  *
  */
 
-#include "curses.h"
 #include <ctype.h>
 #include "rogue.h"
 
@@ -85,96 +84,260 @@ static char *metal[] = {
 
 init_player()
 {
-    bool special = rnd(10) ;
+    bool special = rnd(11) ;
+    struct linked_list *item;
+    struct object *obj;
+    int which_armor, which_weapon, i, which_item;
 
     pstats.s_lvl = 1 ;
     pstats.s_exp = 0L ;
-
-    do_getplayer();	/* get character class */
-
-    player.t_quiet = 0;
-    pstats.s_str = 8 + rnd(5) ;
-    pstats.s_intel = 8 + rnd(5) ;
-    pstats.s_wisdom = 8 + rnd(5) ;
-    pstats.s_dext = 8 + rnd(5) ;
-    pstats.s_const = 10 + rnd(8) ;
-    pstats.s_charisma = 8 + rnd(4) ;
     pstats.s_arm = 10 ;
-    max_stats.s_hpt = pstats.s_hpt = 15 + rnd(5);
 
-    /* Now for the special ability */
-    switch (char_type) {
-	when C_FIGHTER:
-	    pstats.s_str = (special == 4) ? 18 : 16 ;
-	    pstats.s_const += rnd(4);
-	    pstats.s_arm = 8;
-	when C_MAGICIAN:
-	    pstats.s_intel = (special == 4) ? 18 : 16 ;
-	when C_ILLUSION:
-	    pstats.s_intel = (special == 4) ? 18 : 16 ;
-	    pstats.s_dext = (special == 4) ? 18 : 14;
-	when C_CLERIC:
-	    pstats.s_wisdom = (special == 4) ? 18 : 16 ;
-	    pstats.s_str += rnd(4);
-	when C_DRUID:
-	    if(special == 4) {
-		pstats.s_wisdom += rnd(5);
-		pstats.s_charisma += rnd(4);
-	    }
-	    pstats.s_str += rnd(4);
-	    if(pstats.s_wisdom < 16)
-		pstats.s_wisdom = 16;
-	when C_THIEF:
-	    pstats.s_dext = (special == 4) ? 18 : 16 ;
-	when C_ASSASIN:
-	    pstats.s_dext = (special == 4) ? 18 : 16 ;
-	    pstats.s_intel = (special == 4) ? 18 : 16;
-	when C_NINJA:
-	    if(special == 4) {
-		pstats.s_dext += rnd(5);
+    if (!geta_player()) {
+	do_getplayer();	/* get character class */
+	pstats.s_str = 8 + rnd(5) ;
+	pstats.s_intel = 8 + rnd(5) ;
+	pstats.s_wisdom = 8 + rnd(5) ;
+	pstats.s_dext = 8 + rnd(5) ;
+	pstats.s_const = 10 + rnd(8) ;
+	pstats.s_charisma = 8 + rnd(4) ;
+	pstats.s_power = 5 + rnd(5);
+	pstats.s_hpt = 15 + rnd(5);
+
+	/* Now for the special ability */
+	switch (char_type) {
+	    when C_FIGHTER:
+		pstats.s_str = 18;
+		pstats.s_const += rnd(4) + 1;
+	    when C_MAGICIAN:
+		pstats.s_intel = (special == 4) ? 18 : 16 ;
+		pstats.s_power += 5 + rnd(10);
+	    when C_ILLUSION:
+    		pstats.s_intel = (special == 4) ? 18 : 16 ;
+    		pstats.s_dext = (special == 4) ? 18 : 14;
+		pstats.s_power += 5 + rnd(10);
+	    when C_CLERIC:
+		pstats.s_wisdom = (special == 4) ? 18 : 16 ;
 		pstats.s_str += rnd(4);
-		pstats.s_intel += rnd(3);
-	    }
-	    pstats.s_arm = 12;
-	    if(pstats.s_dext < 16)
+		pstats.s_power += 5 + rnd(10);
+	    when C_DRUID:
+		if(special == 4) {
+		    pstats.s_wisdom += rnd(5);
+		    pstats.s_charisma += rnd(4);
+		}
+		pstats.s_str += rnd(4);
+		pstats.s_power += 5 + rnd(10);
+		if(pstats.s_wisdom < 16)
+		    pstats.s_wisdom = 16;
+	    when C_THIEF:
+		pstats.s_dext = 18;
+	    when C_ASSASIN:
+		pstats.s_dext = (special == 4) ? 18 : 16 ;
+		pstats.s_intel = (special == 4) ? 18 : 16;
+	    when C_NINJA:
+		if(special == 4) {
+		    pstats.s_dext += rnd(5);
+		    pstats.s_str += rnd(4);
+		    pstats.s_intel += rnd(3);
+		    pstats.s_wisdom += rnd(3);
+		}
+		if(pstats.s_dext < 16)
 		    pstats.s_dext = 16;
-	when C_PALADIN:
+		if(pstats.s_str < 15)
+		    pstats.s_str = 15;
+		if(pstats.s_wisdom < 15)
+		    pstats.s_wisdom = 15;
+		if(pstats.s_const < 11)
+		    pstats.s_const = 11;
+		if(pstats.s_charisma < 11)
+		    pstats.s_charisma = 11;
+	    when C_PALADIN:
 		pstats.s_charisma = 17;
 		if(special == 4) {
-			pstats.s_charisma += rnd(3);
-			pstats.s_wisdom += rnd(4);
-			pstats.s_str += rnd(5);
+		    pstats.s_charisma += rnd(3);
+		    pstats.s_wisdom += rnd(4);
+		    pstats.s_str += rnd(5);
 		}
 		if(pstats.s_str < 16)
-			pstats.s_str = 16;
+		    pstats.s_str = 16;
 		if(pstats.s_wisdom < 16)
-			pstats.s_wisdom = 16;
-	when C_RANGER:
+		    pstats.s_wisdom = 16;
+	    when C_RANGER:
 		if(special == 4) {
-			pstats.s_wisdom += rnd(4);
-			pstats.s_intel += rnd(4);
-			pstats.s_str += rnd(5);
+		    pstats.s_wisdom += rnd(4);
+		    pstats.s_intel += rnd(4);
+		    pstats.s_str += rnd(5);
 		}
 		if(pstats.s_str < 16)
-			pstats.s_str = 16;
+		    pstats.s_str = 16;
 		if(pstats.s_wisdom <16)
-			pstats.s_wisdom = 16;
+		    pstats.s_wisdom = 16;
 		if(pstats.s_const < 14)
-			pstats.s_const = 14;
-		break ;
+		    pstats.s_const = 14;
+	}
+	puta_player();
     }
     if(char_type == C_ASSASIN || char_type == C_NINJA || char_type == C_FIGHTER)
 	pstats.s_dmg = "2d6";
     else
 	pstats.s_dmg = "1d4";
+
+    if(char_type == C_NINJA || char_type == C_FIGHTER)
+	pstats.s_arm = 8;
+
     if (pstats.s_const > 15)
 	pstats.s_hpt += pstats.s_const - 15;
-    max_stats = pstats ;
-    pack = NULL ;
+
+    max_stats = pstats;
+    player.t_rest_hpt = player.t_rest_pow = 0;
     pstats.s_carry = totalenc();
+    pack = NULL ;
+    switch (player.t_ctype) {	/* now outfit pack */
+	when C_FIGHTER:
+	    purse = roll(50,60);;
+	    which_armor = CHAIN_MAIL;
+	    which_weapon = TWO_SWORD;
+	when C_RANGER:
+	    purse = roll(50,60);;
+	    which_armor = RING_MAIL;
+	    which_weapon = TWO_SWORD;
+	    item = spec_item(WEAPON, BOW, 1, 1);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW;
+	    add_pack(item, TRUE);
+	    item = spec_item(WEAPON, SILVERARROW, 1, 1);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW | ISOWNED | CANRETURN;
+	    obj->o_count = 1;
+	    add_pack(item, TRUE);
+	    item = spec_item(WEAPON, FLAMEARROW, 1, 1);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW | ISOWNED | CANRETURN;
+	    obj->o_count = 1;
+	    add_pack(item, TRUE);
+	when C_CLERIC:
+	    purse = roll(30,80);;
+	    which_armor = PADDED_ARMOR;
+	    which_weapon = QUARTERSTAFF;
+	    which_item = P_HEALING;
+	    p_know[which_item] = TRUE;
+	    item = spec_item(POTION, which_item, 0, 0);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW;
+	    add_pack(item, TRUE);
+	when C_MAGICIAN: {
+	    purse = roll(20,60);;
+	    which_armor = HEAVY_LEATHER;
+	    which_weapon = QUARTERSTAFF;
+	    which_item = P_SEEINVIS;
+	    p_know[which_item] = TRUE;
+	    item = spec_item(POTION, which_item, 0, 0);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW;
+	    add_pack(item, TRUE);
+	    for (i = 1; i < 4; i++) {
+		which_item = rnd(maxscrolls);
+		s_know[which_item] = TRUE;
+		item = spec_item(SCROLL, which_item, 0, 0);
+		obj = OBJPTR(item);
+		obj->o_flags |= ISKNOW;
+		add_pack(item, TRUE);
+	    }
+	}
+	when C_ILLUSION:
+	    purse = roll(20,60);;
+	    which_armor = SOFT_LEATHER;
+	    which_weapon = QUARTERSTAFF;
+	    which_item = P_DISGUISE;
+	    p_know[which_item] = TRUE;
+	    item = spec_item(POTION, which_item, 0, 0);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW;
+	    add_pack(item, TRUE);
+	    which_item = S_REFLECT;
+	    s_know[which_item] = TRUE;
+	    item = spec_item(SCROLL, which_item, 0, 0);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW;
+	    add_pack(item, TRUE);
+	    which_item = WS_MISSILE;
+	    ws_know[which_item] = TRUE;
+	    item = spec_item(STICK, which_item, 0, 0);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW;
+	    fix_stick(obj);
+	    add_pack(item, TRUE);
+	when C_DRUID:
+	    purse = roll(30,80);;
+	    which_armor = SOFT_LEATHER;
+	    which_weapon = QUARTERSTAFF;
+	    which_item = WS_POLYMORPH;
+	    ws_know[which_item] = TRUE;
+	    item = spec_item(STICK, which_item, 0, 0);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW;
+	    fix_stick(obj);
+	    add_pack(item, TRUE);
+	    which_item = WS_CONFMON;
+	    ws_know[which_item] = TRUE;
+	    item = spec_item(STICK, which_item, 0, 0);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW;
+	    fix_stick(obj);
+	    add_pack(item, TRUE);
+	when C_THIEF:
+	    purse = roll(40,80);;
+	    which_armor = HEAVY_LEATHER;
+	    which_weapon = CUTLASS;
+	when C_ASSASIN:
+	    purse = roll(20,80);;
+	    which_armor = SOFT_LEATHER;
+	    which_weapon = SABRE;
+	    item = spec_item(WEAPON, DAGGER, 1, 1);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW | ISPOISON;
+	    add_pack(item, TRUE);
+	when C_NINJA:
+	    purse = roll(20,80);
+	    which_armor = SOFT_LEATHER;
+	    which_weapon = SABRE;
+	    item = spec_item(WEAPON, SHIRIKEN, 1, 1);
+	    obj = OBJPTR(item);
+	    obj->o_flags |= ISKNOW | ISPOISON;
+	    obj->o_count += roll(10, 6);
+	    add_pack(item, TRUE);
+	when C_PALADIN:
+	    purse = roll(20,60);;
+	    which_armor = PLATE_MAIL;
+	    which_weapon = LONG_SWORD;
+    }
+    /*
+     * Add this stuff to the rogue's pack.
+     */
+    item = spec_item(WEAPON, which_weapon, 1, 1);
+    obj = OBJPTR(item);
+    obj->o_flags |= ISKNOW;
+    add_pack(item, TRUE);
+    cur_weapon = obj;
+
+    /*
+     * And his suit of armor
+     */
+    item = spec_item(ARMOR, which_armor, 0, 0);
+    obj = OBJPTR(item);
+    obj->o_flags |= ISKNOW;
+    obj->o_weight = armors[which_armor].a_wght;
+    add_pack(item, TRUE);
+    cur_armor = obj;
+
+    /*
+     * Give him some food too
+     */
+    item = spec_item(FOOD, 0, 0, 0);
+    obj = OBJPTR(item);
+    obj->o_weight = things[TYP_FOOD].mi_wght;
+    add_pack(item, TRUE);
 }
-
-
 
 /*
  * Initialize flags on startup
@@ -182,13 +345,13 @@ init_player()
 init_flags()
 {
     switch (player.t_ctype) {
-
 	case C_MAGICIAN:
 	case C_ILLUSION:
 	case C_CLERIC:
 	case C_DRUID:
 	    turn_on(player, CANSUMMON);
     }
+    turn_on(player, CANCAST);
 }
 
 
@@ -206,9 +369,9 @@ init_things()
 {
     register struct magic_item *mp ;
 
-    for (mp = &things[1] ; mp < &things[NUMTHINGS] ; mp++)
+    for (mp = &things[1] ; mp < &things[numthings] ; mp++)
 	mp->mi_prob += (mp-1)->mi_prob ;
-    badcheck("things", things, NUMTHINGS) ;
+    badcheck("things", things, numthings) ;
 }
 
 /*
@@ -219,9 +382,9 @@ init_fd()
 {
     register struct magic_item *mp ;
 
-    for (mp = &fd_data[1] ; mp < &fd_data[MAXFOODS] ; mp++)
+    for (mp = &fd_data[1] ; mp < &fd_data[maxfoods] ; mp++)
 	mp->mi_prob += (mp-1)->mi_prob ;
-    badcheck("food", fd_data, MAXFOODS) ;
+    badcheck("food", fd_data, maxfoods) ;
 }
 
 /*
@@ -234,8 +397,7 @@ init_colors()
     register int i ;
     register char *str ;
 
-    for (i = 0 ; i < MAXPOTIONS ; i++)
-    {
+    for (i = 0 ; i < maxpotions ; i++) {
 	do
 	    str = rainbow[rnd(NCOLORS)] ;
 	until (isupper(*str)) ;
@@ -246,7 +408,7 @@ init_colors()
 	if (i > 0)
 		p_magic[i].mi_prob += p_magic[i-1].mi_prob ;
     }
-    badcheck("potions", p_magic, MAXPOTIONS) ;
+    badcheck("potions", p_magic, maxpotions) ;
 }
 
 /*
@@ -260,15 +422,12 @@ init_names()
     register char *cp, *sp ;
     register int i, nwords ;
 
-    for (i = 0 ; i < MAXSCROLLS ; i++)
-    {
+    for (i = 0 ; i < maxscrolls ; i++) {
 	cp = prbuf ;
 	nwords = rnd(COLS/20) + 1 + (COLS > 40 ? 1 : 0) ;
-	while(nwords--)
-	{
+	while(nwords--) {
 	    nsyl = rnd(3)+1 ;
-	    while(nsyl--)
-	    {
+	    while(nsyl--) {
 		sp = sylls[rnd((sizeof sylls) / (sizeof (char *)))] ;
 		while(*sp)
 		    *cp++ = *sp++ ;
@@ -283,7 +442,7 @@ init_names()
 	if (i > 0)
 		s_magic[i].mi_prob += s_magic[i-1].mi_prob ;
     }
-    badcheck("scrolls", s_magic, MAXSCROLLS) ;
+    badcheck("scrolls", s_magic, maxscrolls) ;
 }
 
 /*
@@ -296,8 +455,7 @@ init_stones()
     register int i ;
     register char *str ;
 
-    for (i = 0 ; i < MAXRINGS ; i++)
-    {
+    for (i = 0 ; i < maxrings ; i++) {
 	do
 	    str = stones[rnd(NSTONES)] ;
 	until (isupper(*str)) ;
@@ -308,7 +466,7 @@ init_stones()
 	if (i > 0)
 		r_magic[i].mi_prob += r_magic[i-1].mi_prob ;
     }
-    badcheck("rings", r_magic, MAXRINGS) ;
+    badcheck("rings", r_magic, maxrings) ;
 }
 
 /*
@@ -321,17 +479,14 @@ init_materials()
     register int i ;
     register char *str ;
 
-    for (i = 0 ; i < MAXSTICKS ; i++)
-    {
+    for (i = 0 ; i < maxsticks ; i++) {
 	do
-	    if (rnd(100) > 50)
-	    {
+	    if (rnd(100) > 50) {
 		str = metal[rnd(NMETAL)] ;
 		if (isupper(*str))
 			ws_type[i] = "wand" ;
 	    }
-	    else
-	    {
+	    else {
 		str = wood[rnd(NWOOD)] ;
 		if (isupper(*str))
 			ws_type[i] = "staff" ;
@@ -344,7 +499,7 @@ init_materials()
 	if (i > 0)
 		ws_magic[i].mi_prob += ws_magic[i-1].mi_prob ;
     }
-    badcheck("sticks", ws_magic, MAXSTICKS) ;
+    badcheck("sticks", ws_magic, maxsticks) ;
 }
 
 badcheck(name, magic, bound)
@@ -363,24 +518,4 @@ register int bound ;
     fflush(stdout) ;
     while ((getchar() & 0177) != '\n')
 	continue ;
-}
-
-do_getplayer()
-{
-    if (char_type == C_NOTSET) {
-	/* See what type character will be */
-	wclear(hw) ;
-	touchwin(hw) ;
-	mvwaddstr(hw,2,0, "[a] Fighter\n[b] Paladin\n[c] Ranger\n[d] Cleric\n[e] Druid\n[f] Magician");
-	waddstr(hw,"\n[g] Illusionist\n[h] Thief\n[i] Assasin\n[j] Ninja") ;
-	mvwaddstr(hw, 0, 0, "What character class do you desire? ") ;
-	draw(hw) ;
-	char_type = readchar() - 'a';
-	while (char_type < C_FIGHTER || char_type >= C_MONSTER) {
-	    mvwaddstr(hw, 0, 0, "Please enter a character in the displayed range: ");
-	    draw(hw);
-	    char_type = readchar() - 'a';
-	}
-    }
-    player.t_ctype = char_type ;
 }

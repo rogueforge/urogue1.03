@@ -1,67 +1,69 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/10/86
  */
 /*
  * All the daemon and fuse functions are in here
  *
  */
 
-#include "curses.h"
 #include "rogue.h"
+#include "stepok.h"
+#include "death.h"
 
 /*
  * doctor:
- *	A healing daemon that restors hit points after rest
+ *	A healing daemon that restors spell and hit points after rest
  */
 
 doctor(tp)
 struct thing *tp;
 {
-    register int ohp;
-    register short limit, new_points;
-    register struct stats *curp; /* current stats pointer */
-    register struct stats *maxp; /* max stats pointer */
+    register int ohp;				/* turn off ISFLEE? */
+    register short turns_quiet, new_points;
+    register struct stats *curp;		/* current stats pointer */
+    register struct stats *maxp;		/* max stats pointer */
 
     curp = &(tp->t_stats);
     maxp = &(tp->maxstats);
-    if (curp->s_hpt == maxp->s_hpt || on(*tp, ISINWALL)) {
-	tp->t_quiet = 0;
+
+    if (on(*tp, ISINWALL)) {
+	tp->t_rest_hpt = 0;
 	return;
     }
-    tp->t_quiet++;
+
+    /*
+     * Check for regenerating spell points first
+     */
+    if (curp->s_power != maxp->s_power)
+	doctor_spell_points(tp);
+
+    if (curp->s_hpt == maxp->s_hpt) {
+	tp->t_rest_hpt = 0;
+	return;
+    }
+    tp->t_rest_hpt++;
+
     switch (tp->t_ctype) {
 	when C_MAGICIAN:
-	    limit = 8 - curp->s_lvl/2;
-	    new_points = curp->s_lvl/2;
-	when C_ILLUSION:
-	    limit = 8 - curp->s_lvl/2;
-	    new_points = curp->s_lvl/2;
+	case C_ILLUSION:
+	    turns_quiet = 32 - curp->s_lvl*2;
+	    new_points = curp->s_lvl/2 - 5;
 	when C_THIEF:
-	    limit = 16 - curp->s_lvl;
-	    new_points = curp->s_lvl/2 - 2;
-	when C_ASSASIN:
-	    limit = 16 - curp->s_lvl;
-	    new_points = curp->s_lvl/2 - 2;
-	when C_NINJA:
-	    limit = 16 - curp->s_lvl;
-	    new_points = curp->s_lvl/2 - 2;
+	case C_ASSASIN:
+	case C_NINJA:
+	    turns_quiet = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl/2 - 3;
 	when C_CLERIC:
-	    limit = 16 - curp->s_lvl;
-	    new_points = curp->s_lvl/2 - 3;
-	when C_DRUID:
-	    limit = 16 - curp->s_lvl;
-	    new_points = curp->s_lvl/2 - 3;
+	case C_DRUID:
+	    turns_quiet = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl/2 - 2;
 	when C_FIGHTER:
-	    limit = 32 - curp->s_lvl*2;
-	    new_points = curp->s_lvl/2 - 5;
-	when C_RANGER:
-	    limit = 32 - curp->s_lvl*2;
-	    new_points = curp->s_lvl/2 - 5;
-	when C_PALADIN:
-	    limit = 32 - curp->s_lvl*2;
-	    new_points = curp->s_lvl/2 - 5;
+	case C_RANGER:
+	case C_PALADIN:
+	    turns_quiet = 8 - curp->s_lvl/2;
+	    new_points = curp->s_lvl/2;
 	when C_MONSTER:
-	    limit = 16 - curp->s_lvl;
+	    turns_quiet = 16 - curp->s_lvl;
 	    new_points = curp->s_lvl/2 - 6;
 	otherwise:
 	    debug("What a strange character you are!");
@@ -70,29 +72,28 @@ struct thing *tp;
     ohp = curp->s_hpt;
     if (off(*tp, HASDISEASE)) {
 	if (curp->s_lvl < 8) {
-	    if (tp->t_quiet > limit)
+	    if (tp->t_rest_hpt > turns_quiet)
 		curp->s_hpt++;
 	}
-	else
-	    if (tp->t_quiet >= 15)
+	else {
+	    if (tp->t_rest_hpt >= 15) {
 		curp->s_hpt += rnd(new_points)+1;
+	    }
+	}
     }
+
     if (tp == &player) {
 	if (curp->s_lvl > 10)
-	    limit = 2;
+	    turns_quiet = 2;
 	else
-	    limit = rnd(limit/6) + 1;
-	if (ISRING(LEFT_1, R_REGEN)) curp->s_hpt += limit;
-	if (ISRING(LEFT_2, R_REGEN)) curp->s_hpt += limit;
-	if (ISRING(LEFT_3, R_REGEN)) curp->s_hpt += limit;
-	if (ISRING(LEFT_4, R_REGEN)) curp->s_hpt += limit;
-	if (ISRING(RIGHT_1, R_REGEN)) curp->s_hpt += limit;
-	if (ISRING(RIGHT_2, R_REGEN)) curp->s_hpt += limit;
-	if (ISRING(RIGHT_3, R_REGEN)) curp->s_hpt += limit;
-	if (ISRING(RIGHT_4, R_REGEN)) curp->s_hpt += limit;
+	    turns_quiet = rnd(turns_quiet/6) + 1;
+
+	/* +0 R_REGEN just eat food */
+	curp->s_hpt += ring_value(R_REGEN) * turns_quiet;
     }
     if (on(*tp, ISREGEN))
 	curp->s_hpt += curp->s_lvl/5 + 1;
+
     if (ohp != curp->s_hpt) {
 	if (curp->s_hpt >= maxp->s_hpt) {
 	    curp->s_hpt = maxp->s_hpt;
@@ -101,8 +102,82 @@ struct thing *tp;
 		tp->t_oldpos = tp->t_pos;	/* Start our trek over */
 	    }
 	}
-	tp->t_quiet = 0;
+	tp->t_rest_hpt = 0;
     }
+}
+
+
+/*
+ * doctor_spell_points:
+ *	A healing daemon that restors spell points
+ */
+
+doctor_spell_points(tp)
+struct thing *tp;
+{
+    register short turns_quiet, new_points;
+    register struct stats *curp;		/* current stats pointer */
+    register struct stats *maxp;		/* max stats pointer */
+    short opower;				/* current power */
+
+    curp = &(tp->t_stats);
+    maxp = &(tp->maxstats);
+    opower = curp->s_power;
+
+    if (curp->s_power==maxp->s_power || off(*tp, CANCAST)
+	|| (cur_armor && wear_ok(tp, cur_armor, FALSE)==FALSE)) {
+    
+	tp->t_rest_pow = 0;
+	return;
+    }
+    tp->t_rest_pow++;
+
+    switch (tp->t_ctype) {
+	when C_MAGICIAN:
+	case C_ILLUSION:
+	    turns_quiet = 8 - curp->s_lvl/2;
+	    new_points = curp->s_lvl;
+	when C_CLERIC:
+	case C_DRUID:
+	    turns_quiet = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl - 2;
+	when C_THIEF:
+	case C_ASSASIN:
+	case C_NINJA:
+	    turns_quiet = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl - 3;
+	when C_FIGHTER:
+	case C_RANGER:
+	case C_PALADIN:
+	    turns_quiet = 32 - curp->s_lvl*2;
+	    new_points = curp->s_lvl - 5;
+	when C_MONSTER:
+	    turns_quiet = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl - 6;
+	otherwise:
+	    return;
+    }
+
+    if (curp->s_lvl < 8) {
+	if (tp->t_rest_pow > turns_quiet)
+	    curp->s_power++;
+    }
+    else {
+	if (tp->t_rest_pow >= 15)
+	    curp->s_power += rnd(new_points)+1;
+    }
+
+    if (tp == &player) {		/* What if tp==monster? */
+	if (is_wearing(R_WIZARD) || is_wearing(R_PIETY))
+	    curp->s_power += ring_value(R_WIZARD) + ring_value(R_PIETY) + 1;
+	else {
+	    if (curp->s_power >= maxp->s_power)
+		curp->s_power = maxp->s_power;
+	}
+    }
+
+    if (curp->s_power != opower)
+	tp->t_rest_pow = 0;
 }
 
 /*
@@ -124,8 +199,7 @@ rollwand()
 {
     static int between = 0;
 
-    if (++between >= 4)
-    {
+    if (++between >= 4) {
 	/* Theives may not awaken a monster */
 	if ((roll(1, 6) == 4) &&
         ((player.t_ctype != C_THIEF && player.t_ctype != C_ASSASIN &&
@@ -206,7 +280,7 @@ hear()
 
 unsee()
 {
-    if (!ISWEARING(R_SEEINVIS)) {
+    if (!is_wearing(R_SEEINVIS)) {
 	turn_off(player, CANSEE);
 	msg("The tingling feeling leaves your eyes.");
     }
@@ -253,8 +327,7 @@ unphase()
 
 sight()
 {
-    if (on(player, ISBLIND))
-    {
+    if (on(player, ISBLIND)) {
 	extinguish(sight);
 	turn_off(player, ISBLIND);
 	light(&hero);
@@ -330,8 +403,7 @@ stomach()
     int power_scale;
 
     old_hunger = hungry_state;
-    if (food_left <= 0)
-    {
+    if (food_left <= 0) {
 	/*
 	 * the hero is fainting
 	 */
@@ -345,8 +417,7 @@ stomach()
 	count = 0;
 	hungry_state = F_FAINT;
     }
-    else
-    {
+    else {
 	oldfood = food_left;
 	amount =	ring_eat(LEFT_1) + ring_eat(LEFT_2) +
 			ring_eat(LEFT_3) + ring_eat(LEFT_4) +
@@ -354,10 +425,10 @@ stomach()
 			ring_eat(RIGHT_3) + ring_eat(RIGHT_4) + 
 			foodlev;
 
-	if (on(player, SUPEREAT))
+	if (on(player, SUPEREAT))	/* artifact or regeneration munchies */
 	    amount *= 2;
 
-	if (on(player, POWEREAT)) {
+	if (on(player, POWEREAT)) {	/* Used an artifact power */
 	    amount += 40;
 	    turn_off(player, POWEREAT);
 	}
@@ -368,13 +439,11 @@ stomach()
 
 	food_left -= amount * power_scale;
 
-	if (food_left < MORETIME && oldfood >= MORETIME)
-	{
+	if (food_left < MORETIME && oldfood >= MORETIME) {
 	    msg("You are starting to feel weak.");
 	    hungry_state = F_WEAK;
 	}
-	else if (food_left < 2 * MORETIME && oldfood >= 2 * MORETIME)
-	{
+	else if (food_left < 2 * MORETIME && oldfood >= 2 * MORETIME) {
 	    msg(terse ? "Getting hungry." : "You are starting to get hungry.");
 	    hungry_state = F_HUNGRY;
 	}
@@ -493,9 +562,12 @@ struct linked_list
 
     sum_monst = (struct linked_list *) monst;
     tp = THINGPTR(sum_monst);
+    turn_off(*tp, WASSUMMONED);
+    turn_off(player, HASSUMMONED);
     mname = monsters[tp->t_index].m_name;
     msg("The summoned %s phases out of existence", mname);
-    killed(NULL, sum_monst, FALSE, FALSE);
+    killed(NULL, sum_monst, NOMESSAGE, NOPOINTS);
+    --mons_summoned;
 }
 
 
@@ -520,4 +592,103 @@ shero()
     chg_str(2, FALSE, TRUE );
     chg_dext(2, FALSE, TRUE);
     turn_off(player, ISUNHERO);
+}
+
+/*
+ * uncold:
+ *	He lost his cold resistance power
+ */
+
+uncold()
+{
+    turn_off(player, NOCOLD);
+    if (!is_wearing(R_COLDRESIST)) {
+	msg("You feel a slight chill in the air.");
+    }
+}
+
+/*
+ * unhot:
+ *	He lost his fire resistance power
+ */
+
+unhot()
+{
+    turn_off(player, NOFIRE);
+    if (!is_wearing(R_FIRERESIST)) {
+	msg("You feel a flush of warmth.");
+    }
+}
+
+/*
+ * unfly:
+ *	He stopped flying
+ */
+
+unfly()
+{
+    turn_off(player, CANFLY);
+    if (!is_wearing(R_LEVITATION)) {
+	msg("You float gently to the ground.");
+    }
+}
+
+/*
+ * unbreathe:
+ *	He started needing oxygen
+ */
+
+unbreathe()
+{
+    turn_off(player, HASOXYGEN);
+    if (!is_wearing(R_BREATHE)) {
+	msg("You start huffing and puffing.");
+    }
+}
+
+/*
+ * unregen:
+ *	He stops being regenerative
+ */
+
+unregen()
+{
+    turn_off(player, ISREGEN);
+    if (!is_wearing(R_REGEN)) {
+	msg("Your metabolism slows down.");
+    }
+}
+
+/*
+ * unsupereat:
+ *	He stops being excessively hungry
+ */
+
+unsupereat()
+{
+    turn_off(player, SUPEREAT);
+    msg("You stop feeling so hungry.");
+}
+
+/*
+ * unshield:
+ *	He stops having his AC helped by magic
+ */
+
+unshield()
+{
+    turn_off(player, HASSHIELD);
+    pstats.s_arm += 2;
+    msg("Your skin feels normal.");
+}
+
+/*
+ * unmshield:
+ *	He stops ignoring thrown weapons
+ */
+
+unmshield()
+{
+    turn_off(player, HASMSHIELD);
+    msg("The fog dissapates.");
 }

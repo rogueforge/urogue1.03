@@ -1,21 +1,13 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/05/86
  */
 /*
  * This file contains functions for dealing with artifacts
  */
 
-#include "curses.h"
 #include <ctype.h>
 #include "rogue.h"
-
-#define SIZE(array)	(sizeof (array) / sizeof (*(array)))
-
-static int inbag;
-static char bag_letters[] = "zyxwvutsrqponmlkjihgfedcba";
-static char *bag_index	= bag_letters + SIZE(bag_letters) - 1;
-static char *bag_end	= bag_letters + SIZE(bag_letters) - 1;
-struct linked_list *get_bag();
+#include "death.h"
 
 /* 
  * apply an artifact
@@ -28,9 +20,9 @@ apply()
 	register int which;
 	int chance;
 
-	if ((item = get_item("apply", ARTIFACT)) == NULL)
+	if ((item = get_item("activate", ARTIFACT)) == NULL)
 	    return;
-	obj = (struct object *) ldata(item);
+	obj = OBJPTR(item);
 	which = obj->o_which;
 	if (!(obj->art_stats.ar_flags & ISACTIVE)) {
 	    chance = rnd(100);
@@ -45,7 +37,7 @@ apply()
 		}
 	    }
 	    debug("Rolled %d.", chance);
-	    if (chance < 65)
+	    if (chance < 75)
 		do_minor(obj);
 	    else if (chance < 80)
 		do_major(obj);
@@ -54,25 +46,17 @@ apply()
 	}
 	if (obj->art_stats.ar_flags & ISACTIVE) {
 	    switch (which) {
-		when TR_PURSE:
-		    do_bag(obj);
-		when TR_PHIAL:
-		    do_phial();
-		when TR_AMULET:
-		    do_amulet();
-		when TR_PALANTIR:
-		    do_palantir();
-		when TR_CROWN:
-		    do_crown();
-		when TR_SCEPTRE:
-		    do_sceptre();
-		when TR_SILMARIL:
-		    do_silmaril();
-		when TR_WAND:
-		    do_wand();
-		otherwise:
-		    msg("Nothing happens.");
-		    return;
+	    when TR_PURSE:	do_bag(obj);
+	    when TR_PHIAL:	do_phial();
+	    when TR_AMULET:	do_amulet();
+	    when TR_PALANTIR:	do_palantir();
+	    when TR_CROWN:	do_crown();
+	    when TR_SCEPTRE:	do_sceptre();
+	    when TR_SILMARIL:	do_silmaril();
+	    when TR_WAND:	do_wand();
+	    otherwise:
+		nothing_message(ISCURSED);
+		return;
 	    }
 	}
 	if (rnd(pstats.s_lvl) < 6)
@@ -119,7 +103,7 @@ make_artifact()
         mpos = 0;
 	debug("Artifact possession and picked flags : %x %x.", 
 		has_artifact, picked_artifact);
-	for(i = 0; i < MAXARTIFACT; i++) {
+	for(i = 0; i < maxartifact; i++) {
 	   if (!possessed(i) && arts[i].ar_level <= level)
 		return TRUE;
 	}
@@ -134,12 +118,12 @@ new_artifact(which, cur)
 int which;
 register struct object *cur;
 {
-	if (which >= MAXARTIFACT) {
+	if (which >= maxartifact) {
 	    debug("Bad artifact %d.  Random one created.", which);
-	    which = rnd(MAXARTIFACT);
+	    which = rnd(maxartifact);
 	}
 	if (which < 0) {
-	    for(which = 0; which < MAXARTIFACT; which++)
+	    for(which = 0; which < maxartifact; which++)
 		if (!possessed(which) && arts[which].ar_level <= level)
 		    break;
 	}
@@ -226,8 +210,8 @@ struct object *tr;
 		    msg("A pillar of flame leaps up beside you.");
 		else
 		    msg("You feel something very hot nearby.");
-		rp = roomin(&hero);
-		if (ntraps + 1 < MAXTRAPS + MAXTRAPS && 
+		
+		if (ntraps + 1 < 2*MAXTRAPS && 
 				fallpos(&hero, &fpos, TRUE)) {
 			mvaddch(fpos.y, fpos.x, FIRETRAP);
 			traps[ntraps].tr_type = FIRETRAP;
@@ -235,7 +219,7 @@ struct object *tr;
 			traps[ntraps].tr_show = FIRETRAP;
 			traps[ntraps].tr_pos.y = fpos.y;
 			traps[ntraps++].tr_pos.x = fpos.x;
-			if (rp != NULL) {
+			if ((rp = roomin(&hero)) != NULL) {
 			    rp->r_flags &= ~ISDARK;
 			    light(&hero);
 			    mvwaddch(cw, hero.y, hero.x, PLAYER) ;
@@ -269,8 +253,7 @@ struct object *tr;
 		    msg("You feel stronger and clumsier now.");
 		else if (change < 0)
 		    msg("You feel weaker and more dextrous now.");
-		else
-		    msg("Nothing happens.");
+		else nothing_message(ISCURSED);
 	}
 	when 18:
 		msg("You begin to itch all over.");
@@ -513,7 +496,7 @@ struct object *tr;
 		msg("Wait!  Walls are appearing out of nowhere!");
 		new_level(MAZELEV);
 	when 83:
-		blue_light(FALSE, TRUE);
+		blue_light(ISCURSED);
 	when 84:
 		msg("Your mind goes blank for a moment.");
 		wclear(cw);
@@ -529,19 +512,14 @@ struct object *tr;
 		    turn_on(player, ISDEAF);
 		    fuse(hear, 0, 2*PHASEDURATION, AFTER);
 		}
-	when 86: {
-		register struct linked_list *item;
-		register struct object *obj;
+	when 86:
+	{
+	  int baf_curse();
+	  object *apply_to_bag();
 
-		for (item = pack; item != NULL; item = next(item)) {
-		    obj = OBJPTR(item);
-		    if (obj->o_type != ARTIFACT && rnd(8) == 0) {
-			obj->o_flags |= ISCURSED;
-			obj->o_flags &= ~ISBLESSED;
-		    }
-		}
-		if (off(player, ISUNSMELL))
-		    msg("You smell a faint trace of burning sulfur.");
+	  apply_to_bag(pack, NULL, NULL, baf_curse, NULL);
+	  if (off(player, ISUNSMELL))
+	    msg("You smell a faint trace of burning sulfur.");
 	}
 	when 87:
 		msg("You have contracted a parasitic infestation.");
@@ -558,23 +536,23 @@ struct object *tr;
 	when 89:
 		if (cur_weapon != NULL) 
 		    msg("You feel your %s get very hot.", 
-			inv_name(cur_weapon, TRUE));
+			inv_name(cur_weapon, DROP));
 	when 90:
 		if (cur_weapon != NULL) 
 		    msg("Your %s glows white for an instant.",
-			inv_name(cur_weapon, TRUE));
+			inv_name(cur_weapon, DROP));
 	when 91:
 		if (cur_armor != NULL) 
-		    msg("Your %s gets very hot.", inv_name(cur_armor, TRUE));
+		    msg("Your %s gets very hot.", inv_name(cur_armor, DROP));
 	when 92:
 		if (cur_weapon != NULL) 
 		    msg("Your %s suddenly feels very cold.",
-			inv_name(cur_weapon, TRUE));
+			inv_name(cur_weapon, DROP));
 	when 93:
 		if (cur_armor != NULL)
 		    msg("Your armor is covered by an oily film.");
 	when 94:
-		read_scroll(S_CREATE, FALSE);
+		read_scroll(&player, S_CREATE, ISNORMAL);
 	when 95:
 		lower_level(D_POTION);
 	when 96: {
@@ -586,7 +564,8 @@ struct object *tr;
 			    continue;
 			delta.x = x;
 			delta.y = y;
-			do_zap(TRUE, WS_POLYMORPH, FALSE);
+			do_zap(&player, TRUE, WS_POLYMORPH, 
+				rnd(2) ? ISCURSED : ISNORMAL);
 		    }
 		}
 	}
@@ -599,17 +578,31 @@ struct object *tr;
 			    continue;
 			delta.x = x;
 			delta.y = y;
-			do_zap(TRUE, WS_INVIS, FALSE);
+			do_zap(&player, TRUE, WS_INVIS, ISNORMAL);
 		    }
 		}
 	}
 	otherwise:
 		tr->art_stats.ar_flags &= ~ISACTIVE;
-		msg("You hear a click coming from %s.", inv_name(tr, TRUE));
+		msg("You hear a click coming from %s.", inv_name(tr, DROP));
     }
 }
+
 /* 
  * do_major: major malevolent effects
+ *
+ * 0.	read_scroll(S_SELFTELEPORT, ISCURSED)
+ * 1.	PERMBLIND for twice normal duration
+ * 2.	new_level(THRONE);
+ * 3.	turn_on(player, SUPEREAT);
+ * 4.	lengthen(noslow, 20 + rnd(20));
+ * 5.	lower_level(D_POTION) * roll(1,4)
+ * 6.	change stats
+ * 7.	FIRETRAP
+ * 8.	armor crumbles
+ * 9.	weapon crumbles
+ * 10.	weapon crumbles
+ * 11.	curse weapon 
  */
 do_major(tr)
 struct object *tr;
@@ -629,139 +622,147 @@ struct object *tr;
     }
     debug("Rolled %d.", which);
     switch (which) {
-	when 0:
-		level = level * 3 + 10 + rnd(10);
-		new_level(NORMLEV);
-		mpos = 0;
-		msg("You are banished to the lower regions.");
-	when 1:
-		if (on(player, ISBLIND)) {
-		    msg("The cloak of darkness deepens.");
-		    extinguish(sight);
-		    fuse(sight, 0, 4*SEEDURATION, AFTER);
-		}
-		else {
-		    msg("A cloak of darkness falls around you.");
-		    fuse(sight, 0, 2*SEEDURATION, AFTER);
-		}
-		turn_on(player, ISBLIND);
-		turn_on(player, PERMBLIND);
-		look(FALSE);
-	when 2:
-		new_level(THRONE);
-	when 3:
-		msg("You feel very warm all over.");
-		turn_on(player, SUPEREAT);
-	when 4:
-		msg("You feel yourself moving %sslower.",
-		    on(player, ISSLOW) ? "even " : "");
-		if (on(player, ISSLOW))
-		    lengthen(noslow, 20 + rnd(20));
-		else {
-		    turn_on(player, ISSLOW);
-		    player.t_turn = TRUE;
-		    fuse(noslow, 0, 20 + rnd(20), AFTER);
-		}
-	when 5: {
-		register int num, i;
-
-		num = roll(1,4);
-
-		for (i = 1; i < num; i++)
-		    lower_level(D_POTION);
+    when 0:
+	read_scroll(&player, S_SELFTELEP, ISCURSED);
+    when 1:
+	/* not quaff(&player, P_SEEINVIS, ISCURSED) because of R_SEEINVIS */
+	if (on(player, ISBLIND)) {
+	    msg("The gloom around you thickens.");
+	    lengthen(sight, 2*SEEDURATION);
 	}
-	when 6:
-		if (rnd(2))
-		    add_intelligence(TRUE);
-		if (rnd(2))
-		    chg_dext(-1, TRUE, FALSE);
-		if (rnd(2))
-		    chg_str(-1, TRUE, FALSE);
-		if (rnd(2))
-		    add_wisdom(TRUE);
-		if (rnd(2))
-		    add_const(TRUE);
-	when 7: {
-		static coord fires;
-		register struct room *rp;
-
-		if (ntraps + 1 >= MAXTRAPS) {
-		    msg("You feel a puff of hot air.");
-		    return;
-		}
-		for (; ntraps < MAXTRAPS + MAXTRAPS; ntraps++) {
-		    if (!fallpos(&hero, &fires, TRUE))
-		        break;
-		    mvaddch(fires.y, fires.x, FIRETRAP);
-		    traps[ntraps].tr_type = FIRETRAP;
-		    traps[ntraps].tr_flags |= ISFOUND;
-		    traps[ntraps].tr_show = FIRETRAP;
-		    traps[ntraps].tr_pos.x = fires.x;
-		    traps[ntraps].tr_pos.y = fires.y;
-		    if ((rp = roomin(&hero)) != NULL)
-			rp->r_flags &= ~ISDARK;
-		}
+	else {
+	    msg("A mantle of darkness falls around you.");
+	    fuse(sight, 0, 2*SEEDURATION, AFTER);
+	    turn_on(player, ISBLIND);
 	}
-	when 8: {
-		register struct linked_list *item;
-		register struct object *obj;
-
-		if (cur_weapon == NULL) {
-		    msg("You feel your hands tingle a moment.");
-		    return;
-		}
-		for (item = pack; item != NULL; item = next(item))
-		    if ((obj = OBJPTR(item)) == cur_weapon)
-			break;
-		if (obj->o_flags & ISMETAL)
-		    msg("Your %s melts and disappears.", inv_name(obj, TRUE));
-		else
-		    msg("Your %s crumbles in your hands.",
-				inv_name(obj, TRUE));
-		obj->o_flags &= ~ISCURSED;
-		dropcheck(obj);
-		detach(pack, item);
-		freeletter(item);
-		inpack--;
-		discard(item);
+	turn_on(player, PERMBLIND);	/* Untouched by P_SEEINVIS */
+	look(FALSE);
+    when 2:
+	new_level(THRONE);
+    when 3:
+	/* Turn off other body-affecting spells */
+	if (on(player, ISREGEN)) {
+	    extinguish(unregen);
+	    turn_off(player, ISREGEN);
 	}
-	when 9: {
-		register struct linked_list *item;
-		register struct object *obj;
-
-		if (cur_armor == NULL) {
-		    msg("Your body tingles a moment.");
-		    return;
-		}
-		for (item = pack; item != NULL; item = next(item))
-		    if ((obj = OBJPTR(item)) == cur_armor)
-			break;
-		msg("Your %s crumbles into small black powdery dust.",
-				inv_name(obj, TRUE));
-		obj->o_flags &= ~ISCURSED;
-		dropcheck(obj);
-		detach(pack, item);
-		freeletter(item);
-		inpack--;
-		discard(item);
+	if (on(player, NOCOLD)) {
+	    extinguish(uncold);
+	    turn_off(player, NOCOLD);
 	}
-	otherwise:
-		if (cur_weapon == NULL) {
-		    msg("Your hand glows yellow for an instant.");
-		    return;
-		}
-		msg("Your %s glows bright red for a moment.", 
-			weaps[cur_weapon->o_which].w_name);
-	        if (cur_weapon->o_hplus > 0)
-		    cur_weapon->o_hplus = -rnd(3);
-		else
-		    cur_weapon->o_hplus -= rnd(3);
-	        if (cur_weapon->o_dplus > 0)
-		    cur_weapon->o_dplus = -rnd(3);
-		else
-		    cur_weapon->o_dplus -= rnd(3);
-		cur_weapon->o_flags = ISCURSED|ISLOST;
-		cur_weapon->o_ac = 0;
+	if (on(player, NOFIRE)) {
+	    extinguish(unhot);
+	    turn_off(player, NOFIRE);
+	}
+	if (on(player, SUPEREAT)) {
+	    lengthen(unsupereat, 2*PHASEDURATION);
+	    msg("Your body temperature rises still further.");
+	}
+	else {
+	    msg("You feel very warm all over.");
+	    fuse(unsupereat, 0, 2*PHASEDURATION, AFTER);
+	    turn_on(player, SUPEREAT);
+	}
+    when 4:
+	msg("You feel yourself moving %sslower.",
+	    on(player, ISSLOW) ? "even " : "");
+	if (on(player, ISSLOW))
+	    lengthen(noslow, PHASEDURATION);
+	else {
+	    turn_on(player, ISSLOW);
+	    player.t_turn = TRUE;
+	    fuse(noslow, 0, PHASEDURATION, AFTER);
+	}
+    when 5: {
+	register int i, num = roll(1,4);
+
+	    for (i = 1; i < num; i++)
+		lower_level(D_POTION);
+    }
+    when 6:
+	if (rnd(2))
+	    add_intelligence(TRUE);
+	if (rnd(2))
+	    chg_dext(-1, TRUE, FALSE);
+	if (rnd(2))
+	    chg_str(-1, TRUE, FALSE);
+	if (rnd(2))
+	    add_wisdom(TRUE);
+	if (rnd(2))
+	    add_const(TRUE);
+    when 7: {
+	static coord fires;
+	register struct room *rp;
+
+	if (ntraps + 1 >= MAXTRAPS) {
+	    msg("You feel a puff of hot air.");
+	    return;
+	}
+	for (; ntraps < 2*MAXTRAPS; ntraps++) {
+	    if (!fallpos(&hero, &fires, TRUE))
+		break;
+	    mvaddch(fires.y, fires.x, FIRETRAP);
+	    traps[ntraps].tr_type = FIRETRAP;
+	    traps[ntraps].tr_flags |= ISFOUND;
+	    traps[ntraps].tr_show = FIRETRAP;
+	    traps[ntraps].tr_pos.x = fires.x;
+	    traps[ntraps].tr_pos.y = fires.y;
+	    if ((rp = roomin(&hero)) != NULL)
+		rp->r_flags &= ~ISDARK;
+	}
+    }
+    when 8: {
+	register object *obj;
+	int baf_cur_weapon();
+	object *apply_to_bag();
+
+	if (cur_weapon == NULL) {
+	    msg("You feel your hands tingle a moment.");
+	    pstats.s_dmg = "1d2";
+	    return;
+	}
+	obj = apply_to_bag(pack, NULL, NULL, baf_cur_weapon, NULL);
+	if (obj->o_flags & ISMETAL)
+	    msg("Your %s melts and disappears.", inv_name(obj, TRUE));
+	else
+	    msg("Your %s crumbles in your hands.", inv_name(obj, TRUE));
+	obj->o_flags &= ~ISCURSED;
+	dropcheck(obj);
+	del_bag(pack, obj);
+
+    }
+    when 9: {
+	register object *obj;
+	object *apply_to_bag();
+	int baf_cur_armor();
+	if (cur_armor == NULL) {
+	    msg("Your body tingles a moment.");
+	    return;
+	}
+	obj = apply_to_bag(pack, NULL, NULL, baf_cur_armor, NULL);
+	msg("Your %s crumbles into small black powdery dust.",
+	      inv_name(obj, TRUE));
+	obj->o_flags &= ~ISCURSED;
+	dropcheck(obj);
+	del_bag(pack, obj);
+    }
+    otherwise:
+	if (cur_weapon == NULL) {
+	    msg("Your hand glows yellow for an instant.");
+	    pstats.s_dmg = "1d3";
+	    return;
+	}
+	msg("Your %s glows bright red for a moment.", 
+		weaps[cur_weapon->o_which].w_name);
+	if (cur_weapon->o_hplus > 0)
+	    cur_weapon->o_hplus = -rnd(3);
+	else
+	    cur_weapon->o_hplus -= rnd(3);
+	if (cur_weapon->o_dplus > 0)
+	    cur_weapon->o_dplus = -rnd(3);
+	else
+	    cur_weapon->o_dplus -= rnd(3);
+	cur_weapon->o_flags = ISCURSED|ISLOST;
+	cur_weapon->o_ac = 0;
     }
 }
 
@@ -781,7 +782,7 @@ do_phial()
 	return;
     }
     if (which < 0 || which > 1) {
-	add_line( "[a] light");
+	add_line( "[a] total healing");
 	add_line( "[b] monster confusion");
 	end_line();
 	msg("");
@@ -801,10 +802,12 @@ do_phial()
     else
 	msg("Your attempt is successsful.");
     switch (which) {
-	when 0: read_scroll(S_LIGHT, TRUE);
+	when 0:
+	    pstats.s_hpt   = max_stats.s_hpt   += rnd(pstats.s_lvl) + 1;
+	    pstats.s_power = max_stats.s_power += rnd(pstats.s_lvl) + 1;
 	when 1:
 		if (get_dir()) 
-		    do_zap(TRUE, WS_CONFMON, FALSE);
+		    do_zap(&player, TRUE, WS_CONFMON, ISBLESSED);
 	otherwise:
 		msg("What a strange thing to do!!");
     }
@@ -857,12 +860,12 @@ do_palantir()
     else
 	msg("Your attempt is successful.");
     switch (which) {
-	when 0: quaff(P_MFIND, FALSE);
-	when 1: read_scroll(S_GFIND, FALSE);
-	when 2: quaff(P_TFIND, FALSE);
-	when 3: read_scroll(S_FOODFIND, FALSE);
-	when 4: read_scroll(S_TELEP, FALSE);
-	when 5: quaff(P_CLEAR, FALSE);
+	when 0: quaff(&player, P_MONSTDET, ISNORMAL);
+	when 1: read_scroll(&player, S_GFIND, ISNORMAL);
+	when 2: quaff(&player, P_TREASDET, ISNORMAL);
+	when 3: read_scroll(&player, S_FOODDET, ISNORMAL);
+	when 4: read_scroll(&player, S_SELFTELEP, ISNORMAL);
+	when 5: quaff(&player, P_CLEAR, ISNORMAL);
 	otherwise:
 		msg("What a strange thing to do!!");
     }
@@ -905,8 +908,8 @@ do_silmaril()
     else
 	msg("Your attempt is successful.");
     switch (which) {
-	when 0: read_scroll(S_MAP, FALSE);
-	when 1: read_scroll(S_PETRIFY, FALSE);
+	when 0: read_scroll(&player, S_MAP, ISNORMAL);
+	when 1: read_scroll(&player, S_PETRIFY, ISNORMAL);
 	when 2:
 		msg("A stairwell opens beneath your feet and you go down.");
 		level++;
@@ -964,7 +967,7 @@ do_amulet()
 		char *colour, *temp;
 
 		for (item = mlist; item != NULL; item = next(item)) {
-		    tp = (struct thing *) ldata(item);
+		    tp = THINGPTR(item);
 		    count++;
 		    max_nasty = max(max_nasty, 
 			(10 - tp->t_stats.s_arm) * tp->t_stats.s_hpt);
@@ -1012,7 +1015,7 @@ do_amulet()
 
 		msg("The amulet glows %s and %s.", colour, temp);
 	}
-	when 1: quaff(P_INVIS, FALSE);
+	when 1: quaff(&player, P_INVIS, ISNORMAL);
 	otherwise:
 		msg("What a strange thing to do!!");
     }
@@ -1023,71 +1026,78 @@ do_amulet()
  * as a bag of holding
  */
 do_bag(obj)
-struct object *obj;
+     struct object *obj;
 {
-    register int which, limit;
+  register int which, limit;
+  object *get_object();
 
-    /* Prompt for action */
-    msg("How do you wish to apply the Magic Purse of Yendor (* for list)? ");
-
-    which = (short) ((getchar() & 0177) - 'a');
-    if (which == (short) ESCAPE - (short) 'a') {
-	after = FALSE;
-	return;
+  /* Prompt for action */
+  msg("How do you wish to apply the Magic Purse of Yendor (* for list)? ");
+  
+  which = (short) ((getchar() & 0177) - 'a');
+  if (which == (short) ESCAPE - (short) 'a') 
+    {
+      after = FALSE;
+      return;
     }
-
-    limit = 2;
-    if (is_carrying(TR_AMULET))
-	limit += 1;
-
-    if (which < 0 || which > limit) {
+  
+  limit = 2;
+  if (is_carrying(TR_AMULET))
+    limit += 1;
+  
+  if (which < 0 || which > limit)
+    {
+      msg("");
+      add_line( "[a] inventory");
+      add_line( "[b] add to bag");
+      add_line( "[c] remove from bag");
+      if (limit >= 3)
+	add_line( "[d] see invisible");
+      end_line();
+      msg("Which power do you wish to use?");
+      which = (short) ((getchar() & 0177) - 'a');
+      while (which < 0 || which > limit) {
+	if (which == (short) ESCAPE - (short) 'a') 
+	  {
+	    after = FALSE;
+	    return;
+	  }
 	msg("");
-	add_line( "[a] inventory");
-	add_line( "[b] add to bag");
-	add_line( "[c] remove from bag");
-	if (limit >= 3)
-	    add_line( "[d] see invisible");
-	end_line();
-	msg("Which power do you wish to use?");
+	msg("Please enter one of the listed powers: ");
 	which = (short) ((getchar() & 0177) - 'a');
-	while (which < 0 || which > limit) {
-	    if (which == (short) ESCAPE - (short) 'a') {
-		after = FALSE;
-		return;
-	    }
-	    msg("");
-	    msg("Please enter one of the listed powers: ");
-	    which = (short) ((getchar() & 0177) - 'a');
-	}
-	msg("Your attempt is successful.");
+      }
+      msg("Your attempt is successful.");
     }
     else
 	msg("Your attempt is successful.");
     switch (which) {
 	when 0:
-		bag_inventory(obj->art_stats.t_art);
-	when 1:
-		add_bag(&obj->art_stats.t_art);
-	when 2: {
-		register struct linked_list *item;
-		register struct object *op;
-
-		if ((item = get_bag(&obj->art_stats.t_art)) != NULL) {
-		    detach(obj->art_stats.t_art,item);
-		    delbagletter(item);
-		    inbag--;
-		    if (add_pack(item, FALSE) == FALSE) {
-			op = (struct object *) ldata(item);
-			op->o_pos = hero;
-			fall(&player, item, TRUE);
-		    }
-		}
+	    inventory(obj->art_stats.t_art, NULL);
+	when 1: {
+	    register object *new_obj_p;	/* what the user selected */
+	    if ((new_obj_p = get_object(pack, "add", NULL, NULL)) != NULL) {
+		rem_pack(new_obj_p);		/* free up pack slot */
+ 		push_bag(&obj->art_stats.t_art, new_obj_p, new_obj_p->o_type);
+		pack_report(new_obj_p, FALSE, "You just added ");
+  	    }
 	}
+	when 2: {
+	    register object *obj_p;
+	    register linked_list *item_p; 
+	    linked_list *make_item();
+
+	    if ((obj_p = get_object(obj->art_stats.t_art, "remove", NULL, NULL))
+		!= NULL) {
+		item_p = make_item(obj_p);	/* attach upper structure */
+		if (add_pack(item_p, FALSE) != FALSE) 
+		    pop_bag(obj->art_stats.t_art, obj_p);
+		}
+	    }
 	when 3: 
-		quaff(P_SEEINVIS, FALSE);
+	    quaff(&player, P_SEEINVIS, ISNORMAL);
 	otherwise:
-		msg("What a strange thing to do!!");
-    }
+	    msg("What a strange thing to do!!");
+	}
 }
 
 /*
@@ -1159,20 +1169,20 @@ do_sceptre()
 
     switch (which) {
 	when 0: if (get_dir()) 
-		    do_zap(TRUE, WS_CANCEL, FALSE);
+		    do_zap(&player, TRUE, WS_CANCEL, ISBLESSED);
 	when 1: if (get_dir()) 
-		    do_zap(TRUE, WS_POLYMORPH, FALSE);
+		    do_zap(&player, TRUE, WS_POLYMORPH, ISBLESSED);
 	when 2: if (get_dir()) 
-		    do_zap(TRUE, WS_SLOW_M, FALSE);
+		    do_zap(&player, TRUE, WS_SLOW_M, ISBLESSED);
 	when 3: if (get_dir()) 
-		    do_zap(TRUE, WS_TELMON, FALSE);
+		    do_zap(&player, TRUE, WS_MONSTELEP, ISBLESSED);
 	when 4: if (get_dir()) 
-		    do_zap(TRUE, WS_CONFMON, FALSE);
+		    do_zap(&player, TRUE, WS_CONFMON, ISBLESSED);
 	when 5: if (get_dir()) 
-		    do_zap(TRUE, WS_PARALYZE, FALSE);
+		    do_zap(&player, TRUE, WS_PARALYZE, ISBLESSED);
 	when 6: if (get_dir()) 
-		    do_zap(TRUE, WS_DRAIN, FALSE);
-	when 7: quaff(P_SMELL, FALSE);
+		    do_zap(&player, TRUE, WS_DRAIN, ISBLESSED);
+	when 7: quaff(&player, P_SMELL, ISNORMAL);
 	otherwise:
 		msg("What a strange thing to do!!");
     }
@@ -1194,16 +1204,16 @@ do_wand()
 	return;
     }
 
-    if (which < 0 || which >= MAXSTICKS) {
+    if (which < 0 || which >= maxsticks) {
 	msg("");
-	for (i = 0; i < MAXSTICKS; i++) {
+	for (i = 0; i < maxsticks; i++) {
 	    sprintf(prbuf, "[%c] %s", i + 'a', ws_magic[i].mi_name);
 	    add_line(prbuf);
 	}
 	end_line();
 	msg("Which power do you wish to use?");
 	which = (short) ((getchar() & 0177) - 'a');
-	while (which < 0 || which >= MAXSTICKS) {
+	while (which < 0 || which >= maxsticks) {
 	    if (which == (short) ESCAPE - (short) 'a') {
 		after = FALSE;
 		return;
@@ -1219,14 +1229,14 @@ do_wand()
 
     if (rnd(pstats.s_lvl) < 12) {
 	msg("Your finger slips.");
-	which = rnd(MAXSTICKS);
+	which = rnd(maxsticks);
 	if (wizard) {
 	    msg("What wand? (%d)", which);
 	    if(get_str(prbuf,cw) == NORM) {
 		which = atoi(prbuf);
-		if(which < 0 || which >= MAXSTICKS) {
+		if(which < 0 || which >= maxsticks) {
 		    msg("Invalid selection.");
-		    which = rnd(MAXSTICKS);
+		    which = rnd(maxsticks);
 		    msg("Rolled %d.", which);
 		}
 	    }
@@ -1234,7 +1244,7 @@ do_wand()
     }
 
     if (get_dir()) 
-	do_zap(TRUE, which, FALSE);
+	do_zap(&player, TRUE, which, ISBLESSED);
 }
 
 /*
@@ -1292,328 +1302,83 @@ do_crown()
     else
 	msg("Your attempt is successful.");
     switch (which) {
-	when 0: 
-		if (off(player, POWERSTR)) {
-		    turn_on(player, POWERSTR);
-		    chg_str(10, FALSE, FALSE);
-		    msg("You feel much stronger now.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 1: 
-		if (off(player, POWERINTEL)) {
-		    pstats.s_intel += 10;
-		    turn_on(player, POWERINTEL);
-		    msg("You feel much more intelligent now.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 2: 
-		if (off(player, POWERWISDOM)) {
-		    pstats.s_wisdom += 10;
-		    turn_on(player, POWERWISDOM);
-		    msg("Your feel much wiser know.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 3: 
-		if (off(player, POWERDEXT)) {
-		    turn_on(player, POWERDEXT);
-		    chg_dext(10, FALSE, FALSE);
-		    msg("You feel much more dextrous now.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 4: 
-		if (off(player, POWERCONST)) {
-		    pstats.s_const += 10;
-		    turn_on(player, POWERCONST);
-		    msg("You feel much healthier now.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 5: 
-		if (on(player, POWERSTR)) {
-		    turn_off(player, POWERSTR);
-		    chg_str(-10, FALSE, FALSE);
-		    msg("Your muscles bulge less now.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 6: 
-		if (on(player, POWERINTEL)) {
-		    pstats.s_intel = max(pstats.s_intel - 10, 
-				3 + ring_value(R_ADDINTEL));
-		    turn_off(player, POWERINTEL);
-		    msg("You feel less intelligent now.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 7: 
-		if (on(player, POWERWISDOM)) {
-		    pstats.s_wisdom = max(pstats.s_wisdom - 10,
-				3 + ring_value(R_ADDWISDOM));
-		    turn_off(player, POWERWISDOM);
-		    msg("You feel less wise now.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 8: 
-		if (on(player, POWERDEXT)) {
-		    turn_off(player, POWERDEXT);
-		    chg_dext(-10, FALSE, FALSE);
-		    msg("You feel less dextrous now.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 9: 
-		if (on(player, POWERCONST)) {
-		    pstats.s_const -= 10;
-		    turn_off(player, POWERCONST);
-		    msg("You feel less healthy now.");
-		}
-		else
-		    msg("Nothing happens.");
-	when 10:
-		quaff(P_DISGUISE, FALSE);
-	when 11:
-		quaff(P_SHERO, FALSE);
-	otherwise:
-		msg("What a strange thing to do!!");
-    }
-}
-
-/*
- * add_bag:
- *	move an object from the bag to the bag of holding
- */
-add_bag(bag)
-register struct linked_list **bag;
-{
-    register struct linked_list *ip, *lp;
-    register struct object *obj, *op;
-    struct linked_list *item;
-    bool exact;
-
-    if ((item = get_item("add", 0)) == NULL) 
-	return;
-
-    obj = (struct object *) ldata(item);
-    if (obj->o_type == ARTIFACT && obj->o_which == TR_PURSE) {
-	msg("Even wizards can't do that!");
-	return;
-    }
-
-    if (!dropcheck(obj))
-	return;
-
-    if (obj->o_group) {
-	for (ip = *bag; ip != NULL; ip = next(ip)) {
-	    op = (struct object *) ldata(ip);
-	    if (op->o_group == obj->o_group) {
-		op->o_count++;
-		discard(item);
-		item = ip;
-		goto added;
-	    }
+    when 0: 
+	if (off(player, POWERSTR)) {
+	    turn_on(player, POWERSTR);
+	    chg_str(10, FALSE, FALSE);
+	    msg("You feel much stronger now.");
 	}
-    }
-
-    exact = FALSE;
-    for (ip = *bag; ip != NULL; ip = next(ip)) {
-	op = (struct object *) ldata(ip);
-	if (obj->o_type == op->o_type)
-	    break;
-    }
-
-    if (ip == NULL) {
-	for (ip = *bag; ip != NULL; ip = next(ip)) {
-	    op = (struct object *) ldata(ip);
-	    if (op->o_type != FOOD)
-		break;
-	    lp = ip;
+	else nothing_message(ISCURSED);
+    when 1: 
+	if (off(player, POWERINTEL)) {
+	    pstats.s_intel += 10;
+	    turn_on(player, POWERINTEL);
+	    msg("You feel much more intelligent now.");
 	}
-    }
-    else {
-	while (ip != NULL && op->o_type == obj->o_type) {
-	    if (op->o_which == obj->o_which) {
-		exact = TRUE;
-		break;
-	    }
-	    lp = ip;
-	    if ((ip = next(ip)) == NULL)
-		break;
-	    op = (struct object *) ldata(ip);
+	else nothing_message(ISCURSED);
+    when 2: 
+	if (off(player, POWERWISDOM)) {
+	    pstats.s_wisdom += 10;
+	    turn_on(player, POWERWISDOM);
+	    msg("Your feel much wiser know.");
 	}
-    }
-
-    if ((ip == NULL || !exact || !ISMULT(obj->o_type))
-	&& inbag == MAXPACK - 1) {
-	    msg("Your bag has no more room.");
-	    return;
-    }
-
-    detach(pack, item);
-    inpack--;
-    freeletter(item);
-    updpack(FALSE);
-    inbag++;
-    bagletter(item);
-
-    if (ip == NULL) {
-	if (*bag == NULL)
-	    *bag = item;
-	else {
-	    lp->l_next = item;
-	    item->l_prev = lp;
-	    item->l_next = NULL;
+	else nothing_message(ISCURSED);
+    when 3: 
+	if (off(player, POWERDEXT)) {
+	    turn_on(player, POWERDEXT);
+	    chg_dext(10, FALSE, FALSE);
+	    msg("You feel much more dextrous now.");
 	}
-    }
-    else {
-	if (exact && ISMULT(obj->o_type)) {
-	    op->o_count += obj->o_count;
-	    discard(item);
-	    delbagletter(item);
-	    item = ip;
-	    goto added;
+	else nothing_message(ISCURSED);
+    when 4: 
+	if (off(player, POWERCONST)) {
+	    pstats.s_const += 10;
+	    turn_on(player, POWERCONST);
+	    msg("You feel much healthier now.");
 	}
-	if ((item->l_prev = prev(ip)) != NULL)
-	    item->l_prev->l_next = item;
-	else
-	    *bag = item;
-	item->l_next = ip;
-	ip->l_prev = item;
-    }
-added:
-    obj = (struct object *) ldata(item);
-    msg("Added %s (%c).", inv_name(obj, !terse), bag_char(obj,*bag));
-    return;
-}
-
-/*
- * get_bag:
- *	pick something out of bag
- */
-struct linked_list *
-get_bag(bag)
-register struct linked_list **bag;
-{
-    reg struct linked_list *obj, *pit, *savepit;
-    struct object *pob;
-    reg char ch, och, anr;
-    int cnt;
-
-    if (*bag == NULL) {
-	msg("You don't have anything in your bag.");
-	return NULL;
-    }
-    for(;;) {
-	msg("remove what (* for list)? ");
-	ch = readchar();
-	mpos = 0;
-	if (ch == ESCAPE) {		/* abort if escape hit */
-	    after = FALSE;
-	    msg("");		/* clear display */
-	    return NULL;
+	else nothing_message(ISCURSED);
+    when 5: 
+	if (on(player, POWERSTR)) {
+	    turn_off(player, POWERSTR);
+	    chg_str(-10, FALSE, FALSE);
+	    msg("Your muscles bulge less now.");
 	}
-	if (ch == '*') {
-	    char b[LINELEN];
-
-	    pit = *bag;		/* point to bag */
-	    cnt = 0;
-	    for (ch = 'a'; pit != NULL ; pit = next(pit), ch++) {
-		pob = OBJPTR(pit);
-		sprintf(b,"%c) %s",pit->l_letter,inv_name(pob,FALSE));
-		add_line(b);
-	    }
-	    end_line();
-	    msg("remove what? ");
-	    anr = FALSE;
-	    do {
-		ch = readchar();
-		if (isupper(ch))
-		    ch = tolower(ch);
-		if (isalpha(ch) || ch == ESCAPE)
-		    anr = TRUE; 
-	    } while(!anr);		/* do till we got it right */
-	    if(ch == ESCAPE) {
-		after = FALSE;
-		msg("");		/* clear top line */
-		return NULL;	/* all done if abort */
-	    }
+	else nothing_message(ISCURSED);
+    when 6: 
+	if (on(player, POWERINTEL)) {
+	    pstats.s_intel = max(pstats.s_intel - 10, 
+			3 + ring_value(R_ADDINTEL));
+	    turn_off(player, POWERINTEL);
+	    msg("You feel less intelligent now.");
 	}
-	for(obj = *bag,och = 'a'; obj != NULL;obj = next(obj),och++)
-	    if (ch == obj->l_letter)
-		break;
-	if (obj == NULL) {
-	    msg("Not in bag.");
-	    continue;
+	else nothing_message(ISCURSED);
+    when 7: 
+	if (on(player, POWERWISDOM)) {
+	    pstats.s_wisdom = max(pstats.s_wisdom - 10,
+			3 + ring_value(R_ADDWISDOM));
+	    turn_off(player, POWERWISDOM);
+	    msg("You feel less wise now.");
 	}
-	else
-	    return (obj);
+	else nothing_message(ISCURSED);
+    when 8: 
+	if (on(player, POWERDEXT)) {
+	    turn_off(player, POWERDEXT);
+	    chg_dext(-10, FALSE, FALSE);
+	    msg("You feel less dextrous now.");
+	}
+	else nothing_message(ISCURSED);
+    when 9: 
+	if (on(player, POWERCONST)) {
+	    pstats.s_const -= 10;
+	    turn_off(player, POWERCONST);
+	    msg("You feel less healthy now.");
+	}
+	else nothing_message(ISCURSED);
+    when 10:
+	quaff(&player, P_DISGUISE, ISNORMAL);
+    when 11:
+	quaff(&player, P_SHERO, ISNORMAL);
+    otherwise:
+	msg("What a strange thing to do!!");
     }
-}
-
-/*
- * bag_inventory:
- *	list what is in the bag
- */
-bag_inventory(list)
-register struct linked_list *list;
-{
-    register struct object *obj;
-    register char ch;
-    register int n_objs;
-    char inv_temp[LINELEN];
-
-    n_objs = 0;
-    for (ch = 'a'; list != NULL; ch++, list = next(list)) {
-	obj = (struct object *) ldata(list);
-	sprintf(inv_temp, "%c) %s", list->l_letter, inv_name(obj, FALSE));
-	add_line(inv_temp);
-	n_objs++;
-    }
-    if (n_objs == 0) {
-	msg("Your bag is empty." );
-	return;
-    }
-    if (n_objs == 1) {
-	msg(inv_temp);
-	return;
-    }
-    end_line();
-}
-
-bag_char(obj,bag)
-register struct object *obj;
-register struct linked_list *bag;
-{
-    register struct linked_list *item;
-    register char c;
-
-    c = 'a';
-    for (item = bag; item != NULL; item = next(item))
-	if ((struct object *) ldata(item) == obj)
-	    return item->l_letter;
-	else
-	    c++;
-    msg("Help! Item not in bag!");
-}
-
-bagletter(item)
-struct linked_list *item;
-{
-	if (item != NULL)
-		if (bag_index > bag_letters && islower(bag_index[-1]))
-			item->l_letter = *--bag_index;
-		else
-			item->l_letter = '?';
-}
-
-delbagletter(item)
-struct linked_list *item;
-{
-	if (item != NULL && islower(item->l_letter))
-		if (bag_index < bag_end)
-			*bag_index++ = item->l_letter;
 }

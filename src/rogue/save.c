@@ -1,19 +1,17 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 07/27/86
  */
 /*
  * save and restore routines
  *
- * @(#)save.c	3.9 (Berkeley) 6/16/81
  */
 
-#include "curses.h"
-#include "mach_dep.h"
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
 #include "rogue.h"
+#include "mach_dep.h"
 
 typedef struct stat STAT;
 
@@ -30,7 +28,7 @@ save_game()
 {
     register int savefd;
     register int c;
-    char buf[LINELEN];
+    char buf[2*LINELEN];
 
     /*
      * get file name
@@ -43,10 +41,8 @@ save_game()
 	    if (c == ESCAPE) return(0);
 	} while (c != 'n' && c != 'N' && c != 'y' && c != 'Y');
 	mpos = 0;
-	if (c == 'y' || c == 'Y') {
-	    msg("File name: %s", file_name);
+	if (c == 'y' || c == 'Y')
 	    goto gotfile;
-	}
     }
 
     do {
@@ -59,9 +55,18 @@ save_game()
 	}
 	strcpy(file_name, buf);
 gotfile:
+	clear();
+	refresh();
 	if ((savefd = creat(file_name, 0400)) == -1)
 	    msg(sys_errlist[errno]);	/* fake perror() */
     } while (savefd == -1);
+
+    /*
+     * Fix keypad?
+     */
+    if(keypadmode) {
+	keypadoff();
+    }
 
     /*
      * write out encrpyted file (after a stat)
@@ -111,7 +116,7 @@ save_file(savefd)
 register int savefd;
 {
     wmove(cw, LINES-1, 0);
-    draw(cw);
+    wrefresh(cw);
     fstat(savefd, &sbuf);
     write(savefd, "junk", 5);
     lseek(savefd, 0L, 0);
@@ -119,7 +124,6 @@ register int savefd;
     close(savefd);
 }
 
-/*This is only until all have used this rogue version 1.2 */
 restore(file, envp)
 register char *file;
 char **envp;
@@ -127,7 +131,7 @@ char **envp;
     register int infd;
     extern char **environ;
     register char *sp;
-    char buf[LINELEN];
+    char buf[2*LINELEN];
     STAT sbuf2;
 
     makesure();
@@ -214,7 +218,9 @@ char **envp;
     else
 	sp = Def_term;
 #if defined(attron)
+    savetty();
     restartterm(sp, 1, 0);
+    resetty();
 #else
     setterm(sp);
 #endif attron
@@ -222,6 +228,13 @@ char **envp;
     _puts(TI);
     _puts(VS);
 #endif
+
+    /*
+     * Should we turn keypad mode on?
+     */
+    if(keypadmode) {
+	keypadon();
+    }
 
     strcpy(file_name, file);
     setup();

@@ -1,15 +1,13 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/05/86
  */
 /*
  * Anything to do with trading posts
  *
- * @(#)trader.c	8.0	(Bell Labs)	12/16/82
  */
 
-#include "curses.h"
-#include "rogue.h"
 #include <ctype.h>
+#include "rogue.h"
 #define  o_tradevalue  art_stats.ar_flags
 
 /*
@@ -33,9 +31,12 @@ do_post()
 	rp->r_max.x = 40;
 	rp->r_max.y = 10;			/* 10 * 40 room */
 	rp->r_pos.x = (COLS - rp->r_max.x) / 2;	/* center horizontal */
-	rp->r_pos.y = 1;			/* 2nd line */
+	rp->r_pos.y = 3;			/* 2nd line */
 	draw_room(rp);				/* draw the only room */
-	i = roll(4,10);				/* 10 to 40 items */
+	if (level > 0)
+	    i = roll(4,10);			/* 4 to 40 items */
+	else
+	    i = roll(20,8);			/* 20 to 160 items at startup */
 	for (; i > 0 ; i--) {			/* place all the items */
 	    ll = new_thing();			/* get something */
 	    attach(lvl_obj, ll);
@@ -63,13 +64,13 @@ do_post()
 		worth = rnd(luck * 100) + 50;
 	    else if (worth < 25)
 		worth = 25;
-	    worth *= luck + 3;				/* slightly expensive */
+	    worth *= (level == 0 ? 1 : luck + 3);	/* slightly expensive */
 	    worth = (worth/2) + (roll(6,worth)/6);	/* and randomized */
 	    op->o_tradevalue = worth;
 	    mvaddch(tp.y,tp.x,op->o_type);
 	}
 	trader = 0;
-	wmove(cw,12,0);
+	wmove(cw,13,0);
 	waddstr(cw,"Welcome to Friendly Fiend's Flea Market\n\r");
 	waddstr(cw,"=======================================\n\r");
 	waddstr(cw,"$: Prices object that you stand upon.\n\r");
@@ -111,8 +112,9 @@ price_it()
 	}
 	str = typ_name(obj);
 	which = rnd(7);
-	msg("That %s is a%s %s for only %d pieces of gold.",str,
-		vowelstr(bargain[which]), bargain[which],worth);
+	msg("You are standing on %s.", str);
+	msg("It's a%s %s for only %d pieces of gold.",
+		vowelstr(bargain[which]), bargain[which], worth);
 	curprice = worth;		/* save price */
 	strcpy(curpurch,str);		/* save item */
 	return TRUE;
@@ -124,9 +126,11 @@ price_it()
  */
 buy_it()
 {
-	reg int wh;
+	register int wh;
+	register int effective_purse = ( (player.t_ctype==C_PALADIN) ?
+		(9 * purse/10) : purse);
 
-	if (purse <= 0) {
+	if (effective_purse <= 0) {
 	    msg("You have no money.");
 	    return;
 	}
@@ -146,7 +150,7 @@ buy_it()
 	    } until(wh == 'y');
 	}
 	mpos = 0;
-	if (curprice > purse) {
+	if (curprice > effective_purse) {
 	    msg("You can't afford to buy that %s!",curpurch);
 	    return;
 	}
@@ -162,6 +166,7 @@ buy_it()
 	wh = add_pack((struct linked_list *) NULL, FALSE);	/* try to put it in his pack */
 	if (wh) {			/* he could get it */
 	    purse -= curprice;		/* take his money */
+	    effective_purse -= curprice;
 	    ++trader;			/* another transaction */
 	    trans_line();		/* show remaining deals */
 	    curprice = -1;		/* reset stuff */
@@ -189,14 +194,14 @@ sell_it()
 	if (wo <= 0) {
 	    mpos = 0;
 	    msg("We don't buy those.");
-	    if (ISWEARING(R_ADORNMENT) && rnd(7) < 3)
+	    if (is_wearing(R_ADORNMENT) && rnd(7) < 3)
 		msg("How about that %s ring instead?", 
 			r_stones[R_ADORNMENT]);
 	    return;
 	}
 	if (wo < 25)
 	    wo = 25;
-	msg("Your %s is worth %d pieces of gold.",typ_name(obj),wo);
+	msg("It's %s worth %d pieces of gold.",typ_name(obj), wo);
 	msg("Do you want to sell it? ");
 	do {
 	    ch = readchar();
@@ -204,7 +209,7 @@ sell_it()
 		ch = tolower(ch);
 	    if (ch == ESCAPE || ch == 'n') {
 		msg("");
-		if (ISWEARING(R_ADORNMENT) && rnd(7) < 3)
+		if (is_wearing(R_ADORNMENT) && rnd(7) < 3)
 		    msg("How about that %s ring instead?", 
 			r_stones[R_ADORNMENT]);
 		return;
@@ -229,8 +234,8 @@ open_market()
 {
 	register int maxtrans;
 
-	maxtrans = ISWEARING(R_ADORNMENT) ? MAXPURCH + 4 : MAXPURCH;
-	if (wizard || trader < maxtrans)
+	maxtrans = is_wearing(R_ADORNMENT) ? MAXPURCH + 4 : MAXPURCH;
+	if (wizard || trader < maxtrans || (level == 0 && purse > 0))
 	    return TRUE;
 	else {
 	    msg("The market is closed. The stairs are that-a-way.");
@@ -246,7 +251,7 @@ char *
 typ_name(obj)
 reg struct object *obj;
 {
-	static char buff[20];
+	static char buff[2*LINELEN];
 	reg int wh;
 
 	switch (obj->o_type) {
@@ -262,9 +267,11 @@ reg struct object *obj;
 	}
 	if (wh < 0)
 		strcpy(buff,"unknown");
+	else if (level == 0)
+		return inv_name(obj, TRUE);
 	else
 		strcpy(buff,things[wh].mi_name);
-	return (buff);
+	return buff;
 }
 
 /*
@@ -284,7 +291,7 @@ reg struct object *obj;
 		if (obj->o_flags & ISBLESSED)
 		     worth *= 5;
 	    when WEAPON:
-		if (wh < MAXWEAPONS) {
+		if (wh < maxweapons) {
 		    worth = weaps[wh].w_worth;
 		    worth *= obj->o_count * (2 + (4 * obj->o_hplus + 4 * obj->o_dplus));
 		    if (obj->o_flags & ISSILVER)
@@ -295,28 +302,28 @@ reg struct object *obj;
 			worth += 20 * obj->o_charges;
 		}
 	    when ARMOR:
-		if (wh < MAXARMORS) {
+		if (wh < maxarmors) {
 		    worth = armors[wh].a_worth;
 		    worth *= (1 + (10 * (armors[wh].a_class - obj->o_ac)));
 		}
 	    when SCROLL:
-		if (wh < MAXSCROLLS)
+		if (wh < maxscrolls)
 		    worth = s_magic[wh].mi_worth;
 	    when POTION:
-		if (wh < MAXPOTIONS)
+		if (wh < maxpotions)
 		    worth = p_magic[wh].mi_worth;
 	    when RING:
-		if (wh < MAXRINGS) {
+		if (wh < maxrings) {
 		    worth = r_magic[wh].mi_worth;
 		    worth += obj->o_ac * 40;
 		}
 	    when STICK:
-		if (wh < MAXSTICKS) {
+		if (wh < maxsticks) {
 		    worth = ws_magic[wh].mi_worth;
 		    worth += 20 * obj->o_charges;
 		}
 	    when ARTIFACT:
-		if (wh < MAXARTIFACT) 
+		if (wh < maxartifact) 
 		    worth = arts[wh].ar_worth;
 	    otherwise:
 		worth = 0;
@@ -344,13 +351,18 @@ reg struct object *obj;
  */
 trans_line()
 {
-	reg int adorned = ISWEARING(R_ADORNMENT);
+	reg int adorned = is_wearing(R_ADORNMENT);
 
-	if (!wizard)
+	if (level == 0 && purse > 0)
+	    sprintf(prbuf, "You still have %d pieces of gold left.", purse);
+	else if (purse == 0)
+	    sprintf(prbuf, "You have no money right now.");
+	else if (!wizard)
 	    sprintf(prbuf,"You have %d transactions remaining.",
 		max(0,(adorned ? MAXPURCH + 4 : MAXPURCH) - trader));
 	else
 	    sprintf(prbuf,
 		"You have infinite transactions remaining oh great wizard.");
 	mvwaddstr(cw,LINES - 3,0,prbuf);
+	wclrtoeol(cw);
 }

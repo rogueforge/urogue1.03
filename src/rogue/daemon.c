@@ -1,14 +1,12 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 06/22/86
  */
 /*
  * Contains functions for dealing with things that happen in the
  * future.
  *
- * @(#)daemon.c	8.0	(Bell Labs)	12/16/82
  */
 
-#include "curses.h"
 #include "rogue.h"
 
 #define EMPTY 0
@@ -23,6 +21,20 @@ struct delayed_action {
 	int d_arg;
 	int d_time;
 } d_list[MAXDAEMONS] = {
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
+	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
 	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
 	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,
 	_X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_, _X_,

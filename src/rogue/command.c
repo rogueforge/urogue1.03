@@ -1,15 +1,16 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/13/86
  */
 /*
  * Read and execute the user commands
  *
  */
 
-#include "curses.h"
 #include <ctype.h>
 #include <signal.h>
 #include "rogue.h"
+#include "score.h"
+#include "death.h"
 
 /*
  * command:
@@ -31,6 +32,8 @@ command()
 
     an_after = FALSE;
     newcount = FALSE;
+    if (on(player, CANFLY) && rnd(2)) 
+	ntimes++;
     if (on(player, ISHASTE)) 
 	ntimes++;
     if (fighting && att_bonus())
@@ -54,11 +57,10 @@ command()
     }
     summoned = FALSE;
 
-    while (ntimes--)
-    {
+    while (ntimes--) {
 	moving = FALSE;
 	/* If player is infested, take off a hit point */
-	if (on(player, HASINFEST) && !ISWEARING(R_HEALTH)) {
+	if (on(player, HASINFEST) && !is_wearing(R_HEALTH)) {
 	    if ((pstats.s_hpt -= infest_dam) <= 0) {
 		death(D_INFESTATION);
 		return;
@@ -72,14 +74,13 @@ command()
 	lastscore = purse;
 	wmove(cw, hero.y, hero.x);
 	if (!((running || count) && jump))
-	    draw(cw);			/* Draw screen */
+	    wrefresh(cw);			/* Draw screen */
 	take = 0;
 	after = TRUE;
 	/*
 	 * Read command or continue run
 	 */
-	if (!no_command)
-	{
+	if (!no_command) {
 	    if (fighting) {
 		ch = fight_ch;
 	    } else if (running) {
@@ -96,9 +97,9 @@ command()
 		    }
 	        ch = runch;
 	    }
-	    else if (count) ch = countch;
-	    else
-	    {
+	    else if (count) 
+		ch = countch;
+	    else {
 		ch = readchar();
 		if (mpos != 0 && !running)
 		    msg("");	/* Erase message if its there */
@@ -108,22 +109,18 @@ command()
 		ch = '.';
 		fighting = moving = FALSE;
 	}
-	if (no_command)
-	{
+	if (no_command) {
 	    if (--no_command == 0)
 		msg("You can move again.");
 	}
-	else
-	{
+	else {
 	    /*
 	     * check for prefixes
 	     */
-	    if (isdigit(ch))
-	    {
+	    if (isdigit(ch)) {
 		count = 0;
 		newcount = TRUE;
-		while (isdigit(ch))
-		{
+		while (isdigit(ch)) {
 		    count = count * 10 + (ch - '0');
 		    ch = readchar();
 		}
@@ -164,8 +161,7 @@ command()
 	     */
 	    if (count && !running)
 		count--;
-	    switch (ch)
-	    {
+	    switch (ch) {
 		when '!' : shell();
 		when 'h' : do_move(0, -1);
 		when 'j' : do_move(1, 0);
@@ -196,7 +192,8 @@ command()
 			if (!get_dir()) {
 			    after = FALSE;
 			    break;
-			} else {
+			}
+			else {
 			    dta.y = delta.y;
 			    dta.x = delta.x;
 			    beast = NULL;
@@ -205,18 +202,18 @@ command()
 		    do_fight(dta.y, dta.x, (ch == 'F') ? TRUE : FALSE);
 		when 't':
 		    if (!get_dir())
-			after = FALSE;
-		    else
-			missile(delta.y, delta.x,
+			 after = FALSE;
+		    else missile(delta.y, delta.x,
 				get_item("throw", NULL), &player);
 		when 'Q' : after = FALSE; quit();
-		when 'i' : after = FALSE; inventory(pack, 0);
-		when 'I' : after = FALSE; picky_inven();
+		when 'i' : after = FALSE; inventory(pack, '*');
+		when 'I' : after = FALSE; inventory(pack, 0);
 		when 'd' : drop((struct linked_list *) NULL);
-		when 'q' : quaff(-1, FALSE);
-		when 'r' : read_scroll(-1, FALSE);
+		when 'q' : quaff(&player, -1, ISNORMAL);
+		when 'r' : read_scroll(&player, -1, ISNORMAL);
 		when 'e' : eat();
 		when '=' : listen();
+		when '~' : after = FALSE; next_exp_level(MESSAGE);
 		when 'A' : apply();
 		when 'w' : wield();
 		when 'W' : wear();
@@ -231,31 +228,28 @@ command()
 		when '?' : after = FALSE; help();
 		when '/' : after = FALSE; identify();
 		when CTRL(T) :
-		    if (get_dir()) steal();
+		    if (get_dir()) 
+			 steal();
 		    else after = FALSE;
 		when 'D' : dip_it();
 		when '^' : set_trap(&player, hero.y, hero.x);
 		when 's' : search(FALSE);
 		when 'z' :
 		    if (get_dir())
-			do_zap(TRUE, NULL, FALSE);
-		    else
-			after = FALSE;
+			 do_zap(&player, TRUE, -1, ISNORMAL);
+		    else after = FALSE;
 		when 'p' : prayer();
-		    if (levtype == POSTLEV)
-			aggravate();
-		when 'C' : incant();
-		    if (levtype == POSTLEV)
-			aggravate();
+		when 'C' : incant(&player, NULL);
 		when 'a' :
 		    if (get_dir())
-			affect();
+			 affect();
 		    else after = FALSE;
 		when 'v' : after = FALSE;
-			   msg("UltraRogue Version %s.",
-				release);
-		when CTRL(R) : after = FALSE; clearok(curscr, TRUE);
-				touchwin(cw); /* MMMMMMMMMM */
+			   msg("UltraRogue Version %s.", release);
+		when CTRL(R) :
+		    after = FALSE;
+		    clearok(curscr, TRUE);
+		    touchwin(cw);
 		when CTRL(P) : {
 			    register bool decrement = FALSE;
 
@@ -269,10 +263,9 @@ command()
 		}
 		when 'S' : 
 		    after = FALSE;
-		    if (save_game())
-		    {
+		    if (save_game()) {
 			wclear(cw);
-			draw(cw);
+			wrefresh(cw);
 			endwin();
 #if defined(BSD4)
 			(void) TtySetOriginalChars();
@@ -283,16 +276,8 @@ command()
 		when ' ' : after = FALSE;	/* Do Nothing */
 		when CTRL(W) :
 		    after = FALSE;
-		    if (wizard)
-		    {
-			wizard = FALSE;
-			trader = 0;
-			msg("Not wizard any more.");
-		    }
-		    else
-		    {
-			if (passwd())
-			{
+		    if (!wizard) {
+			if (passwd()) {
 			   if(canwizard) {
 				    msg("Welcome, oh mighty wizard.");
 				    wizard = waswizard = TRUE;
@@ -303,40 +288,31 @@ command()
 			}
 			else
 			    msg("Oh no you don't!");
-		    }
-		when ESCAPE :	/* Escape */
-		    door_stop = FALSE;
-		    count = 0;
-		    after = FALSE;
-		when '#':
-		    if (levtype == POSTLEV)		/* buy something */
-			buy_it();
-		    after = FALSE;
-		when '$':
-		    if (levtype == POSTLEV)		/* price something */
-			price_it();
-		    after = FALSE;
-		when '%':
-		    if (levtype == POSTLEV)		/* sell something */
-			sell_it();
-		    after = FALSE;
-		otherwise :
-		    after = FALSE;
-		    if (wizard) switch (ch)
-		    {
-			when CTRL(V) : create_obj(0, 0, FALSE);
-			when CTRL(I) : inventory(lvl_obj, 0);
-			when CTRL(Z) : whatis((struct linked_list *) NULL);
-			when CTRL(D) : msg("rnd(4)%d, rnd(40)%d, rnd(100)%d",
+		    } 
+		    else {
+			msg("Wizard command: ");
+			mpos = 0;
+			ch = readchar();
+			switch(ch) {
+			when 'c' : create_obj(0, 0, ISNORMAL);
+			when 'i' : inventory(lvl_obj, 0);
+			when 'I' : whatis((struct linked_list *) NULL);
+			when 'r' : msg("rnd(4)%d, rnd(40)%d, rnd(100)%d",
 						rnd(4),rnd(40),rnd(100));
-			when CTRL(F) : overlay(stdscr,cw);
-			when CTRL(M) : overlay(mw,cw);
-			when CTRL(X) : teleport();
-			when CTRL(E) : msg("food left: %d\tfood level: %d", 
+			when 'f' : overlay(stdscr,cw);
+			when 'm' : overlay(mw,cw);
+			when 't' : teleport();
+			when 'F' : msg("food left: %d\tfood level: %d", 
 						food_left, foodlev);
-			when '@' : activity();
-			when CTRL(G) : 
-			{
+			when 's' : activity();
+			when 'e' : {
+			    wizard = FALSE;
+			    trader = 0;
+			    msg("Not wizard any more.");
+			}
+			when 'v' :
+			    wiz_verbose = !wiz_verbose;
+			when 'g' : {
 			    int tlev;
 			    prbuf[0] = NULL;
 			    msg("Which level? ");
@@ -365,23 +341,23 @@ command()
 				new_level(levtype);
 			    }
 			}
-			when CTRL(C) :
-			{
-			    register struct linked_list *item;
-
-			    if ((item = get_item("charge", STICK)) != NULL)
-				((struct object *)ldata(item))->o_charges=10000;
+			when 'C' : {
+ 			  register object *obj_p;
+ 			  object *get_object();
+  
+  			  if ((obj_p = get_object(pack, "charge", STICK, NULL))
+  			      != NULL)
+				obj_p->o_charges=10000;
 			}
-			when 'V' :
-			{
-			    register struct linked_list *item;
-
-			    if ((item = get_item("price", 0)) != NULL)
-				msg("Worth %d.", 
-				    get_worth(((struct object *)ldata(item))));
+			when 'w' : {
+ 			  register object *obj_p;
+ 			  object *get_object();
+  
+  			  if ((obj_p = get_object(pack, "price", NULL, NULL))
+  			      != NULL)
+				msg("Worth %d.", get_worth(obj_p));
 			}
-			when CTRL(O) :
-			{
+			when 'o' : {
 			    register int i;
 			    register struct linked_list *item;
 			    register struct object *obj;
@@ -392,105 +368,128 @@ command()
 			    /*
 			     * make decent statistics
 			     */
-			    pstats.s_hpt += 1000;
-			    max_stats.s_hpt += 1000;
-			    pstats.s_str = 25;
-			    max_stats.s_str = 25;
-			    pstats.s_intel = 25;
-			    max_stats.s_intel = 25;
-			    pstats.s_wisdom = 25;
-			    max_stats.s_wisdom = 25;
-			    pstats.s_dext = 25;
-			    max_stats.s_dext = 25;
-			    pstats.s_const = 25;
-			    max_stats.s_const = 25;
+			    max_stats.s_hpt	+= 1000;
+			    max_stats.s_power	+= 1000;
+			    pstats.s_hpt	= max_stats.s_hpt;
+			    pstats.s_power	= max_stats.s_power;
+			    max_stats.s_str	= pstats.s_str		= 25;
+			    max_stats.s_intel	= pstats.s_intel	= 25;
+			    max_stats.s_wisdom	= pstats.s_wisdom	= 25;
+			    max_stats.s_dext	= pstats.s_dext		= 25;
+			    max_stats.s_const	= pstats.s_const	= 25;
 			    /* Give the rogue a sword */
-			    if (cur_weapon == NULL || cur_weapon->o_which != CLAYMORE) {
+			    if (cur_weapon == NULL || 
+			      cur_weapon->o_which != CLAYMORE) {
 				item = spec_item(WEAPON, CLAYMORE, 10, 10);
 				add_pack(item, TRUE);
-				cur_weapon = (struct object *) ldata(item);
+				cur_weapon = OBJPTR(item);
 				cur_weapon->o_flags |= ISKNOW;
 			    }
 
 			    /* and a kill-o-zap stick */
-			    item = spec_item(STICK, WS_ANNIH, 10000, 0);
-			    obj = (struct object *) ldata(item);
+			    item = spec_item(STICK, WS_DISINTEGRATE, 10000, 0);
+			    obj = OBJPTR(item);
 			    obj->o_flags |= ISKNOW;
-	    		    ws_know[WS_ANNIH] = TRUE;
-	    		    if (ws_guess[WS_ANNIH])
-	    		    {
-				cfree(ws_guess[WS_ANNIH]);
-				ws_guess[WS_ANNIH] = NULL;
+			    ws_know[WS_DISINTEGRATE] = TRUE;
+			    if (ws_guess[WS_DISINTEGRATE]) {
+				free(ws_guess[WS_DISINTEGRATE]);
+				ws_guess[WS_DISINTEGRATE] = NULL;
 			    }
 			    add_pack(item, TRUE);
 
 			    /* and his suit of armor */
-			    if (cur_armor == NULL || cur_armor->o_which != CRYSTAL_ARMOR) {
+			    if (cur_armor == NULL || 
+			      cur_armor->o_which != CRYSTAL_ARMOR) {
 				item = spec_item(ARMOR, CRYSTAL_ARMOR, 15, 0);
-				obj = (struct object *) ldata(item);
+				obj = OBJPTR(item);
 				obj->o_flags |= ISKNOW;
-				obj->o_weight = armors[CRYSTAL_ARMOR].a_wght * 0.2;
+				obj->o_weight = 
+					armors[CRYSTAL_ARMOR].a_wght * 0.2;
 				cur_armor = obj;
 				add_pack(item, TRUE);
 			    }
 
 			    /* and some rings (have to put them on, for now) */
-			    if (!ISWEARING(R_SEARCH)) {
+			    if (!is_wearing(R_SEARCH)) {
 				item = spec_item(RING, R_SEARCH, 0, 0);
-				obj = (struct object *) ldata(item);
+				obj = OBJPTR(item);
 				obj->o_flags |= ISKNOW;
 				r_know[R_SEARCH] = TRUE;
-				if (r_guess[R_SEARCH])
-				{
-				    cfree(r_guess[R_SEARCH]);
+				if (r_guess[R_SEARCH]) {
+				    free(r_guess[R_SEARCH]);
 				    r_guess[R_SEARCH] = NULL;
 				}
 				add_pack(item, TRUE);
 			    }
-			    if (!ISWEARING(R_LIGHT)) {
+			    if (!is_wearing(R_LIGHT)) {
 				item = spec_item(RING, R_LIGHT, 0, 0);
-				obj = (struct object *) ldata(item);
+				obj = OBJPTR(item);
 				obj->o_flags |= ISKNOW;
 				r_know[R_LIGHT] = TRUE;
-				if (r_guess[R_LIGHT])
-				{
-				    cfree(r_guess[R_LIGHT]);
+				if (r_guess[R_LIGHT]) {
+				    free(r_guess[R_LIGHT]);
 				    r_guess[R_LIGHT] = NULL;
 				}
 				add_pack(item, TRUE);
 			    }
-			    if (!ISWEARING(R_WIZARD)) {
+			    if (!is_wearing(R_WIZARD)) {
 				item = spec_item(RING, R_WIZARD, 0, 0);
-				obj = (struct object *) ldata(item);
+				obj = OBJPTR(item);
 				obj->o_flags |= ISKNOW;
 				r_know[R_WIZARD] = TRUE;
-				if (r_guess[R_WIZARD])
-				{
-				    cfree(r_guess[R_WIZARD]);
+				if (r_guess[R_WIZARD]) {
+				    free(r_guess[R_WIZARD]);
 				    r_guess[R_WIZARD] = NULL;
 				}
 				add_pack(item, TRUE);
 			    }
+			    item = spec_item(SCROLL, S_ELECTRIFY, 0, 0);
+			    obj = OBJPTR(item);
+			    obj->o_flags |= ISKNOW;
+			    s_know[S_ELECTRIFY] = TRUE;
+			    if (s_guess[S_ELECTRIFY]) {
+				free(s_guess[S_ELECTRIFY]);
+				s_guess[S_ELECTRIFY] = NULL;
+			    }
+			    add_pack(item, TRUE);
 
 			    /* Spiff him up a bit */
-			    quaff(P_CLEAR, TRUE);
-			    quaff(P_SEEINVIS, TRUE);
-			    quaff(P_PHASE, TRUE);
-			    quaff(P_SHERO, TRUE);
-			    read_scroll(S_ELECTRIFY, TRUE);
+			    quaff(&player, P_SHERO, ISBLESSED);
+			    quaff(&player, P_CLEAR, ISBLESSED);
+			    quaff(&player, P_FIRERESIST, ISBLESSED);
+			    quaff(&player, P_SEEINVIS, ISBLESSED);
+			    quaff(&player, P_PHASE, ISBLESSED);
 			    purse += 50000;
 			    updpack(TRUE);
 			}
+			when ESCAPE :	/* Escape */
+			    door_stop = FALSE;
+			    count = 0;
+			    after = FALSE;
 			otherwise :
 			    msg("Illegal command '%s'.", unctrl(ch));
 			    count = 0;
+		    	}
 		    }
-		    else
-		    {
-			msg("Illegal command '%s'.", unctrl(ch));
-			count = 0;
-			after = FALSE;
-		    }
+		when ESCAPE :	/* Escape */
+			after = doescape();
+		when '#':
+		    if (levtype == POSTLEV)		/* buy something */
+			buy_it();
+		    after = FALSE;
+		when '$':
+		    if (levtype == POSTLEV)		/* price something */
+			price_it();
+		    after = FALSE;
+		when '%':
+		    if (levtype == POSTLEV)		/* sell something */
+			sell_it();
+		    after = FALSE;
+		otherwise :
+		    after = FALSE;
+		    msg("Illegal command '%s'.", unctrl(ch));
+		    count = 0;
+		    after = FALSE;
 	    }
 	    /*
 	     * turn off flags if no longer needed
@@ -513,26 +512,26 @@ command()
 	/* If after is true, mark an_after as true so that if
 	 * we are hasted, the first "after" will be noted.
 	 */
-	if (after) an_after = TRUE;
+	if (after) 
+	    an_after = TRUE;
     }
 
     /*
      * Kick off the rest of the daemons and fuses
      */
-    if (an_after)
-    {
+    if (an_after) {
 	look(FALSE);
 	do_daemons(AFTER);
 	do_fuses(AFTER);
 
 	/* Special abilities */
 	if ((player.t_ctype == C_THIEF || player.t_ctype == C_ASSASIN ||
-	    player.t_ctype == C_NINJA) &&
+	    player.t_ctype == C_NINJA || player.t_ctype == C_RANGER) &&
 	    (rnd(100) < (2*pstats.s_dext + 5*pstats.s_lvl))) 
 		    search(TRUE);
-	if (ISWEARING(R_SEARCH)) 
+	if (is_wearing(R_SEARCH)) 
 	    search(FALSE);
-	if (ISWEARING(R_TELEPORT) && rnd(100) < 2) {
+	if (is_wearing(R_TELEPORT) && rnd(100) < 2) {
 	    teleport();
 	    if (off(player, ISCLEAR)) {
 		if (on(player, ISHUH))
@@ -565,7 +564,9 @@ command()
 	    }
 	    else if (cur_weapon->o_flags & ISPOISON && rnd(4) == 0) {
 		msg("You are cut by your %s!", inv_name(cur_weapon, TRUE));
-		if (!save(VS_POISON)) {
+		if (player.t_ctype != C_PALADIN
+			&& !(player.t_ctype == C_NINJA && pstats.s_lvl > 12) 
+			&& !save(VS_POISON)) {
 		    if (pstats.s_hpt == 1) {
 			msg("You die from the poison in the cut.");
 			death(D_POISON);
@@ -579,6 +580,69 @@ command()
 		}
 	    }
 	}
+
+	/* Time to enforce weapon and armor restrictions */
+	if (rnd(9999) == 0)
+	    if (((cur_weapon==NULL) || (wield_ok(&player,cur_weapon,NOMESSAGE)))
+	      && ((cur_armor==NULL) || (wear_ok(&player,cur_armor,NOMESSAGE)))){
+	    switch (player.t_ctype) {
+	    when C_CLERIC:
+	    case C_DRUID:
+	    case C_RANGER:
+	    case C_PALADIN:
+		if (rnd(luck) != 0)	/* You better have done little wrong */
+		    goto bad_cleric;
+		msg("You are enraptured by the renewed power of your god.");
+	    when C_MAGICIAN:
+	    case C_ILLUSION:
+		msg("You become in tune with the universe.");
+	    when C_THIEF:
+	    case C_NINJA:
+	    case C_ASSASIN:
+		msg("You become supernaly sensitive to your surroundings.");
+	    when C_FIGHTER:
+		msg("You catch your second wind.");
+	    otherwise:
+		msg("What a strange type you are!");
+	    }
+	    pstats.s_hpt   = max_stats.s_hpt   += rnd(pstats.s_lvl) + 1;
+	    pstats.s_power = max_stats.s_power += rnd(pstats.s_lvl) + 1;
+	}
+	else {			/* he blew it - make him pay */
+	    int death_cause;
+	    switch (player.t_ctype) {
+	    when C_CLERIC:
+	    case C_DRUID:
+	    case C_RANGER:
+	    case C_PALADIN:
+bad_cleric:
+		msg("Your god scourges you for your misdeeds.");
+		death_cause = D_GODWRATH;
+	    when C_MAGICIAN:
+	    case C_ILLUSION:
+		msg("You short out your mana on the unfamiliar %s.",
+		    (cur_armor!=NULL ? "armor" : "weapon") );
+		death_cause = D_SPELLFUMBLE;
+	    when C_THIEF:
+	    case C_NINJA:
+	    case C_ASSASIN:
+		msg("You trip and fall because of the unfamiliar %s.",
+		    (cur_armor!=NULL ? "armor" : "weapon") );
+		death_cause = D_CLUMSY;
+	    when C_FIGHTER:
+		debug("Fighter getting raw deal?");
+	    otherwise:
+		msg("What a strange type you are!");
+	    }
+	    aggravate();
+	    pstats.s_power /= 2;
+	    pstats.s_hpt   /= 2;
+	    player.t_no_move++;
+	    if ((pstats.s_hpt -= rnd(pstats.s_lvl)) <= 0) {
+		death(death_cause);
+	    }
+	}
+
 	if (rnd(999999) == 0) {
 	    new_level(THRONE);
 	    fighting = running = after = FALSE;
@@ -600,25 +664,23 @@ quit()
     if (signal(SIGINT, quit) != quit)
 	mpos = 0;
     msg("Really quit?");
-    draw(cw);
-    if (readchar() == 'y')
-    {
+    wrefresh(cw);
+    if (readchar() == 'y') {
 	clear();
 	wclear(cw);
 	wrefresh(cw);
 	move(LINES-1, 0);
-	draw(stdscr);
+	wrefresh(stdscr);
 	refresh();
 	score((long) pstats.s_exp, pstats.s_lvl, CHICKEN, 0);
 	byebye();
     }
-    else
-    {
+    else {
 	signal(SIGINT, quit);
 	wmove(cw, 0, 0);
 	wclrtoeol(cw);
 	status(FALSE);
-	draw(cw);
+	wrefresh(cw);
 	mpos = 0;
 	count = 0;
 	fighting = running = 0;
@@ -643,8 +705,7 @@ register bool is_thief;
     if (on(player, ISBLIND))
 	return;
     for (x = hero.x - 1; x <= hero.x + 1; x++)
-	for (y = hero.y - 1; y <= hero.y + 1; y++)
-	{
+	for (y = hero.y - 1; y <= hero.y + 1; y++) {
 	    ch = winat(y, x);
 	    if (isatrap(ch)) {
 		    register struct trap *tp;
@@ -693,11 +754,9 @@ help()
      * If its not a *, print the right help string
      * or an error if he typed a funny character.
      */
-    if (helpch != '*')
-    {
+    if (helpch != '*') {
 	wmove(cw, 0, 0);
-	while (strp->h_ch)
-	{
+	while (strp->h_ch) {
 	    if (strp->h_desc == 0)
 		if (!wizard) {
 		    break;
@@ -706,8 +765,7 @@ help()
 		    continue;
 		}
 
-	    if (strp->h_ch == helpch)
-	    {
+	    if (strp->h_ch == helpch) {
 		msg("%s%s", unctrl(strp->h_ch), strp->h_desc);
 		break;
 	    }
@@ -727,7 +785,8 @@ help()
 	if (strp->h_desc == 0)
 	    if (!wizard) {
 		break;
-	    } else {
+	    } 
+	    else {
 		strp++;
 		continue;
 	    }
@@ -739,18 +798,24 @@ help()
 	if (++cnt >= 46 && strp->h_ch && (strp->h_desc != NULL || wizard)) {
 	    wmove(hw, LINES-1, 0);
 	    wprintw(hw, morestr);
-	    draw(hw);
+	    wrefresh(hw);
 	    wait_for(' ');
 	    wclear(hw);
 	    cnt = 0;
 	}
     }
     wmove(hw, LINES-1, 0);
-    wprintw(hw, spacemsg);
-    draw(hw);
+    wprintw(hw, morestr);
+    wrefresh(hw);
     wait_for(' ');
     wclear(hw);
-    draw(hw);
+    wrefresh(hw);
+
+    /*
+     * Print info on keypad
+     */
+    keypadhelp();
+
     wmove(cw, 0, 0);
     wclrtoeol(cw);
     status(FALSE);
@@ -769,8 +834,7 @@ identify()
     msg("What do you want identified? ");
     ch = readchar();
     mpos = 0;
-    if (ch == ESCAPE)
-    {
+    if (ch == ESCAPE) {
 	msg("");
 	return;
     }
@@ -778,8 +842,7 @@ identify()
 	id_monst(ch);
 	return;
     }
-    else switch(ch)
-    {
+    else switch(ch) {
 	case '|':
 	case '-':
 	    str = "wall of a room";
@@ -826,7 +889,7 @@ d_level()
 {
     bool no_phase=FALSE;
 
-    if (winat(hero.y, hero.x) != STAIRS) {
+    if (mvinch(hero.y, hero.x) != STAIRS) {
 	if (off(player, CANINWALL)) {	/* Must use stairs if can't phase */
 	    msg("I see no way down.");
 	    return;
@@ -834,11 +897,11 @@ d_level()
 	extinguish(unphase);	/* Using phase to go down gets rid of it */
 	no_phase = TRUE;
     }
-    if (ISWEARING(R_LEVITATION)) {
+    if (is_wearing(R_LEVITATION) || on(player, CANFLY)) {
 	msg("You can't!  You're floating in the air.");
 	return;
     }
-    if (rnd(pstats.s_dext) < 2-hitweight()+(on(player, STUMBLER) ? 4 : 0)) {
+    if (rnd(pstats.s_dext) < 4*(2-hitweight()+(on(player, STUMBLER) ? 4 : 0))) {
 	msg("You trip and fall down the stairs.");
 	if ((pstats.s_hpt -= roll(1,10)) <= 0) {
 	    msg("You break your neck and die.");
@@ -860,8 +923,9 @@ u_level()
 {
     register char ch;
 
-    if (has_artifact && ((ch = winat(hero.y, hero.x)) == STAIRS ||
-		(on(player, CANINWALL) && ISWEARING(R_LEVITATION)))) {
+    if (has_artifact && ((ch = mvinch(hero.y, hero.x)) == STAIRS ||
+		(on(player, CANINWALL) 
+		&& (is_wearing(R_LEVITATION) || on(player, CANFLY))))) {
 	if (--level == 0)
 	    total_winner();
 	else if (rnd(wizard ? 3 : 15) == 0)
@@ -877,7 +941,8 @@ u_level()
 	return;
     }
     else if (ch != STAIRS && 
-		!(on(player, CANINWALL) && ISWEARING(R_LEVITATION)))
+		!(on(player, CANINWALL) && (is_wearing(R_LEVITATION) 
+			|| on(player, CANFLY))))
 	msg("I see no way up.");
     else 
 	msg("Your way is magically blocked.");
@@ -899,7 +964,7 @@ shell()
     sh = getenv("SHELL");
     wclear(hw);
     wmove(hw, LINES-1, 0);
-    draw(hw);
+    wrefresh(hw);
 #if defined(BSD4)
     (void) TtySetOriginalChars();
 #endif
@@ -913,8 +978,7 @@ shell()
      */
     while((pid = fork()) < 0)
 	sleep(1);
-    if (pid == 0)
-    {
+    if (pid == 0) {
 	/*
 	 * Set back to original user, just in case
 	 */
@@ -928,8 +992,7 @@ shell()
 #endif
 	exit(-1);
     }
-    else
-    {
+    else {
 	signal(SIGINT, SIG_IGN);
 	signal(SIGQUIT, SIG_IGN);
 	while (wait(&ret_status) != pid)
@@ -961,20 +1024,18 @@ call(mark)
 bool mark;
 {
     register struct object *obj;
-    register struct linked_list *item;
     register char **guess, *elsewise;
     register bool *know;
 
-    if (mark) item = get_item("mark", MARKABLE);
-    else item = get_item("call", CALLABLE);
-    /*
-     * Make certain that it is somethings that we want to wear
-     */
-    if (item == NULL)
+    int bff_callable(), bff_markable();
+    object *get_object();
+
+    if (mark) obj = get_object(pack, "mark", NULL, bff_markable);
+    else obj = get_object(pack, "call", NULL, bff_callable);
+
+    if (obj == NULL)
 	return;
-    obj = (struct object *) ldata(item);
-    switch (obj->o_type)
-    {
+    switch (obj->o_type) {
 	when RING:
 	    guess = r_guess;
 	    know = r_know;
@@ -1019,7 +1080,7 @@ bool mark;
 	msg("alled \"%s\".", elsewise);
 	msg(terse ? "Call it: " : "What do you want to call it? ");
 	if (guess[obj->o_which] != NULL)
-	    cfree(guess[obj->o_which]);
+	    free(guess[obj->o_which]);
 	strcpy(prbuf, elsewise);
     }
     if (get_str(prbuf, cw) == NORM) {
@@ -1035,7 +1096,7 @@ bool mark;
 }
 
 /*
- * at_bonus:
+ * att_bonus:
  *	bonus attacks for certain player classes
  */
 
@@ -1047,9 +1108,13 @@ att_bonus()
 	&& (pstats.s_lvl > 12 || 
 		(pstats.s_lvl > 6 && pstats.s_lvl < 13 && rnd(2))))
 	bonus = TRUE;
-    else if ((player.t_ctype == C_RANGER || player.t_ctype == C_NINJA)
+    else if ((player.t_ctype == C_RANGER)
 	&& (pstats.s_lvl > 14 || 
-		(pstats.s_lvl > 7 && pstats.s_lvl < 14 && rnd(2))))
+		(pstats.s_lvl > 7 && pstats.s_lvl < 15 && rnd(2))))
+	bonus = TRUE;
+    else if ((player.t_ctype == C_NINJA)
+	&& (pstats.s_lvl > 8 || 
+		(pstats.s_lvl > 4 && pstats.s_lvl < 9 && rnd(2))))
 	bonus = TRUE;
     return bonus;
 }
@@ -1065,7 +1130,7 @@ electrificate()
 
     for (item = mlist; item != NULL; item = nitem) {
 	nitem = next(item); /* Get next item now since monster may disappear */
-	tp = (struct thing *) ldata(item);
+	tp = THINGPTR(item);
 	mname = monsters[tp->t_index].m_name;
 
 	if (DISTANCE(tp->t_pos.y, tp->t_pos.x, hero.y, hero.x) < affect_dist) {
@@ -1077,7 +1142,7 @@ electrificate()
 	    }
 	    if ((tp->t_stats.s_hpt -= damage) <= 0) {
 		msg("The %s is killed by an electric shock.", mname);
-		killed(&player, item, TRUE, TRUE);
+		killed(&player, item, MESSAGE, POINTS);
 		continue;
 	    }
 	    lvl = tp->t_stats.s_intel - 5;
@@ -1089,9 +1154,12 @@ electrificate()
 	    }
 	    else msg("The %s is zapped by your electricity.", mname);
 
-	    summon(tp);
+	    summon_help(tp, NOFORCE);
+	    turn_off(*tp, ISFRIENDLY);
+	    turn_off(*tp, ISCHARMED);
 	    turn_on(*tp, ISRUN);
 	    turn_off(*tp, ISDISGUISE);
+	    runto(&tp->t_pos, &hero);
 	    fighting = after = running = FALSE;
 	}
     }

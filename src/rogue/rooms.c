@@ -1,14 +1,13 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/12/86
  */
 /*
  * Draw the nine rooms on the screen
  *
- * @(#)rooms.c	3.8 (Berkeley) 6/15/81
  */
 
-#include "curses.h"
 #include "rogue.h"
+#include "stepok.h"
 
 do_rooms()
 {
@@ -40,8 +39,7 @@ do_rooms()
     /*
      * dig and populate all the rooms on the level
      */
-    for (i = 0, rp = rooms; i < MAXROOMS; rp++, i++)
-    {
+    for (i = 0, rp = rooms; i < MAXROOMS; rp++, i++) {
 	bool has_gold=FALSE;
 
 	/*
@@ -49,14 +47,12 @@ do_rooms()
 	 */
 	top.x = (i%3)*bsze.x;
 	top.y = i/3*bsze.y + 1;
-	if (rp->r_flags & ISGONE)
-	{
+	if (rp->r_flags & ISGONE) {
 	    /*
 	     * Place a gone room.  Make certain that there is a blank line
 	     * for passage drawing.
 	     */
-	    do
-	    {
+	    do {
 		rp->r_pos.x = top.x + rnd(bsze.x-2) + 1;
 		rp->r_pos.y = top.y + rnd(bsze.y-2) + 1;
 		rp->r_max.x = -COLS;
@@ -69,8 +65,7 @@ do_rooms()
 	/*
 	 * Find a place and size for a random room
 	 */
-	do
-	{
+	do {
 	    rp->r_max.x = rnd(bsze.x - 4) + 4;
 	    rp->r_max.y = rnd(bsze.y - 4) + 4;
 	    rp->r_pos.x = top.x + rnd(bsze.x - rp->r_max.x);
@@ -83,8 +78,7 @@ do_rooms()
 	/*
 	 * Put the gold in
 	 */
-	if (rnd(100) < 50 && (!has_artifact || level >= max_level))
-	{
+	if (rnd(100) < 50 && (!has_artifact || level >= max_level)) {
 	    register struct linked_list *item;
 	    register struct object *cur;
 	    coord tp;
@@ -110,15 +104,19 @@ do_rooms()
 	/*
 	 * Put the monster in
 	 */
-	if (rnd(100) < (has_gold ? 90 : 40))
-	{
+	if (rnd(100) < (has_gold ? 80 : 40)) {
+	    short which;
+	    int i;
+
 	    item = new_item(sizeof *tp);
 	    tp = THINGPTR(item);
-	    do
-	    {
+	    do {
 		rnd_pos(rp, &mp);
 	    } until(mvwinch(stdscr, mp.y, mp.x) == FLOOR);
-	    new_monster(item, randmonster(FALSE, FALSE), &mp, FALSE);
+
+	    which = randmonster(NOWANDER, NOGRAB);
+	    new_monster(item, which, &mp, NOMAXSTATS);
+
 	    /*
 	     * See if we want to give it a treasure to carry around.
 	     */
@@ -146,6 +144,41 @@ do_rooms()
 		attach(tp->t_pack, item);
 	    }
 
+	    i = rnd(7);
+	    if (on(*tp, ISSWARM) && i < 5)
+		count = roll(2,4);
+	    else if (on(*tp, ISFLOCK) && i < 5)
+		count = roll(1,4);
+	    else
+		count = 0;
+
+	    for (i = 1; i <= count; i++) {
+		coord *mpos;
+
+		if ((mpos = place_mons(mp.y, mp.x)) != NULL) {
+		    struct linked_list *nitem;
+
+		    nitem = new_item(sizeof (struct thing));
+		    new_monster(nitem, which, mpos, NOMAXSTATS);
+		    /* If the monster is on a trap, trap it */
+		    if (isatrap(mvinch(mpos->y, mpos->x)))
+			be_trapped( THINGPTR(nitem), mp);
+		    if (on(*tp, ISFRIENDLY))
+			turn_on(*(THINGPTR(nitem)), ISFRIENDLY);
+		    else
+			turn_off(*(THINGPTR(nitem)), ISFRIENDLY);
+		}
+	    }
+	    if (count > 0) {
+		if (on(*tp, LOWCAST) || on(*tp, MEDCAST) || on(*tp, HIGHCAST))
+		    turn_on(*tp, CANCAST);
+		tp->t_stats.s_hpt += roll(2,8);
+		tp->t_stats.s_lvl += roll(2,3);
+		tp->t_stats.s_arm -= roll(1,6);
+		tp->t_stats.s_str += roll(2,3);
+		tp->t_stats.s_intel += roll(2,3);
+		tp->t_stats.s_exp += roll(2,8) * monsters[which].m_add_exp;
+    	    }
 	}
     }
 }
@@ -169,8 +202,7 @@ register struct room *rp;
     /*
      * Put the floor down
      */
-    for (j = 1; j < rp->r_max.y-1; j++)
-    {
+    for (j = 1; j < rp->r_max.y-1; j++) {
 	move(rp->r_pos.y + j, rp->r_pos.x+1);
 	for (k = 1; k < rp->r_max.x-1; k++)
 	    addch(FLOOR);

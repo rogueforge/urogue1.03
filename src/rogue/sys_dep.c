@@ -1,5 +1,5 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 07/30/86
  */
 /*
  * Note:  In this file, we use the system curses.h file
@@ -11,14 +11,21 @@
 
 #include <curses.h>
 #include <stdio.h>
-#include "rogue.h"
+#include <sys/ioctl.h>
+#include "defs.h"
 #include "mach_dep.h"
 #if defined(BSD4)
 #include <signal.h>
 #endif
 
+#if defined(USGV5)
+extern int _tty_ch;
+#if !defined(attron) && !defined(PC7300)
+extern SGTTY _tty;
+#endif NOT attron
+#endif
 
-#if !defined(flushout)
+#if !defined(flushout) && !defined(USGV5)
 flushout()
 {
 	int out = 1;
@@ -364,7 +371,6 @@ myresetty()
    */
 
   resetty();
-  return ;
 }
 
 TtyInit()
@@ -460,7 +466,6 @@ TtyMapGameChars()
 #define CTRL(x) (('x') & (~'@'))
 #endif
 
-  GameLtchars.t_suspc = '&';
   GameLtchars.t_dsuspc = -1;
   GameLtchars.t_rprntc = -1;
   GameLtchars.t_flushc = -1;

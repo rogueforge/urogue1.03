@@ -1,5 +1,5 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 08/09/86
  */
  /*
  * Rogue
@@ -10,16 +10,16 @@
  */
 
 #include <stdio.h>
-#include "curses.h"
 #include <signal.h>
 #include <pwd.h>
+#include "rogue.h"
+#include "mach_dep.h"
+#include "score.h"
 #if defined(USGV5) || defined(RTU2)
 #include <time.h>
 #else
 #include <sys/time.h>
 #endif
-#include "mach_dep.h"
-#include "rogue.h"
 
 static int num_checks;		/* times we've gone over in checkout() */
 static double avec[3];		/* load average vector */
@@ -30,6 +30,7 @@ main(argc, argv, envp)
 char **argv;
 char **envp;
 {
+    register int x;
     register char *env;
     register struct passwd *pw;
     register struct linked_list *item;
@@ -42,8 +43,34 @@ char **envp;
     void areuok(), init_exp();
     bool alldone,predef;
     long now;
+	int rflag;
 
-    areuok(PERMOK);					/* read author file */
+    for (x = 1; x < argc; x++) {
+    	if (argv[x][0] != '-')
+    	    break;
+    	switch (argv[x][1]) {
+    	    when 's':
+		prscore = TRUE;
+    	    when 'k':
+		keypadmode = TRUE;
+    	    when 'n':
+		prnews = TRUE;
+    	    when 'v':
+		prversion = TRUE;
+	    when 'r':
+		rflag = TRUE;
+	    otherwise:
+		fprintf(stderr, "%s: Unknown option '%c'.\n",
+		    argv[0], argv[x][1]);
+		exit(1);
+	}
+    }
+    if(!rflag) {
+    	argc -= (x - 1);
+    	argv += (x - 1);
+    }
+
+    areuok(PERMOK);				/* read author file */
     (void) signal(SIGQUIT, SIG_IGN); 		/* ignore quit for now */
 
     /*
@@ -59,7 +86,7 @@ char **envp;
 
     /* Get default save file */
     strcpy(file_name, home);
-    strcat(file_name, "rogue.save");
+    strcat(file_name, ROGUE_SAVE);
 
     /* Get default score file */
     strcpy(score_file, SCOREDIR);
@@ -98,9 +125,9 @@ char **envp;
      strcpy(fd_data[1].mi_name, fruit);
 
     /*
-     * check for print-score option
+     * print scores
      */
-    if (argc == 2 && strcmp(argv[1], "-s") == 0) {
+    if (prscore) {
 	waswizard = TRUE;
 #if defined(BSD4)
 	(void) TtyInit();		/* Set up for the tty magic */
@@ -111,9 +138,9 @@ char **envp;
     }
 
     /*
-     * check for news option
+     * print news 
      */
-    if (argc == 2 && strcmp(argv[1], "-n") == 0) {
+    if (prnews) {
 	pagerbase = strrchr(PAGER, '/')+1;
 	(void) execl(PAGER, pagerbase, NEWS, 0);
 	exit(0);
@@ -122,7 +149,7 @@ char **envp;
     /*
      * check for version option
      */
-    if (argc == 2 && strcmp(argv[1], "-v") == 0) {
+    if (prversion) {
 	printf("UltraRogue Version %s.\n", release);
 	exit(0);
     }
@@ -192,6 +219,14 @@ char **envp;
 	fclose(filep);
     }
 
+    /*
+     * Should we put the terminal's keypad into application's
+     * mode for the user?
+     */
+    if(keypadmode) {
+	keypadon();
+    }
+
     if (argc == 2 && argv[1][0] != '\0') {
 	if (!restore(argv[1], envp)) { /* Note: restore returns on error only */
 	    exit(1);
@@ -237,95 +272,16 @@ char **envp;
     mw = newwin(LINES, COLS, 0, 0);
     hw = newwin(LINES, COLS, 0, 0);
 
-    predef = geta_player();
-    waswizard = wizard;
-re_roll:
-    if(!predef)
-	init_player();			/* Roll up the rogue */
-    else
-	goto get_food;			/* Using a pre-rolled rogue */
-    /*
-     * Give the rogue his weaponry.  
-     */
-    alldone = FALSE;
-    do {
-	int ch;
-	i = rnd(16);	/* number of acceptable weapons */
-	switch(i) {
-	    case 0: ch = 25; wpt = HEAVY_MACE;
-	    when 1: ch = 25; wpt = BROAD_SWORD;
-	    when 2: ch = 15; wpt = TWO_SWORD;
-	    when 3: ch = 10; wpt = LONG_SPEAR;
-	    when 4: ch = 20; wpt = TRIDENT;
-	    when 5: ch = 20; wpt = SPETUM;
-	    when 6: ch = 20; wpt = BARDICHE;
-	    when 7: ch = 15; wpt = SHORT_PIKE;
-	    when 8: ch = 15; wpt = BAST_SWORD;
-	    when 9: ch = 20; wpt = HALBERD;
-	    when 10:ch = 20; wpt = BATTLE_AXE;
-	    when 11:ch = 20; wpt = GLAIVE;
-	    when 12:ch = 20; wpt = LONG_PIKE;
-	    when 13:ch = 20; wpt = BROAD_SWORD;
-	    when 14:ch = 20; wpt = CRYSKNIFE;
-	    when 15:ch = 20; wpt = CLAYMORE;
-	}
-	if(rnd(100) < ch) {		/* create this weapon */
-	    alldone = TRUE;
-	}
-    } while(!alldone);
-    hpadd = rnd(2) + 1;
-    dmadd = rnd(2) + 1;
-    if (player.t_ctype == C_FIGHTER || player.t_ctype == C_PALADIN
-		|| player.t_type == C_RANGER ) {
-	if (rnd(100) > 50)
-	    wpt = TWO_SWORD;
-	else
-	    wpt = CLAYMORE;
-	hpadd = hpadd - 1;
-    }
-    /*
-     * Find out what the armor is.
-     */
-    i = rnd(100) + 1;
-    j = 0;
-    while (armors[j].a_prob < i)
-	j++;
-    /*
-     * See if this rogue is acceptable to the player.
-     */
-    if(!puta_player(j,wpt,hpadd,dmadd))
- 	goto re_roll;
-    /*
-     * It's OK. Add this stuff to the rogue's pack.
-     */
-    item = spec_item(WEAPON, wpt, hpadd, dmadd);
-    obj = (struct object *) ldata(item);
-    obj->o_flags |= ISKNOW;
-    add_pack(item, TRUE);
-    cur_weapon = obj;
-    /*
-     * And his suit of armor
-     */
-    item = spec_item(ARMOR, j, 0, 0);
-    obj = (struct object *) ldata(item);
-    obj->o_flags |= ISKNOW;
-    obj->o_weight = armors[j].a_wght;
-    add_pack(item, TRUE);
-    cur_armor = obj;
-    /*
-     * Give him some food too
-     */
-get_food:
-    item = spec_item(FOOD, 0, 0, 0);
-    obj = OBJPTR(item);
-    obj->o_weight = things[TYP_FOOD].mi_wght;
-    add_pack(item, TRUE);
+    waswizard = wizard;			/* set wizard flags */
+
+    init_player();			/* look up things and outfit pack */
+
     resurrect = pstats.s_const;
     init_exp();				/* set first experience level change */
     init_flags();			/* set initial flags */
     wclear(hw);
     wrefresh(hw);
-    new_level(FALSE);			/* Draw current level */
+    new_level(POSTLEV);			/* Draw current level */
     /*
      * Start up daemons and fuses
      */
@@ -357,7 +313,7 @@ char *s;
     clear();
     move(LINES-2, 0);
     printw("%s", s);
-    draw(stdscr);
+    wrefresh(stdscr);
     endwin();
     printf("\n");	/* So the cursor doesn't stop at the end of the line */
 #if defined(BSD4)
@@ -406,8 +362,7 @@ setup()
     signal(SIGINT, quit);
 
 #if !defined(USGV5)
-    if (!author())
-    {
+    if (!author()) {
 	signal(SIGALRM, checkout);
 	alarm(CHECKTIME * 60);
 	num_checks = 0;
@@ -554,7 +509,7 @@ checkout()
 		clear();
 		move(LINES-2, 0);
 		printw("You didn't listen, so now you are DEAD!!\n");
-		draw(stdscr);
+		wrefresh(stdscr);
 		endwin();
 		printf("\n");	/* now do a save if possible */
 		if (file_name[0] != '\0' 
@@ -623,7 +578,8 @@ reg double *avg;
  * ucount:
  *	Count the number of people on the system
  */
-#if defined(USGV5)		/*Must be a 5.0 UNIX system */
+#if defined(USGV5) || defined(RTU3)
+/*Must be a 5.0 UNIX system */
 #include <sys/types.h>
 #include <utmp.h>
 struct utmp buf;
@@ -646,7 +602,7 @@ ucount()
 }
 #endif
 
-#if defined(BSD4) || defined(USGV3) || defined(RTU2)
+#if !defined (RTU3) && defined(BSD4) || defined(USGV3) || defined(RTU2)
 #include <utmp.h>
 
 struct utmp buf;

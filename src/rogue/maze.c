@@ -1,7 +1,6 @@
 /*
- * Last Modified: 05/25/86
+ * Last Modified: 06/28/86
  */
-#include "curses.h"
 #include "rogue.h"
 
 struct cell {
@@ -16,8 +15,6 @@ struct bordercells {
 char *frontier, *bits;
 char *moffset(), *foffset();
 int lines, cols;
-
-
 
 /*
  * domaze:
@@ -34,9 +31,9 @@ do_maze()
 	coord tp;
 
 	for (rp = rooms; rp < &rooms[MAXROOMS]; rp++) {
-		rp->r_nexits = 0;		/* no exits */
-		rp->r_flags = ISGONE;		/* kill all rooms */
-		rp->r_fires = 0;		/* no fires */
+	    rp->r_nexits = 0;			/* no exits */
+	    rp->r_flags = ISGONE;		/* kill all rooms */
+	    rp->r_fires = 0;			/* no fires */
 	}
 	rp = &rooms[0];				/* point to only room */
 	rp->r_flags = ISDARK;			/* mazes always dark */
@@ -45,6 +42,7 @@ do_maze()
 	rp->r_max.x = COLS - 1;
 	rp->r_max.y = LINES - 3;
 	draw_maze();				/* put maze into window */
+
 	/*
 	 * add some gold to make it worth looking for 
 	 */
@@ -55,6 +53,7 @@ do_maze()
 	rnd_pos(rp, &tp);
 	mvaddch(tp.y, tp.x, GOLD);
 	obj->o_pos = tp;
+
 	/*
 	 * add in some food to make sure he has enough
 	 */
@@ -65,45 +64,41 @@ do_maze()
 	mvaddch(tp.y, tp.x, FOOD);
 	obj->o_pos = tp;
 	if (rnd(100) < 5) {			/* 5% for treasure maze level */
-		treas = TRUE;
-		least = 6;
-		debug("treasure maze");
+	    treas = TRUE;
+	    least = 6;
+	    debug("treasure maze");
 	}
 	else {					/* normal maze level */
-		least = 1;
-		treas = FALSE;
+	    least = 1;
+	    treas = FALSE;
 	}
 	for (i = 0; i < level + least; i++) {
-		if (!treas && rnd(100) < 50)	/* put in some little buggers */
-			continue;
-		/*
-		 * Put the monster in
-		 */
-		item = new_item(sizeof *mp);
-		mp = THINGPTR(item);
-		do {
-			rnd_pos(rp, &tp);
-		} until(mvwinch(stdscr, tp.y, tp.x) == FLOOR);
+	    if (!treas && rnd(100) < 50)	/* put in some little buggers */
+		    continue;
 
-		new_monster(item, randmonster(FALSE, FALSE), &tp, FALSE);
-		/*
-		 * See if we want to give it a treasure to carry around.
-		 */
-		if (rnd(100) < monsters[mp->t_index].m_carry)
-			attach(mp->t_pack, new_thing());
+	    /* Put the monster in */
+	    item = new_item(sizeof *mp);
+	    mp = THINGPTR(item);
+	    do {
+		rnd_pos(rp, &tp);
+	    } until(mvwinch(stdscr, tp.y, tp.x) == FLOOR);
 
-		/*
-		 * If it carries gold, give it some
-		 */
-		if (on(*mp, CARRYGOLD)) {
-			reg struct object *cur;
+	    new_monster(item, randmonster(NOWANDER, NOGRAB), &tp, NOMAXSTATS);
 
-			item = spec_item(GOLD, NULL, NULL, NULL);
-			obj = OBJPTR(item);
-			obj->o_count = GOLDCALC + GOLDCALC + GOLDCALC;
-			obj->o_pos = mp->t_pos;
-			attach(mp->t_pack, item);
-		}
+	    /* See if we want to give it a treasure to carry around. */
+	    if (rnd(100) < monsters[mp->t_index].m_carry)
+		attach(mp->t_pack, new_thing());
+
+	    /* If it carries gold, give it some */
+	    if (on(*mp, CARRYGOLD)) {
+		reg struct object *cur;
+
+		item = spec_item(GOLD, NULL, NULL, NULL);
+		obj = OBJPTR(item);
+		obj->o_count = GOLDCALC + GOLDCALC + GOLDCALC;
+		obj->o_pos = mp->t_pos;
+		attach(mp->t_pack, item);
+	    }
 
 	}
 }
@@ -119,8 +114,8 @@ draw_maze()
 
 	lines = (LINES - 3) / 2;
 	cols = (COLS - 1) / 2;
-	bits = ALLOC((LINES - 3) * (COLS - 1));
-	frontier = ALLOC(lines * cols);
+	bits = malloc((unsigned int) ((LINES - 3) * (COLS - 1)));
+	frontier = malloc((unsigned int) (lines * cols));
 	ptr = frontier;
 	while (ptr < (frontier + (lines * cols)))
 		*ptr++ = TRUE;
@@ -140,8 +135,8 @@ draw_maze()
 		}
 	}
 	crankout();
-	FREE(frontier);
-	FREE(bits);
+	free((char *)frontier);
+	free((char *)bits);
 }
 
 /*

@@ -1,17 +1,19 @@
-DISTRIBDIR	= /usr/herbie/tmp
-INSTALLDIR	= /usr/herbie/bin
-CURSES		= -lcurses
-TERMCAP		=
+DISTRIBDIR	= /usr/tmp
+INSTALLDIR	= /usr/games
+CURSES		= -lcurses42
+TERMCAP		= -ltermcap
+MAKE		= make
 
 urogue: library
-	cc commands/tunable.o rogue/libsrogue.o -o urogue $(CURSES) $(TERMCAP)
+	cc commands/tunable.o rogue/libsrogue.o -o urogue $(CURSES) $(TERMCAP) 
 	@chmod 711 urogue
 	@ls -l urogue
 	@size urogue
 
-install: urogue
+install: urogue urprint
 	@-mkdir $(INSTALLDIR)
-	cp commands/control $(INSTALLDIR)
+	cp commands/control commands/urprint $(INSTALLDIR)
+	chmod 711 $(INSTALLDIR)/control $(INSTALLDIR)/urprint
 	cp urogue $(INSTALLDIR)
 	chmod 4711 $(INSTALLDIR)/urogue
 
@@ -21,26 +23,27 @@ distrib: library
 	@-rm -f $(DISTRIBDIR)/*
 	cp distfiles/Makefile.INST $(DISTRIBDIR)/Makefile
 	cp distfiles/README commands/tunable.c commands/control.o $(DISTRIBDIR)
+	cp distfiles/tunable.h distfiles/urogue.6 $(DISTRIBDIR)
 	cp rogue/libsrogue.o $(DISTRIBDIR)
 	@chmod 644 $(DISTRIBDIR)/*
 
 library: control
-	cd hdrs; make rogue.h
-	cd rogue ; make libsrogue.o
+	cd hdrs; $(MAKE) rogue.h
+	cd rogue ; $(MAKE) libsrogue.o
 
 control:
-	cd commands; make control
+	cd commands; $(MAKE) control
 
-print: commands/print_a commands/print_i commands/print_m commands/print_w
-	cd commands; make print
+urprint: 
+	cd commands; $(MAKE) urprint
 
 clean:
-	cd commands; make clean
-	cd rogue; make clean
+	cd commands; $(MAKE) clean
+	cd rogue; $(MAKE) clean
 	rm -f core urogue
 
 tags:
-	cd rogue; make tags
+	cd rogue; $(MAKE) tags
 
 lint:
-	cd rogue; make lint
+	cd rogue; $(MAKE) lint
