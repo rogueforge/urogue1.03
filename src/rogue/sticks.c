@@ -15,7 +15,7 @@
  */
 static struct object bolt =
 {
-    '*' , 0, {0, 0}, "", 0, 0, "1d4" , 0, 0, 100, 1
+    NULL, '*' , 0, {0, 0}, "", 0, 0, "1d4" , 0, 0, 100, 1
 };
 
 char *bolt_name;
@@ -488,10 +488,10 @@ int flags;
 		    if (m1 == hero.x && m2 == hero.y)
 			continue;
 		    if (ch != ' ') {
-			ll = find_obj(m2,m1);
-			if (ll != NULL) {
-			    detach(lvl_obj,ll);
-			    discard(ll);
+			ll = find_obj(m2,m1,TRUE);
+			while (ll != NULL) {
+			    rem_obj(ll,TRUE);
+			    ll = find_obj(m2,m1,FALSE);
 			}
 			ll = find_mons(m2,m1);
 			if (ll != NULL) {
@@ -729,10 +729,10 @@ int flags;
 		    else if (ch == POTION || ch == SCROLL || ch == FOOD
 			    || ch == WEAPON || ch == RING || ch == ARMOR
 			    || ch == STICK || ch == ARTIFACT || ch == GOLD) {
-			if ((ip = find_obj(obj->o_pos.y, obj->o_pos.x))
-					!= NULL) {
-			    detach(lvl_obj, ip);
-			    discard(ip);
+			ip = find_obj(obj->o_pos.y, obj->o_pos.x, TRUE);
+			while (ip) {	/* BOOM destroys all stacked objects */
+			    rem_obj(ip, TRUE);
+			    ip = find_obj(obj->o_pos.y, obj->o_pos.x, FALSE);
 			}
 			mvaddch(obj->o_pos.y, obj->o_pos.x,
 				roomin(&obj->o_pos) == NULL ? PASSAGE : FLOOR);

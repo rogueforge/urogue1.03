@@ -192,28 +192,97 @@ register bool drop;
 }
 
 /*
+ * rem_obj:
+ *	Remove an object from the level.
+ */
+rem_obj(item, dis)
+register struct linked_list *item;
+int dis;
+{
+    register struct linked_list *llptr;
+    register struct object *objptr, *op;
+    register int x, y;
+
+    detach(lvl_obj, item);
+    objptr = OBJPTR(item);
+
+    if (llptr = objptr->next_obj) {
+	detach((objptr->next_obj), llptr);
+	attach(lvl_obj, llptr);
+	op = OBJPTR(llptr);
+	if (op->next_obj = objptr->next_obj)
+	    objptr->next_obj->l_prev = NULL;
+	y = op->o_pos.y;
+	x = op->o_pos.x;
+	if (cansee(y, x))
+	    mvwaddch(cw, y, x, op->o_type);
+	mvaddch(y, x, op->o_type);
+    }
+    else {
+	y = objptr->o_pos.y;
+	x = objptr->o_pos.x;
+	/* problems if dropped in rock */
+	mvaddch(y, x, (roomin(&(objptr->o_pos)) == NULL ? PASSAGE : FLOOR));
+    }
+    if (dis)
+	discard(item);
+}
+
+/*
+ * add_obj:
+ *	adds an object to the level
+ */
+add_obj(item, y, x)
+register struct linked_list *item;
+int y, x;
+{
+    register struct linked_list *llptr;
+    register struct object *objptr;
+
+    llptr = find_obj(y, x, TRUE);
+    if (llptr) {
+	objptr = OBJPTR(llptr);
+	attach((objptr->next_obj), item);
+    }
+    else {
+	attach(lvl_obj, item);
+	objptr = OBJPTR(item);
+	objptr->next_obj = NULL;
+	mvaddch(y, x, objptr->o_type);
+    }
+}
+
+/*
  * drop:
  *	put something down
  */
 drop(item)
 struct linked_list *item;
 {
-    register char ch;
+    register char ch = mvwinch(stdscr, hero.y, hero.x);
     register struct linked_list *obj, *nobj;
     register struct object *op;
 
-    if (item == NULL) {
-	ch = mvwinch(stdscr, hero.y, hero.x);
-	if (ch != FLOOR && ch != PASSAGE && ch != POOL) {
-	    msg("There is something there already.");
-	    return(FALSE);
-	}
-	if ((obj = get_item("drop", 0)) == NULL)
+    switch (ch) {
+	case GOLD:
+	case POTION:
+	case SCROLL:
+	case FOOD:
+	case WEAPON:
+	case ARMOR:
+	case RING:
+	case STICK:
+	case FLOOR:
+	case PASSAGE:
+	case POOL:
+	case ARTIFACT:
+	    if (item == NULL && (item = get_item("drop", 0)) == NULL)
+		return(FALSE);
+	otherwise:
+	    msg("You can't drop something here.");
 	    return(FALSE);
     }
-    else {
-	obj = item;
-    }
+    obj = item;
     op = OBJPTR(obj);
     if (!dropcheck(op))
 	return(FALSE);
@@ -250,10 +319,8 @@ struct linked_list *item;
 	/*
 	 * Link it into the level object list
 	 */
-	attach(lvl_obj, obj);
+	add_obj(obj, hero.y, hero.x);
 	mvaddch(hero.y, hero.x, op->o_type);
-	op->o_pos = hero;
-	msg("Dropped %s.", inv_name(op, TRUE));
     }
     if (op->o_type == ARTIFACT)
 	has_artifact &= ~(1 << op->o_which);

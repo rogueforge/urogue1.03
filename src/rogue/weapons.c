@@ -184,9 +184,8 @@ bool pr;
 		rp->r_flags &= ~ISDARK;
 	}
 	else {
-	    mvaddch(fpos.y, fpos.x, obj->o_type);
 	    obj->o_pos = fpos;
-	    attach(lvl_obj, item);
+	    add_obj(item, fpos.y, fpos.x);
 	}
 	if (rp != NULL &&
 	    (!(rp->r_flags & ISDARK) ||
@@ -343,12 +342,23 @@ register bool passages;
 	     */
 	    if (y == hero.y && x == hero.x)
 		continue;
-	    else if (((ch = winat(y, x)) == FLOOR ||
-		(passages && ch == PASSAGE)) && rnd(++cnt) == 0) {
+	    else switch (ch = winat(y, x)) {
+		case GOLD:
+		case POTION:
+		case SCROLL:
+		case FOOD:
+		case WEAPON:
+		case ARMOR:
+		case RING:
+		case STICK:
+		case FLOOR:
+		case PASSAGE:
+		case ARTIFACT:
 		    newpos->y = y;
 		    newpos->x = x;
+		    cnt++;
 	    }
-    return (cnt != 0);
+    return (cnt);
 }
 
 /*

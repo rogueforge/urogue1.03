@@ -887,6 +887,7 @@ struct monster {
  */
 
 typedef struct object {
+    struct linked_list *next_obj;	/* The next obj. for stacked objects */
     int o_type;				/* What kind of object it is */
     int o_ident;			/* identifier for object */
     coord o_pos;			/* Where it lives on the screen */
@@ -1004,6 +1005,8 @@ extern struct thing *beast;		/* The last monster attacking */
 extern struct monster monsters[];	/* The initial monster states */
 extern struct linked_list *lvl_obj;	/* List of objects on this level */
 extern struct linked_list *fam_ptr;	/* A ptr to the familiar */
+extern struct linked_list *curr_mons;	/* The mons. currently moving */
+extern struct linked_list *next_mons;	/* The mons. after curr_mons */
 extern struct object *cur_weapon;	/* Which weapon he is wielding */
 extern struct object *cur_armor;	/* What a well dresssed rogue wears */
 extern struct object *cur_cloak;	/* */
@@ -1098,7 +1101,6 @@ extern bool askme;			/* Ask about unidentified things */
 extern bool moving;			/* move using 'm' command */
 extern bool know_items[MAXMAGICTYPES][MAXMAGICITEMS]; /* Does he know what a magic item does */
 extern bool in_shell;			/* True if executing a shell */
-extern bool monst_dead;			/* Indicates if monster got killed */
 extern coord delta;			/* Change indicated to get_dir() */
 extern bool inv_type;			/* Inven style. Bool so options works */
 extern int line_cnt;			/* Counter for inventory style */

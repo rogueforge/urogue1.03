@@ -208,6 +208,7 @@ command()
 		when 'Q' : after = FALSE; quit();
 		when 'i' : after = FALSE; inventory(pack, '*');
 		when 'I' : after = FALSE; inventory(pack, 0);
+		when ',' : add_pack(NULL, TRUE);
 		when 'd' : drop((struct linked_list *) NULL);
 		when 'q' : quaff(&player, -1, ISNORMAL);
 		when 'r' : read_scroll(&player, -1, ISNORMAL);

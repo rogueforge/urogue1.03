@@ -88,13 +88,12 @@ do_rooms()
 	    item = spec_item(GOLD, NULL, NULL, NULL);
 	    cur = OBJPTR(item);
 
-	    /* Put the gold into the level list of items */
-	    attach(lvl_obj, item);
-
 	    /* Put it somewhere */
 	    rnd_pos(rp, &tp);
-	    mvaddch(tp.y, tp.x, GOLD);
 	    cur->o_pos = tp;
+	    /* Put the gold into the level list of items */
+	    add_obj(item, tp.y, tp.x);
+
 	    if (roomin(&tp) != rp) {
 		endwin();
 		abort();

@@ -18,6 +18,114 @@ char type_list[] = "!?])/=:,";	/* things to inventory */
  */
 
 /*
+ * swap_top:
+ *	Takes an stacked object and exchanges places with the top
+ *	object.
+ */
+swap_top(top, node)
+register struct linked_list *top, *node; /* This node must belong to the
+					  * <top>'s stacked object list */
+{
+    register struct object *obt, *obn;
+
+    obt = OBJPTR(top);
+    obn = OBJPTR(node);
+    detach((obt->next_obj), node);	/* Take it out of the stack */
+    attach(lvl_obj, node);		/* and put it into the level */
+    detach(lvl_obj, top);		/* Remove item from level */
+    if (obn->next_obj = obt->next_obj)
+	obn->next_obj->l_prev = NULL;
+    attach((obn->next_obj), top);
+}
+
+/*
+ * get_all:
+ *	Get as many stacked items as possible.
+ */
+get_all(top)
+register struct linked_list *top;
+{
+    register struct linked_list *node;
+    register struct object *obt;
+
+    while (top) {
+	obt = OBJPTR(top);
+	node = obt->next_obj;
+
+	if (!add_pack(top, FALSE))
+	    return;
+
+	rem_obj(top, FALSE);
+	top = node;
+    }
+}
+
+/*
+ * get_stack:
+ *	Allows the user to chose from a stack of items.
+ */
+struct linked_list *
+get_stack(item)
+register struct linked_list *item;
+{
+    register struct object *obj;
+    char buf[2*LINELEN];
+    register int i = 0, j;
+    register struct linked_list *ll;
+
+    obj = OBJPTR(item);
+    if (ll = obj->next_obj) {
+	sprintf(buf, "You are standing on top of the following stack of items: ");
+	add_line(buf);
+	sprintf(buf, "%d) -- %s", i, inv_name(obj, TRUE));
+	add_line(buf);
+	while (ll) {
+	    i++;
+	    obj = OBJPTR(ll);
+	    sprintf(buf, "%d) -- %s", i, inv_name(obj, TRUE));
+	    add_line(buf);
+	    ll = next(ll);
+	}
+	end_line();
+	msg("Which one do you want to pick up? [* for all] ");
+	switch (get_str(buf, cw)) {
+	    when NORM:
+	    when QUIT:		/* pick up nothing */
+		msg("");
+		return(NULL);
+	}
+	if (buf[0] == '*') {
+	    get_all(item);
+	    return(NULL);
+	}
+	else {
+	    i = atoi(buf);
+	    if (i) {
+		obj = OBJPTR(item);
+		ll = obj->next_obj;
+		j = 1;
+		while (ll && (j != i)) {
+		    ll = next(ll);
+		    j++;
+		}
+		if (ll) {
+		    swap_top(item, ll);
+		    return(ll);
+		}
+		else {
+		    msg("Trying to pull a fast one eh?  This game is void.");
+		    return(item);
+		}
+	    }
+	    else
+		return(item);
+	}
+    }
+    else
+	return(item);
+}
+
+/*
  * add_pack:
  *	Pick up an object and add it to the pack.  If the argument is non-null
  * use it as the linked_list pointer instead of getting it off the ground.
@@ -29,21 +137,29 @@ bool silent;
 {
     register struct linked_list *ip, *lp;
     register struct object *obj, *op;
+    register char ch;
     register bool exact, from_floor;
     register unsigned int index = 0;
   
     int bff_group();
     struct object *apply_to_bag();
   
+    ch = mvwinch(stdscr, hero.y, hero.x);
     if (item == NULL) {
 	from_floor = TRUE;
-	if ((item = find_obj(hero.y, hero.x)) == NULL)
+	if ((item = find_obj(hero.y, hero.x, TRUE)) == NULL) {
+	    msg("Nothing to pick up.");
 	    return(FALSE);
-	debug("Picking up %s from floor.",
-		name_type((OBJPTR(item))->o_type));
+	}
     }
     else
 	from_floor = FALSE;
+
+    if (from_floor) {
+	item = get_stack(item);
+	if (!item)
+	    return(FALSE);
+    }
   
     obj = OBJPTR(item);
   
@@ -80,12 +196,8 @@ bool silent;
 	}
 
       purse += obj->o_count;
-      if (from_floor) {
-	  detach(lvl_obj, item);
-	  mvaddch(hero.y, hero.x,
-		  (roomin(&hero) == NULL ? PASSAGE : FLOOR));
-	  discard(item);
-	}
+      if (from_floor)
+	  rem_obj(item, TRUE);	/* Remove object from the level */
       return(TRUE);
     }
   
@@ -112,13 +224,9 @@ bool silent;
   
   if ((op = apply_to_bag(pack, obj->o_type, bff_group, NULL, obj)) != NULL) {
       op->o_count += obj->o_count;	/* add it to the rest */
-      if (from_floor) {
-	  detach(lvl_obj, item);
-	  mvaddch(hero.y, hero.x,
-		  (roomin(&hero) == NULL ? PASSAGE : FLOOR));
-	}
+      if (from_floor)
+	  rem_obj(item, FALSE);
       pack_report(op, silent, "You now have ");
-      discard(item);
       return(TRUE);
     }
   
@@ -129,9 +237,7 @@ bool silent;
   if (obj->o_type == SCROLL && obj->o_which == S_SCARE)
     if (obj->o_flags & ISCURSED) {
 	msg("The scroll turns to dust as you pick it up.");
-	detach(lvl_obj, item);
-	discard(item);
-	mvaddch(hero.y, hero.x, (roomin(&hero) == NULL ? PASSAGE : FLOOR));
+	rem_obj(item, TRUE);
 	return(TRUE);
       }
   
@@ -154,11 +260,8 @@ bool silent;
    * of it.
    */
   
-  if (from_floor) {
-      detach(lvl_obj, item);
-      mvaddch(hero.y, hero.x,
-	      (roomin(&hero) == NULL ? PASSAGE : FLOOR));
-    }
+  if (from_floor)
+      rem_obj(item, FALSE);
   push_bag(&pack, obj, obj->o_type);
   pack_report(obj, silent, "You now have ");
   ur_free(item);
@@ -448,7 +551,7 @@ show_floor()
   register struct linked_list *item;
   register struct object *obj;
   
-  item = find_obj(hero.y, hero.x);
+  item = find_obj(hero.y, hero.x, TRUE);
   if (item != NULL) 
     {
       addmsg("%s onto ", terse ? "Moved" : "You moved");

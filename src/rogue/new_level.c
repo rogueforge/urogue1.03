@@ -362,11 +362,9 @@ LEVTYPE	ltype;		/* designates type of level to create */
 		if ((rnd(100) < (MAXTREAS*100)/(width*length)) &&
 		    (mvinch(rp->r_pos.y+j, rp->r_pos.x+i) == FLOOR)) {
 		    item = new_thing();
-		    attach(lvl_obj, item);
 		    cur = OBJPTR(item);
-	
-		    mvaddch(trp.y, trp.x, cur->o_type);
 		    cur->o_pos = trp;
+		    add_obj(item, trp.y, trp.x);
 		}
 	    }
     }
@@ -382,7 +380,6 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	     * Pick a new object and link it in the list
 	     */
 	    item = new_thing();
-	    attach(lvl_obj, item);
 	    cur = OBJPTR(item);
 	    /*
 	     * Put it somewhere
@@ -392,8 +389,8 @@ LEVTYPE	ltype;		/* designates type of level to create */
 		rm = rnd_room();
 		rnd_pos(&rooms[rm], &tp);
 	    } until (winat(tp.y, tp.x) == FLOOR || cnt++ > 500);
-	    mvaddch(tp.y, tp.x, cur->o_type);
 	    cur->o_pos = tp;
+	    add_obj(item, tp.y, tp.x);
 	}
     /*
      * If he is really deep in the dungeon and he hasn't found an
@@ -402,7 +399,6 @@ LEVTYPE	ltype;		/* designates type of level to create */
     if (make_artifact())
     {
 	item = new_item(sizeof *cur);
-	attach(lvl_obj, item);
 	cur = OBJPTR(item);
 	new_artifact(-1, cur);
 	cnt = 0;
@@ -410,8 +406,8 @@ LEVTYPE	ltype;		/* designates type of level to create */
 	    rm = rnd_room();
 	    rnd_pos(&rooms[rm], &tp);
 	} until (winat(tp.y, tp.x) == FLOOR || cnt++ > 500);
-	mvaddch(tp.y, tp.x, cur->o_type);
 	cur->o_pos = tp;
+	add_obj(item, tp.y, tp.x);
     }
 }
 

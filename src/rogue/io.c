@@ -141,7 +141,7 @@ register struct thing *flgptr;
 	     * so we need to look it up to see what type it is.
 	     */
 	    if (flgptr && flgptr->t_ctype == C_MONSTER) {
-		item = find_obj(y, x);
+		item = find_obj(y, x, TRUE);
 		if (item != NULL && (OBJPTR(item))->o_type == SCROLL &&
 		    (OBJPTR(item))->o_which == S_SCARE &&
 		    rnd(flgptr->t_stats.s_intel) < 12)

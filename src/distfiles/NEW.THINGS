@@ -1520,4 +1520,10 @@
 1)	fixed display of objects in hero's pack at end of game
 2)	fix being able to pick up more objects than 52 of a type
 
+1.03 Alpha, Oct 20, 86
+1)	changed handling of monsters killing each other to get around
+	NULL pointer bug
+2)	partially implemented stacking of more than one object on a square
+	above by Nick Flor
+
 -------	End of File ------

@@ -49,20 +49,18 @@ do_maze()
 	item = spec_item(GOLD, NULL, NULL, NULL);
 	obj = OBJPTR(item);
 	obj->o_count *= (rnd(10) + 1);		/* add in one large hunk */
-	attach(lvl_obj, item);
 	rnd_pos(rp, &tp);
-	mvaddch(tp.y, tp.x, GOLD);
 	obj->o_pos = tp;
+	add_obj(item, tp.y, tp.x);
 
 	/*
 	 * add in some food to make sure he has enough
 	 */
 	item = spec_item(FOOD, NULL, NULL, NULL);
 	obj = OBJPTR(item);
-	attach(lvl_obj, item);
 	rnd_pos(rp, &tp);
-	mvaddch(tp.y, tp.x, FOOD);
 	obj->o_pos = tp;
+	add_obj(item, tp.y, tp.x);
 	if (rnd(100) < 5) {			/* 5% for treasure maze level */
 	    treas = TRUE;
 	    least = 20;

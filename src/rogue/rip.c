@@ -90,15 +90,14 @@ register short monst;
 		    obj->o_flags = flags;
 		    next_item = next(item);
 		    rem_pack(obj);
-		    attach(lvl_obj, item);
 		    if (obj->o_type == ARTIFACT)
 			has_artifact &= ~(1 << obj->o_which);
 		    do {
 			rm = rnd_room();
 		        rnd_pos(&rooms[rm], &pos);
 		    } until (winat(pos.y, pos.x) == FLOOR);
-		    mvaddch(pos.y, pos.x, obj->o_type);
 		    obj->o_pos = pos;
+		    add_obj(item, obj->o_pos.y, obj->o_pos.x);
 		}
 		pstats.s_hpt = pstats.s_const;
 		pstats.s_const = max(pstats.s_const - roll(2,2), 3);

@@ -331,7 +331,7 @@ bool thrown;
 	else
 	    miss(mname);
     }
-    if (!monst_dead)
+    if (curr_mons)
 	runto(mp, &hero);	/* after so that backstabbing can happen */
     count = 0;
     return did_hit;
@@ -1594,7 +1594,10 @@ bool print_message, give_points;
     bool visible = cansee(tp->t_pos.y, tp->t_pos.x);
     bool is_player = (killer == (&player));
 
-    monst_dead = TRUE;	/* flag monster as gone for do_chase() */
+    if (item == curr_mons)
+	curr_mons = NULL;
+    else if (item == next_mons)
+	next_mons = next(next_mons);
 
     if (on(*tp, WASSUMMONED)) {
 	extinguish(unsummon);

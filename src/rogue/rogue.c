@@ -21,6 +21,8 @@ struct object *cur_charm = NULL;	/* Currently charmed monsters */
 struct linked_list *fam_ptr = NULL;	/* A ptr to the familiar */
 struct linked_list *lvl_obj = NULL; 	/* Treasure on this level */
 struct linked_list *mlist = NULL;	/* Monsters on this level */
+struct linked_list *curr_mons = NULL;	/* The mons. currently moving */
+struct linked_list *next_mons = NULL;	/* The mons. after curr_mons */
 struct real_pass rpass;			/* For protection's sake! */
 
 #if defined(USGV5)
@@ -109,7 +111,6 @@ bool firstmove = FALSE;
 bool askme = FALSE;
 bool moving = FALSE;
 bool in_shell = FALSE; 
-bool monst_dead = FALSE;
 coord delta;				/* Change indicated to get_dir() */
 LEVTYPE levtype;			/* type of level i'm on */
 
@@ -230,6 +231,7 @@ struct h_list helpstr[] = {
     '>',	"	go down a staircase",
     's',	"	search for trap/secret door",
     '.',	"	rest for a while",
+    ',',	"	pick up an object",
     'i',	"	inventory all items",
     'I',	"	inventory type of item",
     'q',	"	quaff potion",

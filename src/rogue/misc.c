@@ -257,18 +257,29 @@ register int y, x;
  */
 
 struct linked_list *
-find_obj(y, x)
+find_obj(y, x, start)
 register int y;
-int x;
+int x, start;
 {
-    register struct linked_list *obj;
+    register struct linked_list *obj, *sobj;
     register struct object *op;
+    static struct linked_list *next_ll;
 
-    for (obj = lvl_obj; obj != NULL; obj = next(obj)) {
+    if (start)
+	sobj = lvl_obj;
+    else
+	sobj = next_ll;
+
+    for (obj = sobj; obj != NULL; obj = next(obj)) {
 	op = OBJPTR(obj);
-	if (op && op->o_pos.y == y && op->o_pos.x == x)
+	if (op && op->o_pos.y == y && op->o_pos.x == x) {
+		next_ll = next(obj);
+		if (!next_ll)
+		    next_ll = lvl_obj;
 		return obj;
+	}
     }
+    next_ll = lvl_obj;
     return NULL;
 }
 

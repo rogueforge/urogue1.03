@@ -28,14 +28,13 @@ struct object *pick_weap();		/* find monster's favorite weapon */
 runners()	/* with monsters now fighting each other, this routine
 		have been enhanced and may need more work yet */
 {
-    register struct linked_list *item, *nitem;
+    register struct linked_list *item;
     register struct thing *tp;
 
-    for (item = mlist; item != NULL; item = nitem) {
-	nitem = next(item); /* Get next item now since monster may disappear */
+    for (item = mlist; item != NULL; item = next_mons) {
+	curr_mons = item;
+	next_mons = next(curr_mons); /* Get next item now since monster may disappear */
 	tp = THINGPTR(item);
-
-	monst_dead = FALSE; /* Indicate that this monster is alive */
 
 	if (on(*tp, ISHELD) && rnd(tp->t_stats.s_str+tp->t_stats.s_lvl) > 10+rnd(50)) {
 	    turn_off(*tp, ISHELD);
@@ -59,18 +58,19 @@ runners()	/* with monsters now fighting each other, this routine
 		doctor(tp);
 		do_chase(tp, flee);
 	    }
-	    if (!monst_dead && (on(*tp, ISHASTE) ||
+	    if (curr_mons && (on(*tp, ISHASTE) ||
 			((on(*tp, CANFLY) || on(*tp, ISFAST)) && 
 			DISTANCE(hero.y, hero.x, tp->t_pos.y, tp->t_pos.x) >= 4))) {
 		doctor(tp);
 		do_chase(tp, flee);
 	    }
-	    if (!monst_dead) {
+	    if (curr_mons) {
 		tp->t_turn ^= TRUE;
 		tp->t_wasshot = FALSE;	/* Not shot anymore */
 	    }
 	}
     }
+    curr_mons = next_mons = NULL;
 }
 
 /*
@@ -221,25 +221,20 @@ register bool flee;
 	    stoprun = TRUE;
     }
 
-    if (monst_dead) return;	/* Did monster get itself killed? */
+    if (!curr_mons) return;	/* Did monster get itself killed? */
 
     if (on(*th, NOMOVE)) 
 	return;
 
     /* If we have a scavenger, it can pick something up */
-    if ((item = find_obj(ch_ret.y, ch_ret.x)) != NULL) {
-	register char floor;
+    if ((item = find_obj(ch_ret.y, ch_ret.x, TRUE)) != NULL) {
 	register struct object *obj = OBJPTR(item);
 
 	if (on(*th, ISSCAVENGE) || 
 		((on(*th, CANWIELD) || on(*th, CANSHOOT))
 			&& (obj->o_type == WEAPON || obj->o_type == ARMOR))
 		|| (on(*th, CANCAST) && is_magic(obj))) {
-	    detach(lvl_obj, item);
-	    floor = (roomin(&ch_ret) == NULL) ? PASSAGE : FLOOR;
-	    if (cansee(ch_ret.y, ch_ret.x))
-		mvwaddch(cw, ch_ret.y, ch_ret.x, floor);
-	    mvaddch(ch_ret.y, ch_ret.x, floor);
+	    rem_obj(item, FALSE);
 	    attach(th->t_pack, item);
 	}
     }
@@ -499,15 +494,14 @@ register bool flee;
 		    breath = "fear gas";
 		}
 
-		/* Now breathe -- returns TRUE if kills itself */
+		/* Now breathe */
 		/* save() call vs player happens on shoot_bolt */
-		monst_dead =
-		    shoot_bolt(tp, *er, *shoot_dir, NOPOINTS, tp->t_index, breath,
-			        roll(tp->t_stats.s_lvl, 6));
+		shoot_bolt(tp, *er, *shoot_dir, NOPOINTS,
+			   tp->t_index, breath, roll(tp->t_stats.s_lvl, 6));
 
 		ch_ret = *er;
 		dist = DISTANCE(ch_ret.y, ch_ret.x, ee->y, ee->x);
-		if (monst_dead) return(TRUE);
+		if (!curr_mons) return(TRUE);
 	}
 
     /* 

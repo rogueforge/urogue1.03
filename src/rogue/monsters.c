@@ -876,13 +876,6 @@ register char monster;
 check_residue(tp)
 register struct thing *tp;
 {
-   /*
-    * Flag the monster as dead to prevent multiple moves in this round.
-    * (Done for the benefit of do_chase())
-    */
- 
-  monst_dead = TRUE;
- 
     /*
      * Take care of special abilities
      */

@@ -375,9 +375,8 @@ int flags;
                 item = spec_item(SCROLL,S_SCARE,0,0);
 		obj = OBJPTR(item);
 		obj->o_flags = ISCURSED;
-	        attach(lvl_obj, item);
-	        mvaddch(hero.y, hero.x, obj->o_type);
 	        obj->o_pos = hero;
+	        add_obj(item, hero.y, hero.x);
 		msg("A wave of terror sweeps throughout the room");
 	    } else {
 	    /*
