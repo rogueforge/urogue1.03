@@ -493,7 +493,7 @@ int flags;
 			ll = find_obj(m2,m1,TRUE);
 			while (ll != NULL) {
 			    rem_obj(ll,TRUE);
-			    ll = find_obj(m2,m1,FALSE);
+			    ll = find_obj(m2,m1,TRUE);
 			}
 			ll = find_mons(m2,m1);
 			if (ll != NULL) {
@@ -734,7 +734,7 @@ int flags;
 			ip = find_obj(obj->o_pos.y, obj->o_pos.x, TRUE);
 			while (ip) {	/* BOOM destroys all stacked objects */
 			    rem_obj(ip, TRUE);
-			    ip = find_obj(obj->o_pos.y, obj->o_pos.x, FALSE);
+			    ip = find_obj(obj->o_pos.y, obj->o_pos.x, TRUE);
 			}
 			mvaddch(obj->o_pos.y, obj->o_pos.x,
 				roomin(&obj->o_pos) == NULL ? PASSAGE : FLOOR);

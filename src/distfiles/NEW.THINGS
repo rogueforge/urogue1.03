@@ -1562,4 +1562,7 @@
 31)	fixed tr_name so that the names are spaced correctly in noterse
 	mode
 
+1.03 Alpha, Jan 8, 87
+1)	temporary fix of stacking code by Nick Flor
+
 -------	End of File ------
