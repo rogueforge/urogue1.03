@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * save and restore routines
  *
  * @(#)save.c	3.9 (Berkeley) 6/16/81
@@ -9,7 +12,6 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/file.h>
 #include <signal.h>
 #include "rogue.h"
 
@@ -18,7 +20,7 @@ typedef struct stat STAT;
 extern char *sys_errlist[], version[];
 extern int errno;
 
-char *sbrk();
+char *sbrk(), _putchar();
 
 STAT sbuf;
 
@@ -26,7 +28,7 @@ int sigdie = -1;
 
 save_game()
 {
-    register FILE *savef;
+    register int savefd;
     register int c;
     char buf[LINELEN];
 
@@ -34,43 +36,38 @@ save_game()
      * get file name
      */
     mpos = 0;
-    if (file_name[0] != '\0')
-    {
+    if (file_name[0] != '\0') {
 	msg("Save file (%s)? ", file_name);
-	do
-	{
+	do {
 	    c = getchar() & 0177;
 	    if (c == ESCAPE) return(0);
 	} while (c != 'n' && c != 'N' && c != 'y' && c != 'Y');
 	mpos = 0;
-	if (c == 'y' || c == 'Y')
-	{
+	if (c == 'y' || c == 'Y') {
 	    msg("File name: %s", file_name);
 	    goto gotfile;
 	}
     }
 
-    do
-    {
+    do {
 	msg("File name: ");
 	mpos = 0;
 	buf[0] = '\0';
-	if (get_str(buf, cw) == QUIT)
-	{
+	if (get_str(buf, cw) == QUIT) {
 	    msg("");
 	    return FALSE;
 	}
 	strcpy(file_name, buf);
 gotfile:
-	if ((savef = fopen(file_name, "w")) == NULL)
+	if ((savefd = creat(file_name, 0400)) == -1)
 	    msg(sys_errlist[errno]);	/* fake perror() */
-    } while (savef == NULL);
+    } while (savefd == -1);
 
     /*
      * write out encrpyted file (after a stat)
      * The fwrite is to force allocation of the buffer before the write
      */
-    save_file(savef);
+    save_file(savefd);
     return TRUE;
 }
 
@@ -81,9 +78,7 @@ gotfile:
 auto_save(sig)
 int sig;
 {
-    register FILE *savef;
-    FILE *fopen(),*ferrsig;
-    register int i;
+    register int savefd;
 
     /*
      * Code added by Bruce Dautrich on 4/11/84 to
@@ -103,27 +98,25 @@ int sig;
     }
 
 got1sig:
-    if (file_name[0] != '\0' && (savef = fopen(file_name, "w")) != NULL)
-	save_file(savef);
+    if (file_name[0] != '\0' && (savefd = creat(file_name, 0400)) > -1)
+	save_file(savefd);
 #if defined(BSD4)
     (void) TtySetOriginalChars();
 #endif
+    endwin();
     exit(1);
 }
 
-/*
- * write the saved game on the file
- */
-save_file(savef)
-register FILE *savef;
+save_file(savefd)
+register int savefd;
 {
     wmove(cw, LINES-1, 0);
     draw(cw);
-    fstat(fileno(savef), &sbuf);
-    fwrite("junk", 1, 5, savef);
-    fseek(savef, 0L, 0);
-    encwrite(version, sbrk(0) - version, savef);
-    fclose(savef);
+    fstat(savefd, &sbuf);
+    write(savefd, "junk", 5);
+    lseek(savefd, 0L, 0);
+    encwrite(version, sbrk(0) - version, savefd);
+    close(savefd);
 }
 
 /*This is only until all have used this rogue version 1.2 */
@@ -131,8 +124,9 @@ restore(file, envp)
 register char *file;
 char **envp;
 {
-    register int inf;
+    register int infd;
     extern char **environ;
+    register char *sp;
     char buf[LINELEN];
     STAT sbuf2;
 
@@ -146,26 +140,25 @@ char **envp;
 
     if (strcmp(file, "-r") == 0)
 	file = file_name;
-    if ((inf = open(file, 0)) < 0)
-    {
+    if ((infd = open(file, 0)) < 0) {
 	perror(file);
 	return FALSE;
     }
 
     fflush(stdout);
-    encread(buf, strlen(version) + 1, inf);
-    if (strcmp(buf, version) != 0)
-    {
+    encread(buf, strlen(version) + 1, infd);
+    if (strcmp(buf, version) != 0) {
 	printf("Save Game Version: %s\nReal Game Version: %s\n", buf, version);
 	printf("Sorry, saved game is out of date.\n");
 	return FALSE;
     }
 
-    fstat(inf, &sbuf2);
+    fstat(infd, &sbuf2);
     fflush(stdout);
     brk(version + sbuf2.st_size);
-    lseek(inf, 0L, 0);
-    encread(version, (unsigned int) sbuf2.st_size, inf);
+    lseek(infd, 0L, 0);
+    encread(version, (int) sbuf2.st_size, infd);
+
     /*
      * we do not close the file so that we will have a hold of the
      * inode for as long as possible
@@ -176,9 +169,9 @@ char **envp;
 	    printf("Sorry, saved game is not in the same file.\n");
 	    return FALSE;
 	}
-	else if (sbuf2.st_ctime - sbuf.st_ctime > 1800) {
-	    printf("(%d): Sorry, file has been touched.\n"
-		,sbuf2.st_ctime - sbuf.st_ctime);
+	else if (sbuf2.st_ctime - sbuf.st_ctime > SAVETIME) {
+	    printf("(%d): Sorry, file has been touched.\n",
+		sbuf2.st_ctime - sbuf.st_ctime);
 	    return FALSE;
 	}
     }
@@ -206,22 +199,47 @@ char **envp;
 #endif
 
     environ = envp;
-    if (!My_term && isatty(2))
-    {
-	register char	*sp;
-
+#if defined(USGV5)
+    if (isatty(2)) {
+#else
+    if (!My_term && isatty(2)) {
+#endif
 	_tty_ch = 2;
+#if !defined(USGV5)
 	gettmode();
+#endif
 	if ((sp = getenv("TERM")) == NULL)
 	    sp = Def_term;
-	setterm(sp);
     }
     else
-	setterm(Def_term);
+	sp = Def_term;
+#if defined(attron)
+    restartterm(sp, 1, 0);
+#else
+    setterm(sp);
+#endif attron
+#if !defined(USGV5)
+    _puts(TI);
+    _puts(VS);
+#endif
+
     strcpy(file_name, file);
     setup();
     clearok(curscr, TRUE);
     touchwin(cw);
+#if defined(attron)
+    cbreak();
+    noecho();
+    nonl();
+#else
+#if defined(USGV5)
+    /*
+     * Sys V curses weirdness
+     */
+    noecho();
+    nonl();
+#endif
+#endif attron
     srand(getpid());
     playit();
     /*NOTREACHED*/
@@ -237,13 +255,19 @@ char **envp;
  * the file using data diffusion (putword,getword).
  *
  * Usage:
- *	encwrite (start, size, outf);
- *	char *start; int size; FILE *outf;
+ *	encwrite (start, size, outfd);
+ *	unsigned char *start; int size; int outfd;
  *
  *	encread (start, size, infd);
- *	char *start; int size; int infd;
+ *	unsigned char *start; int size; int infd;
  *
  * HISTORY
+ *
+ * 07-May-86  Michael Laman (laman) at NCR Rancho Bernardo
+ *	Modified for UltraRogue.  Removed all uses of standard I/O from
+ *	data encryption routines.  This is most portable solution around
+ *	a bug of limiting how many times a game may be saved.
+ *
  * 03-Mar-85  Michael Mauldin (mlm) at Carnegie-Mellon University
  *	Modified for UltraRogue.  Allowed multiple encwrites to a file by
  *	removing lseek calls and computing checksum while reading.
@@ -254,13 +278,11 @@ char **envp;
  *
  *****************************************************************/
 
-# include <stdio.h>
-
 /* Constants for key generation */
 # define OFFSET		667818
 # define MODULUS	894871
 # define MULT		2399
-# define ENCHAR		(((seed= ((seed*MULT+OFFSET)%MODULUS)) >> 10) & 0xff)
+# define ENCHAR		((unsigned char) ((seed= ((seed*MULT+OFFSET)%MODULUS)) >> 10))
 
 /* Constants for checksumming */
 # define INITCK		1232531
@@ -272,35 +294,47 @@ struct wb { int w1, w2, w3, w4; };
  * Encwrite: write a buffer to a file using data encryption
  *****************************************************************/
 
-encwrite (start, size, outf)
-register char *start;
+encwrite (start, size, outfd)
+register unsigned char *start;
 int size;
-register FILE *outf;
-{ register int cksum = INITCK, seed, ch;
+int outfd;
+{
+  register unsigned char *buf_p, *end_p;
+  register int cksum = INITCK, seed, ch;
+  register int cnt;
+  char buffer[512 * 20];
 
-  srand (time (0) + getpid () + getuid ());	/* Build a random seed */
+  srand (time ((long *) 0) + getpid () + getuid ());	/* Build a random seed */
   seed = (rand () & 0x7fff);
   
-  putword (seed, outf);				/* Write the random seed */
-  putword (size, outf);				/* Write the file length */
+  putword (seed, outfd);			/* Write the random seed */
+  putword (size, outfd);			/* Write the file length */
 
 # ifdef DEBUG
   fprintf (stderr, "Encwrite: size %ld, seed %ld.\n", size, seed);
 # endif
 
   /* Now checksum, encrypt, and write out the buffer. */
-  while (size--)
-  { ch = *start++ & 0xff;			/* Get the next char */
-    cksum = ((cksum << 8) + ch) % CKMOD;	/* Checksum clear text */
-    putc (ch ^ ENCHAR, outf);			/* Write ciphertext */
+  while (size)
+  {
+    buf_p = (unsigned char *) buffer;
+    cnt = min(size, sizeof buffer);
+    end_p = (unsigned char *) &buffer[cnt];
+    while(buf_p < end_p) {
+	cksum = ((cksum << 8) + (ch = *start++)) % CKMOD;
+	*buf_p++ = ch ^ ENCHAR;
+    }
+    if(write(outfd, buffer, cnt) != cnt)
+	return 0;
+    size -= cnt;
   }
 
-  putword (cksum, outf);			/* Write out the checksum */
-  fflush (outf);				/* Flush the output */
+  putword (cksum, outfd);			/* Write out the checksum */
 
 # ifdef DEBUG
   fprintf (stderr, "Checksum is %ld.\n", cksum);
 # endif
+  return 1;
 }
 
 /*****************************************************************
@@ -308,7 +342,7 @@ register FILE *outf;
  *****************************************************************/
 
 encread (start, size, infd)
-register char *start;
+register unsigned char *start;
 int size;
 int infd;
 { register int cksum = INITCK, seed, length, cnt, ch;
@@ -324,7 +358,7 @@ int infd;
   
   if ((length = read (infd, start, (int) min (size, stored))) > 0)
   { for (cnt = length; cnt--; ) 
-    { ch = (*start++ ^= ENCHAR) & 0xff;
+    { ch = (unsigned char) (*start++ ^= ENCHAR);
       cksum = ((cksum << 8) + ch) % CKMOD;
     }
   
@@ -348,7 +382,7 @@ int infd;
 
 putword (word, file)
 int word;
-FILE *file;
+int file;
 { struct wb w;
 
   w.w1 = rand ();  
@@ -356,7 +390,7 @@ FILE *file;
   w.w3 = rand ();  
   w.w4 = w.w1 ^ w.w2 ^ w.w3 ^ word;
   
-  return (fwrite ((char *) &w, sizeof (struct wb), 1, file));
+  return write (file, (char *) &w, sizeof w);
 }
 
 /*****************************************************************
@@ -367,7 +401,7 @@ getword (fd)
 int fd;
 { struct wb w;
   
-  if (read (fd, (char *) &w, sizeof (struct wb)) == sizeof (struct wb))
+  if (read (fd, (char *) &w, sizeof w) == sizeof w)
     return (w.w1 ^ w.w2 ^ w.w3 ^ w.w4);
   else
     return (0);

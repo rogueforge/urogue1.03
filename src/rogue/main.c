@@ -1,3 +1,6 @@
+/*
+ * Last Modified: 05/25/86
+ */
  /*
  * Rogue
  * Exploring the dungeons of doom
@@ -7,10 +10,14 @@
  */
 
 #include <stdio.h>
-#include <curses.h>
+#include "curses.h"
 #include <signal.h>
 #include <pwd.h>
+#if defined(USGV5) || defined(RTU2)
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
 #include "mach_dep.h"
 #include "rogue.h"
 
@@ -30,16 +37,18 @@ char **envp;
     struct passwd *getpwuid();
     char *getpass(), *crypt(), *strrchr();
     char *pagerbase;
+    FILE *filep;
     int quit(), lowtime, wpt, i, j, hpadd, dmadd;
-    bool alldone, predef;
+    void areuok(), init_exp();
+    bool alldone,predef;
     long now;
 
     areuok(PERMOK);					/* read author file */
     (void) signal(SIGQUIT, SIG_IGN); 		/* ignore quit for now */
+
     /*
      * get home and options from environment
      */
-
     if ((env = getenv("HOME")) != NULL)
 	strcpy(home, env);
     else if ((pw = getpwuid(getuid())) != NULL)
@@ -61,11 +70,10 @@ char **envp;
      */
     fd_score = open(score_file, 2);
 
-    if ((env = getenv("SROGUEOPTS")) != NULL)
+    if ((env = getenv(OPTIONS)) != NULL)
 	parse_opts(env);
     if (env == NULL || whoami[0] == '\0')
-	if ((pw = getpwuid(getuid())) == NULL)
-	{
+	if ((pw = getpwuid(getuid())) == NULL) {
 	    printf("Say, who the hell are you?\n");
 	    printf("You can't run without a name.\n");
 	    sleep(4);
@@ -92,14 +100,13 @@ char **envp;
     /*
      * check for print-score option
      */
-    if (argc == 2 && strcmp(argv[1], "-s") == 0)
-    {
+    if (argc == 2 && strcmp(argv[1], "-s") == 0) {
 	waswizard = TRUE;
 #if defined(BSD4)
 	(void) TtyInit();		/* Set up for the tty magic */
 	(void) TtyMapGameChars();
 #endif
-	score(0, SCOREIT, 0);
+	score(0L, 0, SCOREIT, 0);
 	exit(0);
     }
 
@@ -111,15 +118,33 @@ char **envp;
 	(void) execl(PAGER, pagerbase, NEWS, 0);
 	exit(0);
     }
+
+    /*
+     * check for version option
+     */
+    if (argc == 2 && strcmp(argv[1], "-v") == 0) {
+	printf("UltraRogue Version %s.\n", release);
+	exit(0);
+    }
+
+    /*
+     * check for NOPLAY file 
+     */
+    if ((filep = fopen(NOPLAY, "r")) != NULL) {
+	register int ch;
+	while((ch = getc(filep)) != EOF)
+		putchar(ch);
+	putchar('\n');
+	exit(0);
+    }
+
     /*
      * Check to see if he is a wizard
      */
     makesure();
     if (argc >= 2 && argv[1][0] == '\0')
-	if (strcmp(PASSWD, crypt(getpass("Wizard's password: "), PASSWDSEED)) == 0)
-	{
-		if (canwizard)
-		{
+	if (strcmp(PASSWD, crypt(getpass("Wizard's password: "), PASSWDSEED)) == 0) {
+		if (canwizard) {
 		    signal(SIGQUIT, SIG_DFL);
 		    wizard = TRUE;
 		    argv++;
@@ -129,8 +154,7 @@ char **envp;
 			printf("Well that's odd...\n");
 	}
 
-    if( !author() && !wizard && !holiday())
-	{
+    if( !author() && !wizard && !holiday()) {
 	static char *niceties[] = { "juicy", "fresh", "nice" ,"sweet" };
 
 	srand48((long) (getpid()+rnd(127)));
@@ -138,11 +162,9 @@ char **envp;
 	printf("Meanwhile, why not enjoy a %s %s?\n",niceties[rnd(4)], fruit);
 	sleep(4);
 	exit(1);
-	}
-    if (too_much() && !wizard)
-    {
-	if(!author())
-	{
+    }
+    if (too_much() && !wizard) {
+	if(!author()) {
 	    static char *niceties[] = { "juicy", "fresh", "nice" ,"sweet" };
 
 	    srand48((long) (getpid()+rnd(127)));
@@ -152,8 +174,7 @@ char **envp;
 	    sleep(4);
 	    exit(1);
 	}
-	else
-	{
+	else {
 		printf("The system load is rather heavy, %s...\n",whoami);
 		printf("However I'll let you play anyway!\n");
 		printf("Please note that there are %d users!\n",ucount());
@@ -161,9 +182,20 @@ char **envp;
 	}
     }
 
+    if ((filep = fopen(MOTD, "r")) != NULL) {
+	register int ch;
+	while((ch = getc(filep)) != EOF)
+		putchar(ch);
+	putchar('\n');
+	printf(retstr);
+	gets(prbuf);
+	fclose(filep);
+    }
+
     if (argc == 2 && argv[1][0] != '\0') {
-	if (!restore(argv[1], envp))/* Note: restore returns on error only */
+	if (!restore(argv[1], envp)) { /* Note: restore returns on error only */
 	    exit(1);
+	}
     }
     lowtime = (int) time(&now);
     dnum = (wizard && getenv("SEED") != NULL ?
@@ -175,7 +207,7 @@ char **envp;
 	printf("Hello %s, just a moment while I dig the dungeon...", whoami);
     fflush(stdout);
     seed = dnum;
-    srand48(seed);
+    srand48((long) seed);
 
     init_things();			/* Set up probabilities of things */
     init_fd();				/* Set up food probabilities */
@@ -186,6 +218,9 @@ char **envp;
     (void) TtyInit();			/* Set up for the tty magic */
 #endif
     initscr();				/* Start up cursor package */
+#if defined(attron)
+    typeahead(-1);	/* Turn off typeahead checking */
+#endif attron
     init_names();			/* Set up names of scrolls */
     setup();
 
@@ -217,20 +252,20 @@ re_roll:
 	int ch;
 	i = rnd(16);	/* number of acceptable weapons */
 	switch(i) {
-	    case 0: ch = 25; wpt = MACE;
-	    when 1: ch = 25; wpt = SWORD;
-	    when 2: ch = 15; wpt = TWOSWORD;
-	    when 3: ch = 10; wpt = SPEAR;
+	    case 0: ch = 25; wpt = HEAVY_MACE;
+	    when 1: ch = 25; wpt = BROAD_SWORD;
+	    when 2: ch = 15; wpt = TWO_SWORD;
+	    when 3: ch = 10; wpt = LONG_SPEAR;
 	    when 4: ch = 20; wpt = TRIDENT;
 	    when 5: ch = 20; wpt = SPETUM;
 	    when 6: ch = 20; wpt = BARDICHE;
-	    when 7: ch = 15; wpt = SPIKE;
-	    when 8: ch = 15; wpt = BASWORD;
+	    when 7: ch = 15; wpt = SHORT_PIKE;
+	    when 8: ch = 15; wpt = BAST_SWORD;
 	    when 9: ch = 20; wpt = HALBERD;
-	    when 10:ch = 20; wpt = BATTLEAXE;
+	    when 10:ch = 20; wpt = BATTLE_AXE;
 	    when 11:ch = 20; wpt = GLAIVE;
-	    when 12:ch = 20; wpt = LPIKE;
-	    when 13:ch = 20; wpt = BRSWORD;
+	    when 12:ch = 20; wpt = LONG_PIKE;
+	    when 13:ch = 20; wpt = BROAD_SWORD;
 	    when 14:ch = 20; wpt = CRYSKNIFE;
 	    when 15:ch = 20; wpt = CLAYMORE;
 	}
@@ -240,9 +275,10 @@ re_roll:
     } while(!alldone);
     hpadd = rnd(2) + 1;
     dmadd = rnd(2) + 1;
-    if (player.t_ctype == C_FIGHTER) {
+    if (player.t_ctype == C_FIGHTER || player.t_ctype == C_PALADIN
+		|| player.t_type == C_RANGER ) {
 	if (rnd(100) > 50)
-	    wpt = TWOSWORD;
+	    wpt = TWO_SWORD;
 	else
 	    wpt = CLAYMORE;
 	hpadd = hpadd - 1;
@@ -285,11 +321,15 @@ get_food:
     obj->o_weight = things[TYP_FOOD].mi_wght;
     add_pack(item, TRUE);
     resurrect = pstats.s_const;
+    init_exp();				/* set first experience level change */
+    init_flags();			/* set initial flags */
+    wclear(hw);
+    wrefresh(hw);
     new_level(FALSE);			/* Draw current level */
     /*
      * Start up daemons and fuses
      */
-    daemon(doctor, &player, AFTER);
+    daemon(doctor, (int) &player, AFTER);
     fuse(swander, 0, WANDERTIME, AFTER);
     daemon(stomach, 0, AFTER);
     daemon(runners, 0, AFTER);
@@ -334,7 +374,7 @@ char *s;
 rnd(range)
 register int range;
 {
-	return (range == 0 ? 0 : (lrand48() & 0x7fffffff) % range);
+	return(range == 0 ? 0 : (lrand48() & 0x7fffffff) % range);
 }
 
 /*
@@ -352,28 +392,34 @@ register int number, sides;
     return dtotal;
 }
 
-
 setup()
 {
+    void areuok();
     int  checkout();
+
 #if defined(BSD4)
     int  tstop();
+    signal(SIGTSTP, tstop);
 #endif
 
     signal(SIGHUP, auto_save);
     signal(SIGINT, quit);
-#if defined(BSD4)
-    signal(SIGTSTP, tstop);
-#endif
 
+#if !defined(USGV5)
     if (!author())
     {
 	signal(SIGALRM, checkout);
 	alarm(CHECKTIME * 60);
 	num_checks = 0;
     }
+#endif
+#if defined(attron)
+    cbreak();
+#else
     crmode();				/* Cbreak mode */
+#endif attron
     noecho();				/* Echo off */
+    nonl();
 }
 
 /*
@@ -390,16 +436,24 @@ playit()
      * set up defaults for slow terminals
      */
 
+#if defined(attron)
+	if(baudrate() < B1200)
+#else
 #if defined(USGV5) || defined(USGV3)
 	if((_tty.c_cflag & CBAUD) < B1200)
 #endif
 #if defined(BSD4)
 	if(_tty.sg_ospeed < B1200)
 #endif
+#if defined(RTU2)
+	if(TRUE == FALSE)  /* dummy if since RTU screws up BSD simulation */
+#endif
+#endif attron
     {
 	terse = TRUE;
 	jump = TRUE;
-    }
+	inv_type = INV_SLOW;
+    } 
 
     char_type = player.t_ctype;
 
@@ -416,8 +470,12 @@ playit()
  */
 too_much()
 {
+#if !defined(USGV5)
 	loadav(avec);
 	return (avec[2] > (MAXLOAD / 10.0)) || (ucount() > MAXUSERS);
+#else
+	return (0);
+#endif
 }
 
 /*
@@ -451,8 +509,8 @@ makesure()
 	for ( i=0; i<2;i++)
 		rpass.rp_pkey[i] = 0;
 
-	encread(rpass.rp_pkey, sizeof(rpass.rp_pkey), fd);
-	encread(rpass.rp_pass, sizeof(rpass.rp_pass), fd);
+	encread(rpass.rp_pkey, (int) sizeof(rpass.rp_pkey), fd);
+	encread(rpass.rp_pass, (int) sizeof(rpass.rp_pass), fd);
 
 	close(fd);
 
@@ -460,7 +518,7 @@ makesure()
 	    canwizard = TRUE;
 	return(FALSE);
 }
-/**void**/
+void
 areuok(file)
 char	*
 file;
@@ -472,11 +530,12 @@ file;
 	if((fd = open(file,0)) < 0)
 		return ;
 
-	encread(auth_or, sizeof(auth_or), fd);
+	encread(auth_or, (int) sizeof(auth_or), fd);
 
 	close(fd);
 }
 
+#if !defined(USGV5)
 checkout()
 {
 	static char *msgs[] = {
@@ -506,7 +565,7 @@ checkout()
 #endif
 		exit(1);
 	    }
-	    checktime = CHECKTIME / (2 * (num_checks + 1));
+	    checktime = WARNTIME;
 	    chmsg(msgs[num_checks++], checktime);
 	    alarm(checktime * 60);
 	}
@@ -523,6 +582,7 @@ checkout()
  * checkout()'s version of msg.  If we are in the middle of a shell, do a
  * printf instead of a msg to avoid the refresh.
  */
+/*VARARGS1*/
 chmsg(fmt, arg)
 char *fmt;
 int arg;
@@ -544,11 +604,20 @@ reg double *avg;
 {
 	FILE * pp;
 	FILE * popen ();
-	pp = popen (LOADAV_PROG, "r");
-	fscanf (pp, "%lf%lf%lf", &avg[0], &avg[1], &avg[2]);
+	extern char LOADAV_PROG[];
+	extern char LOADAV_SCAN[];
+
+	if( (pp = popen (LOADAV_PROG, "r")) == (FILE*) 0) {
+		avg[0] = 0;
+		avg[1] = 0;
+		avg[2] = 0;
+		return;
+	}
+	fscanf(pp, LOADAV_SCAN, &avg[0], &avg[1], &avg[2]);
 	pclose (pp);
 	return;
 }
+#endif
 
 /*
  * ucount:
@@ -569,7 +638,7 @@ ucount()
 
 	up = &buf;
 	count = 0;
-	while (fread(up, 1, sizeof (*up), utmp) > 0)
+	while (fread((char *) up, 1, sizeof (*up), utmp) > 0)
 		if (buf.ut_type == USER_PROCESS)
 			count++;
 	fclose(utmp);
@@ -577,7 +646,7 @@ ucount()
 }
 #endif
 
-#if defined(BSD4) || defined(USGV3)
+#if defined(BSD4) || defined(USGV3) || defined(RTU2)
 #include <utmp.h>
 
 struct utmp buf;
@@ -594,7 +663,7 @@ ucount()
     up = &buf;
     count = 0;
 
-    while (fread(up, 1, sizeof (*up), utmp) > 0)
+    while (fread((char *) up, 1, sizeof (*up), utmp) > 0)
 	if (buf.ut_name[0] != '\0')
 	    count++;
     fclose(utmp);

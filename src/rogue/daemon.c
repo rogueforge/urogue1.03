@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Contains functions for dealing with things that happen in the
  * future.
  *
@@ -10,7 +13,7 @@
 
 #define EMPTY 0
 #define DAEMON -1
-#define MAXDAEMONS 60
+#define MAXDAEMONS 200
 
 #define _X_ { EMPTY }
 

@@ -1,4 +1,7 @@
-/* 
+/*
+ * Last Modified: 05/25/86
+ */
+/*
  * Hero movement commands
  *
  */
@@ -24,6 +27,11 @@ char ch;
     running = TRUE;
     after = FALSE;
     runch = ch;
+    if (doorstop && !on(player, ISBLIND))
+    {
+	door_stop = TRUE;
+	firstmove = TRUE;
+    }
 }
 
 /*
@@ -131,8 +139,12 @@ int dy, dx;
      */
     if ((rnd(100) < 80 && on(player, ISHUH)) || 
 	(ISWEARING(R_DELUSION) && rnd(100) < 25) ||
-	on(player, STUMBLER) && rnd(40) == 0)
-	nh = *rndmove(&player);
+	on(player, STUMBLER) && rnd(40) == 0) {
+
+	coord *foo = rndmove(&player);	/* bug in 4.2 compiler for the RT PC */
+
+	nh = *foo;
+    }
     else {
 	nh.y = hero.y + dy;
 	nh.x = hero.x + dx;
@@ -269,10 +281,36 @@ int dy, dx;
 	return;
     }
     else if (isalpha(ch)) {
+	register struct linked_list *mp;
+	register struct thing *tp;
+	register int t;
 	running = FALSE;
-	hero = old_hero;    /* Restore hero -- we'll fight instead of move */
-	fight(&nh, ch, cur_weapon, FALSE);
-	return;
+	mp = find_mons(hero.y,hero.x);
+	tp = THINGPTR(mp);
+	if (on(*tp,ISFAMILIAR) || on(*tp, ISCHARMED)) 
+	{ 	/* Exchange places with your buddy */
+	    mvwaddch(cw,old_hero.y,old_hero.x,ch);
+	    mvwaddch(mw,old_hero.y,old_hero.x,ch);
+	    mvwaddch(mw,hero.y,hero.x,' ');
+	    mvwaddch(cw,hero.y,hero.x,tp->t_oldch);
+
+	    (*tp).t_pos.x = old_hero.x; /* Update monster position variables */
+	    (*tp).t_pos.y = old_hero.y;
+	    (*tp).t_oldpos.x = old_hero.x;
+	    (*tp).t_oldpos.y = old_hero.y;
+
+	    t = (*tp).t_oldch;
+	    (*tp).t_oldch = player.t_oldch;
+	    player.t_oldch = t;
+
+	    mvwaddch(cw,hero.y,hero.x,PLAYER);
+	    draw(cw);
+	    return;
+	} else {
+	    hero = old_hero;   /* Restore hero -- we'll fight instead of move */
+	    fight(&nh, ch, cur_weapon, FALSE);
+	    return;
+	}
     } 
     else fighting = FALSE;
 
@@ -481,7 +519,7 @@ register int y, x;
     }
     else if (isalpha(ch)) {
 	if ((it = find_mons(y, x)) == NULL) {
-	    debug("Can't find monster in show.");
+	    debug("Can't find monster in move.");
 	    return ' ';
 	}
 	tp = (struct thing *) ldata(it);
@@ -620,7 +658,7 @@ register coord *tc;
 		    if (can_see) msg("An arrow shot the %s.", mname);
 		    if ((th->t_stats.s_hpt -= roll(1, 6)) <= 0) {
 			if (can_see) msg("The arrow killed the %s.", mname);
-			killed(mitem, FALSE, FALSE);
+			killed(NULL, mitem, FALSE, FALSE);
 		    }
 		}
 	    }
@@ -641,7 +679,7 @@ register coord *tc;
 		arrow->o_count = 1;
 		arrow->o_pos = *tc;
 		arrow->o_mark[0] = '\0';
-		fall(item, FALSE);
+		fall(&player, item, FALSE);
 	    }
 	when TELTRAP:
 	    if (is_player) {
@@ -702,12 +740,12 @@ register coord *tc;
 		}
 		else {
 		    if (can_see)
-			msg("A small dart just hit the %s in the shoulder.",
+			msg("A small dart just hit the %s.",
 				mname);
 		    if (off(*th, ISUNDEAD) &&
 			    (th->t_stats.s_hpt -= roll(1,4)) <= 0) {
 			if (can_see) msg("The dart killed the %s.", mname);
-			killed(mitem, FALSE, FALSE);
+			killed(NULL, mitem, FALSE, FALSE);
 		    }
 		}
 	    }
@@ -715,7 +753,7 @@ register coord *tc;
 		if (is_player)
 		    msg("A small dart whizzes by your ear and vanishes.");
 		else if (can_see)
-		    msg("A small dart whizzes by the %s's ear and vanishes.",
+		    msg("A small dart whizzes by the %s and vanishes.",
 			mname);
 	    }
         when POOL: {
@@ -723,6 +761,19 @@ register coord *tc;
 
 	    i = rnd(100);
 	    if (is_player) {
+		if (on(player, ISELECTRIC)) {
+		    msg("Oh no!!! The water shorts you out");
+		    extinguish(unelectrify);
+		    turn_off(player, ISELECTRIC);
+		    if (!ISWEARING(R_ELECTRESIST)) {
+			if ((pstats.s_hpt -= roll(1,10)) <= 0) {
+			    addmsg("!  The shock killed you.");
+			    endmsg();
+			    death(D_DROWN);
+			    return (ch);
+			}
+		    }
+		}
 		if ((tp->tr_flags & ISGONE)) {
 		    if (i < 30) {
 			teleport();	   /* teleport away */
@@ -734,7 +785,7 @@ register coord *tc;
 				fuse(unconfuse, 0, rnd(8)+HUHDURATION, AFTER);
 		    	    turn_on(player, ISHUH);
 			    }
-		else msg("You feel dizzy for a moment, but it quickly passes.");
+			else msg("You feel dizzy for a moment, but it quickly passes.");
 			pool_teleport = TRUE;
 		    }
 		    else if((i < 45) && level > 2) {
@@ -750,7 +801,7 @@ register coord *tc;
 				fuse(unconfuse, 0, rnd(8)+HUHDURATION, AFTER);
 		    	    turn_on(player, ISHUH);
 			    }
-	else msg("You feel dizzy for a moment, but it quickly passes.");
+			else msg("You feel dizzy for a moment, but it quickly passes.");
 		    }
 		    else if(i < 70) {
 			level += rnd(4) + 1;
@@ -765,20 +816,24 @@ register coord *tc;
 				fuse(unconfuse, 0, rnd(8)+HUHDURATION, AFTER);
 		    	    turn_on(player, ISHUH);
 			    }
-		else msg("You feel dizzy for a moment, but it quickly passes.");
+			else msg("You feel dizzy for a moment, but it quickly passes.");
 		    }
 		    else if(i > 95) {
-			msg("Oh no!!! You drown in the pool!!! --More--");
-			wait_for(' ');
-			death(D_DROWN);
-			return (ch);
+			if(ISWEARING(R_BREATHE))
+			    msg("You splash in the pool unharmed.");
+			else {
+			    msg("Oh no!!! You drown in the pool!!! --More--");
+			    wait_for(' ');
+			    death(D_DROWN);
+			    return (ch);
+			}
 		    }
 		}
 	    }
 	    else {
 		if (i < 30) {
 		    if (can_see) msg("The %s drowned in the pool!", mname);
-		    killed(mitem, FALSE, FALSE);
+		    killed(NULL, mitem, FALSE, FALSE);
 		}
 	    }
 	}
@@ -795,8 +850,7 @@ register coord *tc;
 		    death(D_FALL);
 		    return (ch);
 	        }
-               }
-	 
+	    }
 	    addmsg("!");
 	    endmsg();
 	    if (off(player, ISCLEAR)) {
@@ -897,7 +951,9 @@ register coord *tc;
 	    if (is_player) {
 		msg("You are splashed by water.");
 		if (cur_armor != NULL &&
-		    cur_armor->o_which != LEATHER &&
+		    cur_armor->o_which != SOFT_LEATHER &&
+		    cur_armor->o_which != HEAVY_LEATHER &&
+		    cur_armor->o_which != CUIRBOLILLI &&
 		    cur_armor->o_which != PADDED_ARMOR &&
 		    cur_armor->o_which != CRYSTAL_ARMOR &&
 		    cur_armor->o_which != MITHRIL &&
@@ -977,7 +1033,7 @@ dip_it()
 			ob->o_flags &= ~ISCURSED;
 		        msg("The %s glows blue for a moment.",weaps[wh].w_name);
 		    }
-		    else if(i < 70 && i >= 50) {	/* curse weapon here */
+		    else if(i < 70) {	/* curse weapon here */
 			if ((ob->o_flags & ISCURSED) == NULL) {
 				ob->o_hplus = -(rnd(2)+1);
 				ob->o_dplus = -(rnd(2)+1);
@@ -1090,8 +1146,10 @@ register int y, x;
     for (tp = traps; tp < ep; tp++)
 	if (tp->tr_pos.y == y && tp->tr_pos.x == x)
 	    break;
-    if (tp == ep)
+    if (tp == ep) {
 	debug((sprintf(prbuf, "Trap at %d,%d not in array", y, x), prbuf));
+	tp = NULL;
+    }
     return tp;
 }
 
@@ -1121,9 +1179,11 @@ register int y, x;
 
     if (is_player && player.t_ctype == C_THIEF) thief_bonus = 10;
 
-  if (ntraps >= MAXTRAPS + MAXTRAPS || ++trap_tries >= MAXTRPTRY || levtype == POSTLEV ||
+    if (ntraps >= MAXTRAPS + MAXTRAPS || ++trap_tries >= MAXTRPTRY 
+		|| levtype == POSTLEV ||
 	rnd(60) >= (tp->t_stats.s_dext + tp->t_stats.s_lvl/2 + thief_bonus)) {
-	if (is_player) msg("The trap failed!");
+	if (is_player) 
+	    msg("The trap failed!");
 	return;
     }
 
@@ -1132,13 +1192,15 @@ register int y, x;
     touchwin(cw);
 
     if (is_player) {
-	wclear(hw);
-	touchwin(hw);
-	mvwaddstr(hw, 2, 0,
-	    "[1] Trap Door\n[2] Bear Trap\n[3] Sleep Trap\n[4] Arrow Trap\n");
-	waddstr(hw, "[5] Teleport Trap\n[6] Dart Trap\n[7] Fire Trap");
-	mvwaddstr(hw, 0, 0, "Which kind of trap do you wish to set? ");
-	draw(hw);
+	add_line("[1] Trap Door");
+	add_line("[2] Bear Trap");
+	add_line("[3] Sleep Trap");
+	add_line("[4] Arrow Trap");
+	add_line("[5] Teleport Trap");
+	add_line("[6] Dart Trap");
+	add_line("[7] Fire Trap");
+	end_line();
+	msg("Which trap? ");
 
 	selection = (short) ((getchar() & 0177) - '0');
 	while (selection < 1 || selection > 7) {
@@ -1146,8 +1208,8 @@ register int y, x;
 		after = FALSE;
 		return;
 	    }
-	    mvwaddstr(hw, 0, 0, "Please enter a selection between 1 and 7:  ");
-	    draw(hw);
+	    msg("");
+	    msg("Please enter a selection between 1 and 7:  ");
 	    selection = (short) ((getchar() & 0177) - '0');
 	}
     }

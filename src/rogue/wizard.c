@@ -1,4 +1,6 @@
-
+/*
+ * Last Modified: 05/25/86
+ */
 /*
  * Special wizard commands (some of which are also non-wizard commands
  * under strange circumstances)
@@ -6,6 +8,9 @@
 
 #include "curses.h"
 #include "mach_dep.h"
+#if defined(attron)
+#include <term.h>
+#endif attron
 #include <ctype.h>
 #include "rogue.h"
 
@@ -76,8 +81,7 @@ int which_item, which_type;
     reg struct linked_list *item;
     reg struct object *obj;
     reg int wh;
-    reg char ch, newitem, newtype, *pt;
-    int msz, whc;
+    reg char ch, newitem, newtype, whc, msz, *pt;
     WINDOW *thiswin;
     int tsize;
     int pres_item = 1;
@@ -85,49 +89,68 @@ int which_item, which_type;
     thiswin = cw;
     if (which_item == 0) {
 	bool nogood = TRUE;
+	char buf[LINELEN];
 	thiswin = hw;
-	wclear(hw);
-	wprintw(hw,"Item\tKey\n\n");
-	wprintw(hw,"%s\t %c\n%s\t %c\n",things[TYP_RING].mi_name,RING,
-		things[TYP_STICK].mi_name,STICK);
-	wprintw(hw,"%s\t %c\n%s\t %c\n",things[TYP_POTION].mi_name,POTION,
-		things[TYP_SCROLL].mi_name,SCROLL);
-	wprintw(hw,"%s\t %c\n%s\t %c\n",things[TYP_ARMOR].mi_name,ARMOR,
-		things[TYP_WEAPON].mi_name,WEAPON);
-	wprintw(hw,"%s\t %c\n",things[TYP_FOOD].mi_name,FOOD);
-	if (wizard) {
-	    wprintw(hw,"%s %c\n",things[TYP_ARTIFACT].mi_name, ARTIFACT);
-	    waddstr(hw,"monster\t m");
-	}
-	wprintw(hw,"\n\nWhat do you want to create? ");
-	draw(hw);
+	msg("What do you want to create (* for list)? ");
 	do {
-	    ch = readchar();
-	    if (ch == ESCAPE) {
-		restscr(cw);
-		return;
-	    }
-	    switch (ch) {
-		case RING:
-		case STICK:	
-		case POTION:
-		case SCROLL:	
-		case ARMOR:	
-		case WEAPON:
-		case FOOD:
-		    nogood = FALSE;
-		    break;
-		case 'm':
-		    if (wizard) 
-			nogood = FALSE;
-		    break;
-		case ARTIFACT:
-		    if (wizard)
-			nogood = FALSE;
-		    break;
-		default:
-		    nogood = TRUE;
-	    }
+		ch = readchar();
+		if (ch == '*') {
+			sprintf(buf,"ITEM\tKEY");
+			add_line(buf);
+			sprintf(buf,"%s\t %c",
+				things[TYP_RING].mi_name,RING);
+			add_line(buf);
+			sprintf(buf,"%s\t %c",
+				things[TYP_STICK].mi_name,STICK);
+			add_line(buf);
+			sprintf(buf,"%s\t %c",
+				things[TYP_POTION].mi_name,POTION);
+			add_line(buf);
+			sprintf(buf,"%s\t %c",
+				things[TYP_SCROLL].mi_name,SCROLL);
+			add_line(buf);
+			sprintf(buf,"%s\t %c",
+				things[TYP_ARMOR].mi_name,ARMOR);
+			add_line(buf);
+			sprintf(buf,"%s\t %c",
+				things[TYP_WEAPON].mi_name,WEAPON);
+			add_line(buf);
+			sprintf(buf,"%s\t %c",things[TYP_FOOD].mi_name,FOOD);
+			add_line(buf);
+			if (wizard) {
+			    sprintf(buf,"%s %c",
+				things[TYP_ARTIFACT].mi_name, ARTIFACT);
+			    add_line(buf);
+			    sprintf(buf,"monster\t m");
+			    add_line(buf);
+			}
+			end_line();
+			msg("");
+			msg("What do you want to create (* for list) ? ");
+		}
+		if(ch == ESCAPE) 
+			return;
+	        switch (ch) {
+			case RING:
+			case STICK:	
+			case POTION:
+			case SCROLL:	
+			case ARMOR:	
+			case WEAPON:
+			case FOOD:
+			    nogood = FALSE;
+			    break;
+			case 'm':
+			    if (wizard) 
+				nogood = FALSE;
+			    break;
+			case ARTIFACT:
+			    if (wizard)
+				nogood = FALSE;
+			    break;
+			default:
+			    nogood = TRUE;
+		}
 	} while (nogood);
 	newitem = ch;
     }
@@ -160,13 +183,12 @@ int which_item, which_type;
     }
     if(msz == 1) {		/* if only one type of item */
 	ch = 1;
-	if (thiswin == hw)
-	    restscr(cw);
     }
     else if (which_type == 0) {
 	struct magic_item *wmi;
 	struct init_artifact *war;
 	char wmn;
+	char buf[LINELEN];
 	int ii;
 	char numstr[20];
 
@@ -184,83 +206,38 @@ int which_item, which_type;
 		when WEAPON:	wmn = 1;
 		when ARMOR:	wmn = 2;
 	}
-	wclear(hw);
 	thiswin = hw;
-	while (msz > 0) {
-	    register int left_limit;
-	    int num_lines = 2*(LINES-3);
-
-	    wclear(hw);
-	    touchwin(hw);
-	    if (msz < num_lines) 
-		left_limit = (msz + 1)/2;
-	    else 
-		left_limit = num_lines / 2;
-
-	    wmove(hw, 2, 0);
-	    for (ii = 0 ; ii < left_limit; ii++) {
-		sprintf(numstr,"%d", pres_item);
-	        waddstr(hw, numstr);
-	        waddstr(hw,") ");
+	for (ii = 0 ; ii < msz && pres_item <= tsize; ii++) {
+		sprintf(buf,"%d) ", pres_item);
 		if (wmi != NULL) {
-	            waddstr(hw, wmi->mi_name);
+	            strcat(buf, wmi->mi_name);
 	            wmi++;
 		}
 		else if (war != NULL) {
-		    waddstr(hw, war->ar_name);
+		    strcat(buf, war->ar_name);
 		    war++;
 		}
 	        else if(wmn == 1)
-		    waddstr(hw, weaps[pres_item - 1].w_name);
+		    strcat(buf, weaps[pres_item - 1].w_name);
 	        else if(wmn == 2)
-		    waddstr(hw, armors[pres_item - 1].a_name);
-		waddstr(hw, "\n");
+		    strcat(buf, armors[pres_item - 1].a_name);
+		add_line(buf);
 		pres_item++;
-	    }
-	    for (ii = 0 ; ii < left_limit && pres_item <= tsize; ii++) {
-		sprintf(numstr,"%d", pres_item);
-	        mvwaddstr(hw, ii+2, COLS/2, numstr);
-	        waddstr(hw,") ");
-		if (wmi != NULL) {
-	            waddstr(hw, wmi->mi_name);
-	            wmi++;
-		}
-		else if (war != NULL) {
-		    waddstr(hw, war->ar_name);
-		    war++;
-		}
-	        else if(wmn == 1)
-		    waddstr(hw, weaps[pres_item - 1].w_name);
-	        else if(wmn == 2)
-		    waddstr(hw, armors[pres_item - 1].a_name);
-		waddstr(hw, "\n");
-		pres_item++;
-	    }
-	    if ((msz -= num_lines) > 0) {
-		mvwaddstr(hw, LINES-1, 0, morestr);
-		draw(hw);
-		wait_for(' ');
-	    }
 	}
-	sprintf(prbuf,"Which %s? ",things[whc].mi_name);
-	mvwaddstr(hw,LINES - 1, 0, prbuf);
-	draw(hw);
+	end_line();
+	msg("");
+	msg("Which %s? ",things[whc].mi_name);
 	do {
-	    ch = get_str(numstr, hw);
-	    if (ch == QUIT) {
-	        restscr(cw);
+	    ch = get_str(numstr, cw);
+	    if (ch == QUIT || ch == ESCAPE) {
 	        msg("");
 	        return;
 	    }
 	    newtype = atoi(numstr) - 1;
 	    if (newtype < 0 || newtype >= tsize) {
-		mvwaddstr(hw, 0, 0, "Please enter a number in the displayed range -- ");
-		mvwaddstr(hw,LINES - 1, 0, prbuf);
-		draw(hw);
+		msg("Please enter a number in the displayed range: ");
 	    }
 	} until (newtype >= 0 && newtype < tsize);
-        if (thiswin == hw)			/* restore screen if need be */
-	    restscr(cw);
     }
     else 
 	newtype = which_type;
@@ -270,7 +247,7 @@ int which_item, which_type;
 	new_artifact(newtype, obj);
 	if (add_pack(item, FALSE) == FALSE) {
 	    obj->o_pos = hero;
-	    fall(item, TRUE);
+	    fall(&player, item, TRUE);
 	}
 	return;
     }
@@ -328,7 +305,7 @@ int which_item, which_type;
     obj->o_flags |= ISKNOW;
     if (add_pack(item, FALSE) == FALSE) {
 	obj->o_pos = hero;
-	fall(item, TRUE);
+	fall(&player, item, TRUE);
     }
 }
 
@@ -357,38 +334,23 @@ makemon()
 {
     register int i;
     register short which_monst;
-    register int num_monst = NUMMONST+1, pres_monst=1, num_lines=2*(LINES-3);
-    char monst_name[40];
+    register int pres_monst=1, num_lines=LINES-3;
+    char monst_name[LINELEN*2];
 
     /* Print out the monsters */
-    while (num_monst > 0) {
-	register left_limit;
-
-	if (num_monst < num_lines) left_limit = (num_monst+1)/2;
-	else left_limit = num_lines/2;
-
+    while (pres_monst <= NUMMONST+2) {
 	wclear(hw);
 	touchwin(hw);
 
-	/* Print left column */
 	wmove(hw, 2, 0);
-	for (i=0; i<left_limit; i++) {
+	for (i=0; i<num_lines && pres_monst <= NUMMONST+2; i++) {
 	    sprintf(monst_name, "[%d] %s\n",
 				pres_monst, monsters[pres_monst].m_name);
 	    waddstr(hw, monst_name);
 	    pres_monst++;
 	}
 
-	/* Print right column */
-	for (i=0; i<left_limit && pres_monst <= NUMMONST+1; i++) {
-	    sprintf(monst_name, "[%d] %s",
-				pres_monst, monsters[pres_monst].m_name);
-	    wmove(hw, i+2, COLS/2);
-	    waddstr(hw, monst_name);
-	    pres_monst++;
-	}
-
-	if ((num_monst -= num_lines) > 0) {
+	if (pres_monst <= NUMMONST+2) {
 	    mvwaddstr(hw, LINES-1, 0, morestr);
 	    draw(hw);
 	    wait_for(' ');
@@ -410,18 +372,18 @@ makemon()
 	    return;
 	}
 	which_monst = atoi(monst_name);
-	if (which_monst < 1 || which_monst > NUMMONST+1) {
-	    mvwaddstr(hw, 0, 0, "Please enter a number in the displayed range -- ");
+	if (which_monst < 1 || which_monst > NUMMONST+2) {
+	    mvwaddstr(hw, 0, 0, "Please enter a number in the displayed range: ");
 	    draw(hw);
 	}
-    } until (which_monst > 0 && which_monst <= NUMMONST+1);
+    } until (which_monst > 0 && which_monst <= NUMMONST+2);
     restscr(cw);
     creat_mons (&player, which_monst, TRUE);
     touchwin(cw);
 }
 
 /*
- * telport:
+ * teleport:
  *	Bamf the hero someplace else
  */
 
@@ -540,17 +502,17 @@ passwd()
     mpos = 0;
     sp = buf;
     while ((c = (getchar() & 0177)) != '\n' && c != '\r' && c != '\033')
-#if defined(USGV3) || defined(USGV5)
+#if (defined(USGV3) || defined(USGV5)) && !defined(SCO5)
 	if (c == _tty.c_cc[VKILL])
 #endif
-#if defined(BSD4)
+#if defined(BSD4) || defined(RTU2) || defined(SCO5)
 	if (c == _tty.sg_kill)
 #endif
 	    sp = buf;
-#if defined(USGV3) || defined(USGV5)
+#if (defined(USGV3) || defined(USGV5)) && !defined(SCO5)
 	else if (c == _tty.c_cc[VERASE] && sp > buf)
 #endif
-#if defined(BSD4)
+#if defined(BSD4) || defined(RTU2) || defined(SCO5)
 	else if (c == _tty.sg_erase && sp > buf)
 #endif
 	    sp--;

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * machine dependencies
  *
  */
@@ -18,4 +21,20 @@
 #define	_doprnt	_dprnt
 #define	setegid	setgid
 #define	seteuid	setuid
+#endif
+
+#if	defined(RTU2)
+#define	srand48	srand
+#define	lrand48	rand
+#define setegid	setgid
+#define	seteuid	setuid
+#endif
+
+#if	defined(USGV5)
+#define setegid	setgid
+#define	seteuid	setuid
+#if	defined(RTU3)
+#define	srand48	srandom
+#define	lrand48	random
+#endif
 #endif

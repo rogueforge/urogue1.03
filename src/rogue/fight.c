@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * All the fighting gets done here
  *
  */
@@ -12,20 +15,32 @@
  * This are the beginning experience levels for all players
  * all further experience levels are computed by muliplying by 2
  */
-static long e_levels[4] = {
+static long e_levels[10] = {
 	113L,	/* Fighter */
-	135L,	/* Magician */
+	142L,	/* Paladin */
+	129L,	/* Ranger */
 	87L,	/* Cleric */
+	114L,	/* Druid */
+	135L,	/* Magician */
+	129L,	/* Illusionist */
 	72L,	/* Thief */
+	86L,	/* Assasin */
+	229L	/* Ninja */
 };
 
-struct matrix att_mat[5] = {
+struct matrix att_mat[11] = {
 /* Base		Max_lvl,	Factor,		Offset,		Range */
-{  10,		17,		2,		1,		2 },
-{  9,		21,		2,		1,		5 },
-{  10,		19,		2,		1,		3 },
-{  10,		21,		2,		1,		4 },
-{   7,		25,		1,		0,		2 }
+{  10,		17,		2,		1,		2 }, /* fi */
+{  10,		17,		2,		1,		2 }, /* pa */
+{  10,		17,		2,		1,		2 }, /* ra */
+{  10,		19,		2,		1,		3 }, /* cl */
+{  10,		19,		2,		1,		3 }, /* dr */
+{  9,		21,		2,		1,		5 }, /* mu */
+{  9,		21,		2,		1,		5 }, /* il */
+{  10,		21,		2,		1,		4 }, /* th */
+{  10,		21,		2,		1,		4 }, /* as */
+{  10,		21,		2,		1,		4 }, /* nj */
+{   7,		25,		1,		0,		2 }  /* mn */
 };
 
 do_fight(y, x, tothedeath)
@@ -81,8 +96,7 @@ bool thrown;
      * Let him know it was really a mimic (if it was one).
      */
     if (on(*tp, ISDISGUISE) && (tp->t_type != tp->t_disguise) &&
-	off(player, ISBLIND))
-    {
+	off(player, ISBLIND)) {
 	msg("Wait! That's a %s!", monsters[tp->t_index].m_name);
 	turn_off(*tp, ISDISGUISE);
 	did_hit = thrown;
@@ -93,17 +107,15 @@ bool thrown;
 	did_hit = thrown;
     }
 
-    if (did_hit)
-    {
+    if (did_hit) {
 	register char *mname;
 
 	did_hit = FALSE;
 	mname = (on(player, ISBLIND)) ? "it" : monsters[tp->t_index].m_name;
 	if (!can_blink(tp) &&
 	    (off(*tp, MAGICHIT) || (weap != NULL && (weap->o_hplus > 0 || weap->o_dplus > 0))) &&
-	    (off(*tp, BMAGICHIT) || (weap != NULL && (weap->o_hplus > 1 || weap->o_dplus > 1))) &&
-	    roll_em(&player, tp, weap, thrown, cur_weapon))
-	{
+	    (off(*tp, BMAGICHIT) || (weap != NULL && (weap->o_hplus > 3 || weap->o_dplus > 3))) &&
+	    roll_em(&player, tp, weap, thrown, cur_weapon)) {
 	    did_hit = TRUE;
 	    tp->t_wasshot = TRUE;
 
@@ -116,7 +128,17 @@ bool thrown;
 		thunk(weap, mname);
 	    }
 	    else
-		hit(NULL, mname);
+		hit((char *) NULL, mname);
+
+	    /* hitting a friendly monster is curtains */
+	    if (on(*tp, ISFRIENDLY)) {
+		turn_off(*tp, ISFRIENDLY);
+		turn_on(*tp, ISMEAN);
+	    }
+
+            /* Charmed monsters become uncharmed */
+	    if (on(*tp, ISCHARMED))
+		turn_off(*tp, ISCHARMED);
 
 	    /* If the player hit a rust monster, he better have a + weapon */
 	    if (on(*tp, CANRUST)) {
@@ -142,7 +164,24 @@ bool thrown;
 			!save_throw(VS_WAND, tp)) {
 		msg("The %s vanishes in a ball of flame.", 
 			monsters[tp->t_index].m_name);
-		killed(item, TRUE, TRUE);
+		killed(&player, item, TRUE, TRUE);
+	    }
+
+	    /* spores explode and infest hero  */
+	    if (on(*tp, CANSPORE)) { 
+		msg("The %s explodes in a cloud of dust.", 
+			monsters[tp->t_index].m_name);
+		if (ISWEARING(R_HEALTH) || 
+			thrown && rnd(50) > 0 || 
+			rnd(20) > 0) 
+		    msg("The dust makes it hard to breath.");
+		else {
+		    msg(terse ? "You have been infested."
+			: "You have contracted a parasitic infestation!");
+		    infest_dam++;
+		    turn_on(player, HASINFEST);
+		}
+		killed(&player, item, TRUE, TRUE);
 	    }
 
 	    /* fireproof monsters laugh at you when burning weapon hits */
@@ -150,6 +189,24 @@ bool thrown;
 		msg("The %s laughs as the %s bounces.", 
 			monsters[tp->t_index].m_name,
 			weaps[weap->o_which].w_name);
+
+	    /* sharp weapons have no effect on NOSHARP monsters */
+	    if (on(*tp, NOSHARP) && (weap != NULL) &&
+			(weap->o_flags & ISSHARP)) {
+		msg("The %s has no effect on the %s!", 
+			weaps[weap->o_which].w_name,
+			monsters[tp->t_index].m_name);
+		fighting = FALSE;
+	    }
+
+	    /* metal weapons pass through NOMETAL monsters */
+	    if (on(*tp, NOMETAL) && (weap != NULL) &&
+			(weap->o_flags & ISMETAL)) {
+		msg("The %s passes through the %s!", 
+			weaps[weap->o_which].w_name,
+			monsters[tp->t_index].m_name);
+		fighting = FALSE;
+	    }
 
 	    /* If the player hit something that shrieks, wake the dungeon */
 	    if (on(*tp, CANSHRIEK)) {
@@ -163,7 +220,7 @@ bool thrown;
 		else
 		    msg("The %s seems to be trying to make some noise.", mname);
 		aggravate();
-		if (rnd(wizard ? 3 : 50) == 0 && cur_armor != NULL 
+		if (rnd(wizard ? 3 : 39) == 0 && cur_armor != NULL 
 		    && cur_armor->o_which == CRYSTAL_ARMOR) {
 
 		    register struct linked_list *item;
@@ -192,38 +249,10 @@ bool thrown;
 	    if (on(*tp, CANSURPRISE)) turn_off(*tp, CANSURPRISE);
 
 	    /* If the player hit something that can summon, it will try to */
-	    if (on(*tp, CANSUMMON) && rnd(40) < tp->t_stats.s_lvl) {
-	        register char *helpname;
-	        register int which, i;
-
-		turn_off(*tp, CANSUMMON);
-	        msg("The %s summons help!", mname);
-	        helpname = monsters[tp->t_index].m_typesum;
-	        for (which=1; which<NUMMONST; which++) {
-		     if (strcmp(helpname, monsters[which].m_name) == NULL)
-		         break;
-	        }
-	        if (which >= NUMMONST)
-		     debug("Couldn't find summoned one.");
-
-		/* summoned monster was genocided */
-		if (which < NUMMONST && 
-		     !monsters[which].m_normal &&
-		     !monsters[which].m_wander) {
-		     msg("The %s becomes very annoyed at you!", mname);
-		     if (on(*tp, ISSLOW))
-			turn_off(*tp, ISSLOW);
-		     else
-			turn_on(*tp, ISHASTE);
-		}
-		else
-	             for (i=0; i<monsters[tp->t_index].m_numsum; i++)
-			creat_mons(&player, which, FALSE);
-	    }
+	    summon(tp);
 
 	    /* Can the player confuse? */
-	    if (on(player, CANHUH) && !thrown)
-	    {
+	    if (on(player, CANHUH) && !thrown) {
 		msg("Your hands stop glowing red!");
 		msg("The %s appears confused.", mname);
 		turn_on(*tp, ISHUH);
@@ -233,18 +262,18 @@ bool thrown;
 	    /* increases prices and curses objects from now on though */
 	    if (on(*tp, CANSELL)) {
 		msg("The %s disappears with his wares in a flash.",mname);
-		killed(item, FALSE, FALSE);
+		killed(NULL, item, FALSE, FALSE);
 		aggravate();
 		luck++;
 	    }
 
 	    else if (tp->t_stats.s_hpt <= 0)
-		killed(item, TRUE, TRUE);
+		killed(&player, item, TRUE, TRUE);
 
 	    /* If the monster is fairly intelligent and about to die, it
 	     * may turn tail and run.
 	     */
-	    else if ((tp->t_stats.s_hpt < max(10, tp->maxstats.s_hpt/10)) &&
+	    else if ((tp->t_stats.s_hpt < max(10,tp->maxstats.s_hpt/10)) &&
 		     (rnd(25) < tp->t_stats.s_intel)) {
 		turn_on(*tp, ISFLEE);
 
@@ -264,7 +293,7 @@ bool thrown;
 	    if (thrown) 
 		bounce(weap, mname);
 	    else
-		miss(NULL, mname);
+		miss((char *) NULL, mname);
 	}
     }
     count = 0;
@@ -308,12 +337,11 @@ bool thrown;
     if (on(*mp, ISDISGUISE) && off(player, ISBLIND))
 	turn_off(*mp, ISDISGUISE);
     mname = on(player, ISBLIND) ? "the monster" : monsters[mp->t_index].m_name;
-    if (roll_em(mp, &player, weapon, thrown, wield_weap(weapon, mp)))
-    {
+    if (roll_em(mp, &player, weapon, thrown, wield_weap(weapon, mp))) {
 	did_hit = TRUE;
 
 	if (thrown) m_thunk(weapon, mname);
-	else hit(mname, NULL);
+	else hit(mname, (char *) NULL);
 
 	if (pstats.s_hpt <= 0) {
 	    death(mp->t_index);	/* Bye bye life ... */
@@ -332,9 +360,7 @@ bool thrown;
 	     * If a vampire hits, it may take half your hit points
 	     */
 	    if (on(*mp, CANSUCK) && 
-		!save(VS_MAGIC - 
-		    ((cur_armor != NULL && cur_armor->o_which == MITHRIL) ?
-			-5 : 0))) {
+		!save(VS_MAGIC)) {
 		if (pstats.s_hpt == 1) {
 		    death(mp->t_index);
 		    return TRUE;
@@ -448,6 +474,19 @@ bool thrown;
 	    }
 
 	    /*
+	     * If a trampling monster hits, it may step on the hero
+	     */
+	    if (on(*mp, CANTRAMPLE)) {
+		if (roll(1,20) >= 16 || roll(1,20) >= 16) {
+		    msg("The %s steps on you.", mname);
+		    if ((pstats.s_hpt -= roll(3,mp->t_stats.s_lvl)) <= 0) {
+			death(mp->t_index);
+			return TRUE;
+		    }
+		}
+	    }
+
+	    /*
 	     * If a disease-carrying monster hits, there is a chance the
 	     * player will catch the disease
 	     */
@@ -470,7 +509,9 @@ bool thrown;
 	     */
 	    if (on(*mp, CANRUST)) {
 		if (cur_armor != NULL &&
-		    cur_armor->o_which != LEATHER &&
+		    cur_armor->o_which != SOFT_LEATHER &&
+		    cur_armor->o_which != HEAVY_LEATHER &&
+		    cur_armor->o_which != CUIRBOLILLI &&
 		    cur_armor->o_which != PADDED_ARMOR &&
 		    cur_armor->o_which != CRYSTAL_ARMOR &&
 		    cur_armor->o_which != MITHRIL &&
@@ -482,7 +523,9 @@ bool thrown;
 		}
 		else if (cur_armor != NULL && 
 		    (cur_armor->o_flags & ISPROT) &&
-		    cur_armor->o_which != LEATHER &&
+		    cur_armor->o_which != SOFT_LEATHER &&
+		    cur_armor->o_which != HEAVY_LEATHER &&
+		    cur_armor->o_which != CUIRBOLILLI &&
 		    cur_armor->o_which != PADDED_ARMOR &&
 		    cur_armor->o_which != CRYSTAL_ARMOR &&
 		    cur_armor->o_which != MITHRIL)
@@ -527,11 +570,8 @@ bool thrown;
 	     */
 	    if (on(*mp, TOUCHFEAR)) {
 		turn_off(*mp, TOUCHFEAR);
-		if (!save(VS_WAND - 
-		    ((cur_armor != NULL && cur_armor->o_which == MITHRIL) ?
-			 -5 : 0)) 
-		    && !(on(player, ISFLEE) 
-		    && (player.t_dest == &mp->t_pos))) {
+		if (!save(VS_WAND) 
+		    && !(on(player, ISFLEE) && (player.t_dest == &mp->t_pos))) {
 			if (off(player, SUPERHERO)) {
 			    turn_on(player, ISFLEE);
 			    player.t_dest = &mp->t_pos;
@@ -586,6 +626,42 @@ bool thrown;
 	    }
 
 	    /*
+	     * permanently drain a wisdom point
+	     */
+	    if (on(*mp, DRAINWISDOM) && rnd(100) < 15) {
+		int ring_str;	/* Value of ring strengths */
+
+		/* Undo any ring changes */
+		ring_str = ring_value(R_ADDWISDOM) + 
+			(on(player, POWERWISDOM) ? 10 : 0);
+		pstats.s_wisdom -= ring_str;
+		msg("You feel slightly less wise now.");
+		pstats.s_wisdom = max(pstats.s_wisdom - 1, 3);
+		max_stats.s_wisdom = pstats.s_wisdom;
+
+		/* Now put back the ring changes */
+		pstats.s_wisdom += ring_str;
+	    }
+
+	    /*
+	     * permanently drain a intelligence point
+	     */
+	    if (on(*mp, DRAINBRAIN) && rnd(100) < 15) {
+		int ring_str;	/* Value of ring strengths */
+
+		/* Undo any ring changes */
+		ring_str = ring_value(R_ADDINTEL) + 
+			(on(player, POWERINTEL) ? 10 : 0);
+		pstats.s_intel -= ring_str;
+		msg("You feel slightly less intelligent now.");
+		pstats.s_intel = max(pstats.s_intel - 1, 3);
+		max_stats.s_intel = pstats.s_intel;
+
+		/* Now put back the ring changes */
+		pstats.s_intel += ring_str;
+	    }
+
+	    /*
 	     * Violet fungi and others stop the poor guy from moving
 	     */
 	    if (on(*mp, CANHOLD) && off(*mp, DIDHOLD) 
@@ -613,10 +689,7 @@ bool thrown;
 	     */
 	    if (on(*mp, CANSMELL)) {
 		turn_off(*mp, CANSMELL);
-		if (save(VS_MAGIC - 
-			((cur_armor != NULL && cur_armor->o_which == MITHRIL) ?
-				 -5 : 0)) 
-			|| ISWEARING(R_SUSABILITY))
+		if (save(VS_MAGIC) || ISWEARING(R_SUSABILITY))
 		    msg("You smell an unpleasant odor.");
 		else {
 		    short odor_str = -(rnd(6)+1);
@@ -669,9 +742,7 @@ bool thrown;
 
 		lastpurse = purse;
 		purse -= GOLDCALC;
-		if (!save(VS_MAGIC - 
-			((cur_armor != NULL && cur_armor->o_which == MITHRIL) ?
-				 -5 : 0)))
+		if (!save(VS_MAGIC)) 
 		    purse -= GOLDCALC + GOLDCALC + GOLDCALC + GOLDCALC;
 		if (purse < 0)
 		    purse = 0;
@@ -720,8 +791,7 @@ bool thrown;
 		 * and pick out one we like.
 		 */
 		steal = NULL;
-		for (list = pack; list != NULL; list = next(list))
-		{
+		for (list = pack; list != NULL; list = next(list)) {
 		    obj = (struct object *) ldata(list);
 		    if (rnd(33) == 0) {
 			if (obj->o_flags & ISBLESSED)
@@ -742,13 +812,11 @@ bool thrown;
 			    worth = get_worth(obj);
 		    }
 		}
-		if (steal != NULL)
-		{
+		if (steal != NULL) {
 		    register struct object *obj;
 
 		    obj = (struct object *) ldata(steal);
-		    if (obj->o_count > 1 && obj->o_group == 0)
-		    {
+		    if (obj->o_count > 1 && obj->o_group == 0) {
 			register int oc;
 			register struct linked_list *nitem;
 			register struct object *op;
@@ -758,13 +826,12 @@ bool thrown;
 			nitem = new_item(sizeof *obj);
 			op = (struct object *) ldata(nitem);
 			*op = *obj;
-			msg("She stole %s!", inv_name(obj, TRUE));
+			msg("The %s stole %s!", mname, inv_name(obj, TRUE));
 			obj->o_count = oc;
 			attach(mp->t_pack, nitem);
 		    }
-		    else
-		    {
-			msg("She stole %s!", inv_name(obj, TRUE));
+		    else {
+			msg("The %s stole %s!", mname, inv_name(obj, TRUE));
 			obj->o_flags &= ~ISCURSED;
 			dropcheck(obj);
 			detach(pack, steal);
@@ -804,7 +871,7 @@ bool thrown;
 	else if (thrown) 
 	    m_bounce(weapon, mname);
 	else 
-	    miss(mname, NULL);
+	    miss(mname, (char *) NULL);
     }
     if (fight_flush)
 	flushout();
@@ -812,6 +879,63 @@ bool thrown;
     status(FALSE);
     return(did_hit);
 }
+
+
+/*
+ * mon_mon_attack:
+ *	A monster attacks another monster
+ */
+mon_mon_attack(attacker,mon,weapon,thrown)
+register struct thing *attacker;
+struct linked_list *mon;
+register struct object *weapon; /* For future enhancements */
+bool thrown; /* For future enhancements */
+{
+    register char *mname1,*mname2;
+    register bool did_hit = FALSE;
+    struct thing *attackee;
+
+    attackee = THINGPTR(mon);
+
+    /* If the monster is in a wall, it cannot attack */
+    if (on(*attacker, ISINWALL)) 
+	return(FALSE);
+
+    /*
+     * Since this is an attack, stop running and any healing that was
+     * going on at the time.
+     */
+    attackee->t_quiet = 0;
+    attacker->t_quiet = 0;
+
+    mname1 = monsters[attacker->t_index].m_name;
+    mname2 = monsters[attackee->t_index].m_name;
+    if (roll_em(attacker,attackee,0,0,0)) {
+	did_hit = TRUE;
+
+	hit(mname1,mname2);
+
+	if (attackee->t_stats.s_hpt <= 0) {
+	    killed(attacker, mon, TRUE, TRUE);
+	    return TRUE;
+	}
+
+        if (off(*attackee, ISMEAN) && off(*attackee, ISFAMILIAR)) {
+	    msg("The %s glares angrily at the %s",mname2,mname1);
+	    turn_on(*attackee,ISMEAN);
+	    turn_on(*attackee,ISRUN);
+	}
+    }
+    else 
+	msg("The %s misses the %s",mname1,mname2);
+
+    if (fight_flush)
+	flushout();
+    count = 0;
+    status(FALSE);
+    return(did_hit);
+}
+
 
 /*
  * swing:
@@ -836,6 +960,16 @@ int at_lvl, op_arm, wplus;
 }
 
 /*
+ * init_exp:
+ *	set up initial experience level change threshold
+ */
+
+void init_exp()
+{
+    max_stats.s_exp = e_levels[player.t_ctype];
+}
+
+/*
  * check_level:
  *	Check to see if the guy has gone up a level.
  */
@@ -843,35 +977,45 @@ int at_lvl, op_arm, wplus;
 check_level()
 {
     register int i, j, add = 0;
-    register unsigned long exp;
     int nsides;
 
     i = 0;
-    exp = e_levels[player.t_ctype];
-    while (exp <= pstats.s_exp) {
-	i++;
-	exp *= 2L;
+    while (pstats.s_exp >= max_stats.s_exp) {
+	pstats.s_exp -= max_stats.s_exp;	/* excess experience points */
+	i++;					/* levels jumped counter */
+	if (max_stats.s_exp < 0x3fffffffL) 	/* 2^30 - 1 */
+	    max_stats.s_exp *= 2L;		/* twice as many for next */
     }
-    if (++i > pstats.s_lvl) {
+    pstats.s_lvl += i;			/* new experience level */
+    if (i > 0) {
 	switch (player.t_ctype) {
 	    when C_FIGHTER:	nsides = 12;
+	    when C_PALADIN:	nsides = 12;
 	    when C_MAGICIAN:	nsides = 4;
+	    when C_ILLUSION:	nsides = 4;
 	    when C_CLERIC:	nsides = 8;
+	    when C_RANGER:	nsides = 8;
+	    when C_DRUID:	nsides = 8;
 	    when C_THIEF:	nsides = 6;
+	    when C_ASSASIN:	nsides = 6;
+	    when C_NINJA:	nsides = 6;
 	}
 
 	/* Take care of multi-level jumps */
-	for (j=0; j < (i-pstats.s_lvl); j++)
+	for (j = 0; j < i; j++)
 	    add += max(1, roll(1,nsides) + const_bonus());
 	max_stats.s_hpt += add;
 	if ((pstats.s_hpt += add) > max_stats.s_hpt)
 	    pstats.s_hpt = max_stats.s_hpt;
 	msg("Welcome, %s, to level %d.",
-	    cnames[player.t_ctype][min(i-1, 10)], i);
-	pray_time = 0;	/* A new round of prayers */
+	    cnames[player.t_ctype][min(pstats.s_lvl-1, 14)], pstats.s_lvl);
 	spell_power = 0; /* A new round of spells */
+	/*
+	 * Create a more powerful familiar (if player has one)
+	 */
+	if (on(player,HASFAMILIAR) && on(player,CANSUMMON)) 
+	    summon_monster((short) 0,TRUE,FALSE);
     }
-    pstats.s_lvl = i;
 }
 
 /*
@@ -901,23 +1045,20 @@ struct object *cur_weapon;
 	cp = att->s_dmg;
     else if (hurl)
 	if ((weap->o_flags&ISMISL) && cur_weapon != NULL &&
-	  cur_weapon->o_which == weap->o_launch)
-	{
+	  cur_weapon->o_which == weap->o_launch) {
 	    cp = weap->o_hurldmg;
 	    prop_hplus = cur_weapon->o_hplus;
 	    prop_dplus = cur_weapon->o_dplus;
 	}
 	else
 	    cp = (weap->o_flags&ISMISL ? weap->o_damage : weap->o_hurldmg);
-    else
-    {
+    else {
 	cp = weap->o_damage;
 	/*
 	 * Drain a staff of striking
 	 */
 	if (weap->o_type == STICK && weap->o_which == WS_HIT
-	    && weap->o_charges == 0)
-		{
+	    && weap->o_charges == 0) {
 		    weap->o_damage = "0d0";
 		    weap->o_hplus = weap->o_dplus = 0;
 		}
@@ -929,11 +1070,11 @@ struct object *cur_weapon;
 	int dplus = prop_dplus + (weap == NULL ? 0 : weap->o_dplus);
 
 	/* Is attacker weak? */
-	if (on(*att_er, HASSTINK)) hplus -= 2;
+	if (on(*att_er, HASSTINK)) 
+	    hplus -= 2;
 
 	/* Code changed by Bruce Dautrich 4/4/84 to fix bug */
-	if (att_er == &player)	/* Is it the player? */
-	{
+	if (att_er == &player)	{	/* Is it the player? */
 	    hplus += hitweight();	/* adjust for encumberence */
 	    dplus += hung_dam();	/* adjust damage for hungry player */
 	    dplus += ring_value(R_ADDDAM);
@@ -946,9 +1087,18 @@ struct object *cur_weapon;
 	    nplus = atoi(++cp);
 	else nplus = 0;
 
-	if (def == &pstats)
-	{
-	    if (cur_armor != NULL)
+	if (def == &pstats) {
+	    if (on(*att_er, NOMETAL) && cur_armor != NULL && 
+		(cur_armor->o_which == RING_MAIL ||
+		cur_armor->o_which == SCALE_MAIL ||
+		cur_armor->o_which == CHAIN_MAIL ||
+		cur_armor->o_which == SPLINT_MAIL ||
+		cur_armor->o_which == BANDED_MAIL ||
+		cur_armor->o_which == GOOD_CHAIN ||
+		cur_armor->o_which == PLATE_MAIL ||
+		cur_armor->o_which == PLATE_ARMOR ))
+		def_arm = def->s_arm;
+	    else if (cur_armor != NULL)
 		def_arm = cur_armor->o_ac - 10 + pstats.s_arm;
 	    else
 		def_arm = def->s_arm;
@@ -960,8 +1110,7 @@ struct object *cur_weapon;
 		(weap->o_flags & ISSILVER) && 
 		!save_throw(VS_MAGIC,def_er)) ||
 	    swing(att_er->t_ctype, att->s_lvl, def_arm-dext_prot(def->s_dext),
-		  hplus+str_plus(att->s_str)+dext_plus(att->s_dext)))
-	{
+		  hplus+str_plus(att->s_str)+dext_plus(att->s_dext))) {
 	    register int proll;
 
 	    proll = roll(ndice, nsides);
@@ -970,30 +1119,40 @@ struct object *cur_weapon;
 	    damage = dplus + proll + nplus + add_dam(att->s_str);
 
 	    /* Check for half damage monsters */
-	    if (on(*def_er, HALFDAMAGE) && weap != NULL &&
+	    if (on(*def_er, HALFDAMAGE) && (weap != NULL) &&
 		!((weap->o_flags & CANBURN) && on(*def_er, CANBBURN)))
 		damage /= 2;
 
 	    /* undead get twice damage from silver weapons */
 	    if (on(*def_er, ISUNDEAD) && 
-			weap != NULL && weap->o_flags & ISSILVER) 
+			(weap != NULL) && (weap->o_flags & ISSILVER))
 		damage *= 2;
 
 	    /* Check for fireproof monsters */
-	    if (on(*def_er, NOFIRE) && weap != NULL && 
+	    if (on(*def_er, NOFIRE) && (weap != NULL) && 
 			(weap->o_flags & CANBURN))
+		damage = 0;
+
+	    /* Check for metal proof monsters */
+	    if (on(*def_er, NOMETAL) && (weap != NULL) && 
+			(weap->o_flags & ISMETAL))
+		damage = 0;
+
+	    /* Check for monsters that ignore sharp weapons  */
+	    if (on(*def_er, NOSHARP) && (weap != NULL) && 
+			(weap->o_flags & ISSHARP))
 		damage = 0;
 
 	    /* Check for poisoned weapons */
 	    if ((weap != NULL) && (weap->o_flags & ISPOISON) 
 			&& off(*def_er, ISUNDEAD)
 			&& !save_throw(VS_POISON, def_er)) {
-		damage = (def->s_hpt / 2) + 5;
+		damage = max(damage, (def->s_hpt / 2) + 5);
 		debug("Defender was hit by poison.");
 	    }
 
 	    /* Check for no-damage and division */
-	    if (on(*def_er, BLOWDIVIDE) &&
+	    if (on(*def_er, BLOWDIVIDE) && rnd(3) == 0 &&
 			!((weap != NULL) && (weap->o_flags & CANBURN))) {
 		damage = 0;
 		creat_mons(def_er, def_er->t_index, FALSE);
@@ -1001,10 +1160,13 @@ struct object *cur_weapon;
 
 	    damage = max(0, damage);
 	    def->s_hpt -= damage;	/* Do the damage */
+	    debug("Hit %s for %d (%d) ",
+		monsters[def_er->t_index].m_name, damage, def_er->t_stats.s_hpt-damage);
 	    if (att_er == &player && ISWEARING(R_VREGEN)) {
 		damage = (ring_value(R_VREGEN) * damage) / 3;
 		pstats.s_hpt = min(max_stats.s_hpt, pstats.s_hpt + damage);
 	    }
+
 	    did_hit = TRUE;
 	}
 	if (cp == NULL || (cp = strchr(cp, '/')) == NULL)
@@ -1106,11 +1268,29 @@ save_throw(which, tp)
 int which;
 struct thing *tp;
 {
-    register int need;
+	register int need;
+	register int ring_bonus = 0;
+	register int armor_bonus = 0;
+  
+	if (tp == &player) {
+	    ring_bonus = ring_value(R_PROTECT);
+	    if (cur_armor != NULL && (which==VS_WAND || which==VS_MAGIC)) {
+		if (cur_armor->o_which == MITHRIL)
+		    armor_bonus += 5;
+		armor_bonus += (armors[cur_armor->o_which].a_class
+			- cur_armor->o_ac);
+	    }
+	}
 
-    need = 14 + which - tp->t_stats.s_lvl / 2;
-    return (roll(1, 20) >= need);
+	need = 14 + which - tp.t_stats.s_lvl/2 - ring_bonus - armor_bonus;
+
+	/* Roll of 1 always fails; 20 always saves */
+
+	if (need < 1)		need = 1;
+	else if (need > 20 )	need = 20;
+	return (roll(1, 20) >= need);
 }
+
 /*
  * save:
  *	See if he saves against various nasty things
@@ -1190,9 +1370,7 @@ hung_dam()
 
 raise_level()
 {
-    if (pstats.s_exp < e_levels[player.t_ctype]/2)
-	pstats.s_exp = e_levels[player.t_ctype];
-    else pstats.s_exp *= 2;
+    pstats.s_exp = max_stats.s_exp;
     check_level();
 }
 
@@ -1306,7 +1484,8 @@ register struct object *obj;
  *	Called to put a monster to death
  */
 
-killed(item, pr, points)
+killed(killer, item, pr, points)
+register struct thing *killer;
 register struct linked_list *item;
 bool pr, points;
 {
@@ -1314,25 +1493,68 @@ bool pr, points;
     register struct linked_list *pitem, *nexti;
 
     fighting = FALSE;
+    monst_dead = TRUE;		/* flag monster as gone for do_chase() */
     tp = (struct thing *) ldata(item);
     if (pr)
     {
-	addmsg(terse ? "Defeated " : "You have defeated ");
+	if (killer == (&player))
+	    addmsg(terse ? "Defeated " : "You have defeated ");
+	else 
+	    addmsg("The %s has defeated ", monsters[killer->t_index].m_name);
+
 	if (on(player, ISBLIND))
 	    msg("it.");
 	else
 	{
-	    if (!terse)
+	    if (!terse || killer != (&player))
 		addmsg("the ");
 	    msg("%s.", monsters[tp->t_index].m_name);
 	}
     }
 
+    if (killer && item == familiar_ptr) { 	/* The player's familiar died */
+	turn_off(player,HASFAMILIAR);
+	turn_off(player,CANSUMMON); 	/* Allow no more familiars */
+	msg("An incredible wave of sadness sweeps over you.");
+    }
+    else {	
+        if (tp->t_index == NUMMONST+2) {	/* killed Friendly Fiend */
+	    register struct linked_list *list;
+	    register struct object *obj;
+
+	    levtype = NORMLEV;		/* hero can take objects now */
+	    trader = 4 * MAXPURCH;
+	    luck += 4;
+	    msg("The gods become very angry at you.");
+	    for (list = pack; list != NULL; list = next(list)) {
+	        obj = (struct object *) ldata(list);
+	        if (rnd(3) == 0) {
+		    if (obj->o_flags & ISBLESSED)
+		        obj->o_flags &= ~ISBLESSED;
+		    else
+		        obj->o_flags |= ISCURSED;
+		    obj->o_flags &= ~(ISSILVER & ISPROT & ISZAPPED & ISVORPED
+			    & ISPOISON & CANRETURN & ISOWNED);
+		    obj->o_flags |= ISLOST;
+		    obj->o_hplus = 0;
+		    obj->o_dplus = 0;
+		    if (obj->o_type == RING)
+		        obj->o_ac = 0;
+		    else if (obj->o_type == ARMOR)
+		        obj->o_ac = armors[obj->o_which].a_class + 1;
+		    else if (obj->o_type == STICK)
+		        obj->o_charges = 0;
+	        }
+	    }
+        }
+    }
     /* Take care of any residual effects of the monster */
     check_residue(tp);
 
     if (points) {
-	pstats.s_exp += tp->t_stats.s_exp;
+        killer->t_stats.s_exp += tp->t_stats.s_exp;
+	if (on(*killer,ISFAMILIAR))
+	    pstats.s_exp += tp->t_stats.s_exp;
 
 	/*
 	 * Do adjustments if he went up a level
@@ -1358,7 +1580,7 @@ bool pr, points;
 	obj->o_pos = tp->t_pos;
 	detach(tp->t_pack, pitem);
 
-	if (points) fall(pitem, FALSE);
+	if (points) fall(killer, pitem, FALSE);
 	else discard(pitem);
 
 	pitem = nexti;
@@ -1402,4 +1624,46 @@ struct thing *mp;
 	    return((struct object *) ldata(pitem));
 
     return(NULL);
+}
+
+/*
+ * Summon - see whether to summon help
+ * Returns TRUE if help comes, FALSE otherwise
+ */
+summon(mons)
+register struct thing *mons;
+{
+    register char *helpname;
+    register int which, i;
+    register char *mname = monsters[mons->t_index].m_name;
+    
+    /* Try to summon if less than 1/3 max hit points */
+    if(on(*mons, CANSUMMON) &&
+      (mons->t_stats.s_hpt < mons->maxstats.s_hpt/3) &&
+      (rnd(40 * 10) < (mons->t_stats.s_lvl * mons->t_stats.s_intel) ) ) {
+	turn_off(*mons, CANSUMMON);
+	msg("The %s summons help!", mname);
+	helpname = monsters[mons->t_index].m_typesum;
+	for (which=1; which<NUMMONST; which++) {
+	     if (strcmp(helpname, monsters[which].m_name) == NULL)
+		 break;
+	}
+	if (which >= NUMMONST) {
+	     debug("Couldn't find summoned one.");
+	     return(FALSE);
+	}
+
+	/* summoned monster was genocided */
+	if ( !monsters[which].m_normal && !monsters[which].m_wander) {
+	     msg("The %s becomes very annoyed at you!", mname);
+	     if (on(*mons, ISSLOW))
+		turn_off(*mons, ISSLOW);
+	     else
+		turn_on(*mons, ISHASTE);
+	     return(FALSE);
+	}
+	else for (i=0; i<monsters[mons->t_index].m_numsum; i++)
+	    creat_mons(mons, which, FALSE);
+	}
+    return(TRUE);
 }

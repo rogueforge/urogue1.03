@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Note:  In this file, we use the system curses.h file
  * rather that our own version.
  *
@@ -13,6 +16,7 @@
 #if defined(BSD4)
 #include <signal.h>
 #endif
+
 
 #if !defined(flushout)
 flushout()

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Functions to implement the various sticks one might find
  * while wandering around the dungeon.
  */
@@ -97,24 +100,28 @@ bool blessed;
 	     * evenly from the monsters in the room or next to hero
 	     * if he is in a passage (but leave the monsters alone
 	     * if the stick is cursed)
+	     * Drain no points from hero if blessed
 	     */
 	    if (pstats.s_hpt < 2) {
 		msg("You are too weak to use it.");
 		return;
 	    }
-	    if (obj->o_flags & ISCURSED)
+	    if (cursed)
 		pstats.s_hpt /= 2;
 	    else if ((rp = roomin(&hero)) == NULL)
 		drain(hero.y-1, hero.y+1, hero.x-1, hero.x+1);
 	    else
 		drain(rp->r_pos.y, rp->r_pos.y+rp->r_max.y,
 		    rp->r_pos.x, rp->r_pos.x+rp->r_max.x);
+	    if (blessed)
+		pstats.s_hpt *= 2.0/3.0;
 	when WS_POLYMORPH:
 	case WS_TELMON:
 	case WS_CANCEL:
 	{
 	    register char monster, oldch;
 	    register int rm;
+	    register int save_adj = 0;
 
 	    y = hero.y;
 	    x = hero.x;
@@ -127,7 +134,13 @@ bool blessed;
 		item = find_mons(y, x);
 		tp = THINGPTR(item);
 		/* if the monster gets the saving throw, leave the case */
-		if (save_throw(VS_MAGIC, tp)) {
+		if (blessed) save_adj = -5;
+		if (cursed)
+		    if (which == WS_POLYMORPH)
+			save_adj = -5;	/* not save vs becoming tougher */
+		    else save_adj = 5;
+
+		if (save_throw(VS_MAGIC - save_adj, tp)) {
 		    msg("Nothing happens.");
 		    break;
 		}
@@ -144,11 +157,42 @@ bool blessed;
 		}
 
 		if (which == WS_POLYMORPH) {
+		    register int which_new;
+
 		    detach(mlist, item);
 		    oldch = tp->t_oldch;
 		    delta.y = y;
 		    delta.x = x;
-		    new_monster(item, rnd(NUMMONST-1) + 1, &delta, FALSE);
+		    if (!blessed && !cursed)
+			which_new = randmonster(TRUE, TRUE);
+		    else {
+			/* duplicate randmonster() for now */
+			/* Eventually fix to take level */
+			register int cur_level, range, i; 
+			if (blessed) cur_level = level/2;
+			if (cursed) cur_level = level*2;
+			range = 4*NLEVMONS;
+			i = 0;
+			do
+			{
+			    if (i++ > range*10) { /* just in case all have be genocided */
+				i = 0;
+				if (--cur_level <= 0)
+				    fatal("Rogue could not find a monster to make");
+			    }
+			    which_new = NLEVMONS*(cur_level - 1) + (rnd(range) - (range - 1 - NLEVMONS));
+			    if (which_new < 1)
+				which_new = rnd(NLEVMONS) + 1;
+			    if (which_new > NUMMONST - NUMSUMMON - 1) {
+				if (blessed)
+				    which_new = rnd(range) + (NUMMONST - NUMSUMMON - 1) - (range - 1);
+				else if (which_new > NUMMONST - 1)
+				    which_new = rnd(range+NUMSUMMON) + (NUMMONST-1) - (range+NUMSUMMON-1);
+			    }
+			}
+			while (!monsters[which_new].m_normal);
+		    }
+		    new_monster(item, which_new, &delta, FALSE);
 		    monster = tp->t_type;
 		    if (off(*tp, ISRUN))
 			runto(&delta, &hero);
@@ -163,6 +207,18 @@ bool blessed;
 		    tp->t_flags[1] &= CANC1MASK;
 		    tp->t_flags[2] &= CANC2MASK;
 		    tp->t_flags[3] &= CANC3MASK;
+		    tp->t_flags[4] &= CANC4MASK;
+		    tp->t_flags[5] &= CANC5MASK;
+		    tp->t_flags[6] &= CANC5MASK;
+		    tp->t_flags[7] &= CANC7MASK;
+		    tp->t_flags[8] &= CANC8MASK;
+		    tp->t_flags[9] &= CANC9MASK;
+		    tp->t_flags[10] &= CANCAMASK;
+		    tp->t_flags[11] &= CANCBMASK;
+		    tp->t_flags[12] &= CANCCMASK;
+		    tp->t_flags[13] &= CANCDMASK;
+		    tp->t_flags[14] &= CANCEMASK;
+		    tp->t_flags[15] &= CANCFMASK;
 		}
 		else { /* A teleport stick */
 		    if (cursed) {	/* Teleport monster to player */
@@ -175,7 +231,7 @@ bool blessed;
 			}
 		    }
 		    else if (blessed) {	/* Get rid of monster */
-			killed(item, FALSE, FALSE);
+			killed(NULL, item, FALSE, FALSE);
 			return;
 		    }
 		    else {
@@ -208,10 +264,45 @@ bool blessed;
 		'*' , {0, 0}, "", 0, 0, "1d4" , 0, 0, 100, 1
 	    };
 
-	    sprintf(bolt.o_hurldmg, "%dd4", pstats.s_lvl);
+	    struct linked_list *item;
+	    struct thing *tp;
+	    int damage;
+	    int nsides = 4;
+	    char ch;
+	    char *mname;
+
+	    /* Magic Missiles *always* hit, no saving throw */
 	    do_motion(&bolt, delta.y, delta.x, &player);
-	    if (!hit_monster(unc(bolt.o_pos), &bolt, &player))
-	       msg("The missle vanishes with a puff of smoke.");
+	    ch = winat(bolt.o_pos.y, bolt.o_pos.x);
+
+	    if (cursed)
+		nsides /= 2;
+	    else if (blessed)
+		nsides *= 2;
+	    damage = roll(pstats.s_lvl, nsides);
+
+	    if (isalpha(ch)) {
+		item = find_mons(bolt.o_pos.y, bolt.o_pos.x);
+		tp = THINGPTR(item);
+		mname = monsters[tp->t_index].m_name;
+
+		debug("Missiled %s for %d (%d)",
+		    mname, damage, tp->t_stats.s_hpt-damage);
+		if ((tp->t_stats.s_hpt -= damage) <= 0) {
+		    msg("The missile kills the %s.", 
+			on(player, ISBLIND) ? "monster" : mname);
+		    killed(&player, item, FALSE, TRUE);
+		}
+		else {
+		    msg("The missile hits the %s", mname);
+		    runto(&bolt.o_pos, &hero);
+		    summon(tp);
+		}
+	    }
+	    if ( bolt.o_pos.y >= 0 && bolt.o_pos.x >= 0 &&
+			    bolt.o_pos.y < LINES && bolt.o_pos.x < COLS)
+		mvwaddch(cw, bolt.o_pos.y, bolt.o_pos.x,
+			show(bolt.o_pos.y, bolt.o_pos.x));
 	}
 	when WS_HIT:
 	{
@@ -223,12 +314,23 @@ bool blessed;
 	    ch = winat(delta.y, delta.x);
 	    if (isalpha(ch))
 	    {
+		static char buf[20];
+		register int nsides, ndice;
+
 		strike = *obj;
-		strike.o_hplus  = 6;
+		if (blessed)	 strike.o_hplus  = 12;
+		else if (cursed) strike.o_hplus  = 3;
+		else		 strike.o_hplus  = 6;
+
 		if (strcmp(ws_type[which], "staff") == 0)
-		    strike.o_damage = "3d8";
-		else
-		    strike.o_damage = "2d8";
+		     ndice = 3;
+		else ndice = 2;
+		if (blessed)	 nsides  = 16;
+		else if (cursed) nsides  = 4;
+		else		 nsides  = 8;
+		sprintf(buf, "%dd%d", ndice, nsides);
+
+		strike.o_damage = buf;
 		fight(&delta, ch, &strike, FALSE);
 	    }
 	}
@@ -272,28 +374,30 @@ bool blessed;
 		msg("This is a wand of charging.");
 	    if ((nitem = get_item("charge", STICK)) != NULL) {
 		nobj = OBJPTR(nitem);
-		if ((++nobj->o_charges == 1) && (nobj->o_which == WS_HIT))
+		if ( !cursed && (nobj->o_charges == 0) && (nobj->o_which == WS_HIT))
 		    fix_stick(nobj);
+		else
+		if (blessed)	 nobj->o_charges += 2;
+		else if (cursed) nobj->o_charges -= 1;
+		else		 nobj->o_charges += 1;
 	    }
 	when WS_ELECT:
 	case WS_FIRE:
 	case WS_COLD:
 	    {
 		char *name;
-		int damage;
+		int damage = roll(6,6) + BOLT_LENGTH;
 
-		if (which == WS_ELECT)
+		switch (which) {
+		when WS_ELECT:
 		    name = "lightning bolt";
-		else if (which == WS_FIRE)
+		    if (obj->o_charges > 50)
+			damage = roll(6+rnd(6),6+rnd(3)) + BOLT_LENGTH;
+		when WS_FIRE:
 		    name = "flame";
-		else
+		when WS_COLD:
 		    name = "ice";
-
-		if (which == WS_ELECT && obj->o_charges > 50)
-		    damage = roll(6+rnd(6),6+rnd(3));
-		else
-		    damage = roll(6,6);
-
+		}
 		shoot_bolt(&player, hero, delta, TRUE, D_BOLT, name, damage);
 	    }
 	when WS_ANTIM: {
@@ -352,10 +456,16 @@ bool blessed;
 	    }
 	    if ( x >= 0 && x < COLS && y >= 1 && y < LINES - 2 &&
 			isalpha(mvwinch(mw, y, x))) {
+		register int save_adj = 0;
 		item = find_mons(y, x);
 		tp = THINGPTR(item);
-		if (save_throw(VS_MAGIC, tp))
-		     msg("Nothing happens.");
+		if (blessed) save_adj = -5;
+		if (cursed)
+		    save_adj = 5;
+
+		if (save_throw(VS_MAGIC - save_adj, tp)) {
+		    msg("Nothing happens.");
+		}
 		else
 		     turn_on (*tp, ISHUH);
 		delta.y = y;
@@ -372,10 +482,16 @@ bool blessed;
 	    }
 	    if ( x >= 0 && x < COLS && y >= 1 && y < LINES - 2 &&
 			isalpha(mvwinch(mw, y, x))) {
+		register int save_adj = 0;
 		item = find_mons(y, x);
 		tp = THINGPTR(item);
-		if (save_throw(VS_WAND, tp))
+		if (blessed) save_adj = -5;
+		if (cursed)
+		    save_adj = 5;
+
+		if (save_throw(VS_MAGIC - save_adj, tp)) {
 		    msg("Nothing happens.");
+		}
 		else {
 		    tp->t_no_move = FREEZETIME;
 		}
@@ -402,15 +518,15 @@ bool blessed;
 			luck++;
 			aggravate();
 		     }
-		     tp->t_stats.s_hpt /= 2;
-		     msg("The %s appears to be weaker now.", 
-			monsters[tp->t_index].m_name);
+		     tp->t_stats.s_hpt /= (blessed ? 4 : 2);
+		     msg("The %s appears to be %sweaker now.", 
+			monsters[tp->t_index].m_name, (blessed ? "much " : "") );
 		}
 		delta.y = y;
 		delta.x = x;
 		runto(&delta, &hero);
 	        if (tp->t_stats.s_hpt < 1)
-		     killed(item, TRUE, TRUE);
+		     killed(&player, item, TRUE, TRUE);
 	    }
 	when WS_ANNIH:
 	    y = hero.y;
@@ -453,7 +569,7 @@ bool blessed;
 		    if (on(*tp, ISUNIQUE) && save_throw(VS_MAGIC, tp)) {
 			tp->t_stats.s_hpt /= 2;
 			if (tp->t_stats.s_hpt < 1) {
-			     killed(item, FALSE, TRUE);
+			     killed(&player, item, FALSE, TRUE);
 			     msg("You have disintegrated the %s.", 
 				    monsters[tp->t_index].m_name);
 			}
@@ -463,6 +579,7 @@ bool blessed;
 			    runto(&delta, &hero);
 			    msg("The %s appears wounded.",
 				monsters[tp->t_index].m_name);
+			    summon(tp);
 			}
 		    }
 		    else {
@@ -472,12 +589,12 @@ bool blessed;
 			}
 			msg("You have disintegrated the %s.", 
 				monsters[tp->t_index].m_name);
-			killed (item, FALSE, TRUE);
+			killed (&player, item, FALSE, TRUE);
 		    }
 		}
 	    }
 	when WS_NOTHING:
-	    msg("Nothing happens.");
+	    msg("Nothing %shappens.", (blessed ? "good " : (cursed ? "bad " : "")) );
 	when WS_INVIS: {
 	    if (cursed) {
 		register int x1, y1, x2, y2;
@@ -651,7 +768,8 @@ int ymin, ymax, xmin, xmax;
 		    aggravate();
 		}
 		if ((ick->t_stats.s_hpt -= count) < 1)
-		    killed(item, cansee(i, j) && !on(*ick, ISINVIS), TRUE);
+		    killed(&player, item, 
+			   cansee(i, j) && !on(*ick, ISINVIS), TRUE);
 	    }
 }
 
@@ -685,17 +803,27 @@ bool
 shoot_bolt(shooter, start, dir, get_points, reason, name, damage)
 struct thing *shooter;
 coord start, dir;
-bool get_points;
-short reason;
-char *name;
-int damage;
+bool get_points;		/* should player get exp points? */
+short reason;			/* reason for dying */
+char *name;			/* fire, nerve, cold, etc */
+int damage;			/* make zapee suffer */
 {
     register char dirch, ch;
-    register bool used, change;
+    register bool change;
     register short y, x;
     coord pos;
     coord spotpos[BOLT_LENGTH];
-    bool ret_val = FALSE;	/* True if monster gets killed */
+    bool ret_val = FALSE;	/* True if breathing monster gets killed */
+    register struct linked_list *item;
+    register struct thing *tp;
+    register char *mname;	/* = monsters[tp->t_index].m_name */
+    int bounced;		/* where along BOLT_LENGTH it hit a wall */
+    int player_damage;		/* damage if player saved */
+    bool no_effect;		/* zap does not effect zapee */
+    int take_that[BOLT_LENGTH+1]; /* damage to each monster */
+				/* last spot for player */
+
+    debug("%s does %d damage", name, damage);
 
     switch (dir.y + dir.x) {
 	when 0: dirch = '/';
@@ -704,22 +832,29 @@ int damage;
     }
     pos.y = start.y + dir.y;
     pos.x = start.x + dir.x;
-    used = FALSE;
     change = FALSE;
-    for (y = 0; y < BOLT_LENGTH && !used; y++)
+    for (y = 0; y < BOLT_LENGTH+1; y++) take_that[y] = 0;
+
+    bounced = 0;
+    for (y = 0; y < BOLT_LENGTH; y++)
     {
+	no_effect = FALSE;
 	ch = winat(pos.y, pos.x);
 	spotpos[y] = pos;
+
+	/* Bolt damage dimishes over space */
+	damage = max(0,damage-(y/3));
 
 	/* Are we at hero? */
 	if (ce(pos, hero)) goto at_hero;
 
 	switch (ch)
 	{
-	    case SECRETDOOR:
+	    case SECRETDOOR:	/* Bolts pass through regular doors */
 	    case '|':
 	    case '-':
 	    case ' ':
+		bounced = y;
 		if (dirch == '-' || dirch == '|') {
 		    dir.y = -dir.y;
 		    dir.x = -dir.x;
@@ -777,10 +912,7 @@ int damage;
 		msg("The %s bounces!", name);
 		break;
 	    default:
-		if (isalpha(ch)) {
-		    register struct linked_list *item;
-		    register struct thing *tp;
-		    register char *mname;
+		if (isalpha(ch)) {			/* hit a monster */
 
 		    item = find_mons(unc(pos));
 		    if (item == NULL) {
@@ -790,165 +922,143 @@ int damage;
 		    tp = THINGPTR(item);
 		    mname = monsters[tp->t_index].m_name;
 
-		    if (!save_throw(VS_MAGIC, tp)) {
-			if (on(*tp, ISDISGUISE) &&
-			    (tp->t_type != tp->t_disguise) &&
-			    off(player, ISBLIND)) {
-			    msg("Wait! That's a %s!", mname);
-			    turn_off(*tp, ISDISGUISE);
-			}
-
-			tp->t_wasshot = TRUE;
-
-			if (on(*tp, CANSELL)) {
-			    luck++;
-			    aggravate();
-			}
-
-			/* Hit the monster -- does it do damage? */
-			if ((strcmp(name, "ice") == 0 && on(*tp, NOCOLD)) ||
-			    (strcmp(name, "ice") == 0 && on(*tp, ISUNDEAD)) ||
-			    (strcmp(name,"flame")== 0 && on(*tp, NOFIRE)) ||
-			    (strcmp(name,"lightning bolt")==0 && 
-							on(*tp,NOBOLT))) {
-			    msg("The %s has no effect on the %s.", name,
-				on(player, ISBLIND) ? "monster" : mname);
-			}
-
-			else if ((strcmp(name, "lightning bolt") == 0) &&
-				 on(*tp, BOLTDIVIDE)) {
-				if (creat_mons(tp, tp->t_index, FALSE))
-				    msg("The %s divides the %s.", name, mname);
-				else msg("The %s has no effect on the %s.",
-					name, on(player, ISBLIND) ? 
-					"monster" : mname);
-			}
-
-			else if ((strcmp(name, "flame") == 0) &&
-				on(*tp, CANBBURN)) {
-			    msg("The %s is burned to death by the flame.",
-					mname);
-			    killed(item, FALSE, get_points);
-			    ret_val = TRUE;
-			}
-
-			else if ((tp->t_stats.s_hpt -= damage) <= 0) {
-			    msg("The %s kills the %s.", name,
-				on(player, ISBLIND) ? "monster" : mname);
-			    killed(item, FALSE, get_points);
-			    ret_val = TRUE;
-			}
-
-			else {
-			    msg("The %s hits the %s.", name,
-				on(player, ISBLIND) ? "monster" : mname);
-			    if (get_points) runto(&pos, &hero);
-			}
-			used = TRUE;
+		    /* Disguised monsters stay hidden if they save */
+		    if (on(*tp, ISDISGUISE) && save_throw(VS_MAGIC, tp) &&
+			(tp->t_type != tp->t_disguise) && off(player, ISBLIND)) {
+			msg("Wait! That's a %s!", mname);
+			turn_off(*tp, ISDISGUISE);
 		    }
-		    else if (isalpha(show(pos.y, pos.x))) {
-			if (terse)
-			    msg("%s misses.", name);
-			else
-			    msg("The %s whizzes past the %s.", name,
-				on(player, ISBLIND) ? "monster" : mname);
-			if (get_points) runto(&pos, &hero);
+
+		    tp->t_wasshot = TRUE;
+		    if (on(*tp, CANSELL)) {
+			luck++;
+			aggravate();
+		    }
+
+		    /* Hit the monster -- does it do damage? */
+		    if (strcmp(name, "ice") == 0) {
+			if ( on(*tp, NOCOLD) || on(*tp, ISUNDEAD) )
+			    no_effect=TRUE;
+		    }
+		    else if (strcmp(name, "flame") == 0) {
+			if ( on(*tp, NOFIRE) )
+			    no_effect=TRUE;
+			if ( on(*tp, CANBBURN) ) {
+			    msg("The %s is burned to death by the flame.",
+				mname);
+			    take_that[y] += tp->t_stats.s_hpt + 1;
+			    ret_val = TRUE;
+			}
+		    }
+		    else if (strcmp(name, "lightning bolt") == 0) {
+			if ( on(*tp, NOBOLT) )
+			    no_effect=TRUE;
+			if ( on(*tp, BOLTDIVIDE) ) {
+			    no_effect=TRUE;
+			    if (creat_mons(tp, tp->t_index, FALSE))
+				msg("The %s divides the %s.", name, mname);
+			}
+		    }
+		    if (no_effect == TRUE) {
+			msg("The %s has no effect on the %s.", name,
+			    on(player, ISBLIND) ? "monster" : mname);
+		    }
+		    else {
+			take_that[(bounced?bounced--:y)] +=
+				save_throw(VS_MAGIC, tp) ? damage/2 : damage;
 		    }
 		}
 		else if (pos.y == hero.y && pos.x == hero.x) {
 at_hero: 
+		    player_damage = damage;
 		    running = fighting = FALSE;
-		    if (!save(VS_MAGIC-((cur_armor != NULL &&
-			cur_armor->o_which == MITHRIL) ? -5 : 0))) {
-			if (terse)
-			    msg("The %s hits you.", name);
-			else
-			    msg("You are hit by the %s.", name);
-			if (cur_armor != NULL && 
-				cur_armor->o_which == CRYSTAL_ARMOR &&
-	 			(strcmp(name, "acid") == 0)) {
-				damage = 0;
-				msg("The acid splashes harmlessly against your armor!");
-		       	}
-		    	else if (((cur_armor != NULL &&
-				    cur_armor->o_which == CRYSTAL_ARMOR) ||
-			     	ISWEARING(R_ELECTRESIST)) &&
-				(strcmp(name, "lightning bolt") == 0)) {
-				damage = 0;
-				if ( rnd(100) < 75 
-					&& cur_weapon != NULL
-					&& shooter != &player) {
-				    cur_weapon->o_flags |= ISZAPPED;
-				    cur_weapon->o_charges += (10 + rnd(15));
-				}
-				if (cur_weapon != NULL && cur_armor != NULL)
-				    msg("Your armor and %s are covered with dancing blue lights!", weaps[cur_weapon->o_which].w_name);
-				else if (cur_armor != NULL)
-				    msg("Your armor is covered with dancing blue lights!");
-				else if (cur_weapon != NULL)
-				    msg("Your %s is covered with dancing blue lights!", weaps[cur_weapon->o_which].w_name);
-				else
-				    msg("You are momentarily covered with dancing blue lights.");
-		       	}
-			else if(ISWEARING(R_FIRERESIST) &&
-				(strcmp(name, "flame") == 0)) {
-				damage = 0;
-				msg("It flickers a moment and then fades.");
-			}
-			else if(ISWEARING(R_COLDRESIST) &&
-				(strcmp(name, "ice") == 0)) {
-				damage = 0;
-				msg("It cracks and quickly melts.");
-			}
-			if ((pstats.s_hpt -= damage) <= 0) {
-			    death(reason);
-			    return;
-			}
-			used = TRUE;
+		    bounced = 0;
 
-			/* Check for gas with special effects */
-			if (!save(VS_BREATH) && !ISWEARING(R_BREATHE)) {
-			    if (strcmp(name, "nerve gas") == 0) {
-				if (no_command == 0) {
-				    msg("The nerve gas paralyzes you.");
-				    no_command = FREEZETIME;
-				}
+		    if (cur_armor != NULL && 
+			    cur_armor->o_which == CRYSTAL_ARMOR &&
+			    (strcmp(name, "acid") == 0)) {
+			    player_damage = 0;
+			    msg("The acid splashes harmlessly against your armor!");
+		    }
+		    else if (((cur_armor != NULL &&
+				cur_armor->o_which == CRYSTAL_ARMOR) ||
+			    ISWEARING(R_ELECTRESIST)) &&
+			    (strcmp(name, "lightning bolt") == 0)) {
+			    player_damage = 0;
+			    if ( rnd(100) < 75 
+				    && cur_weapon != NULL
+				    && shooter != &player) {
+				cur_weapon->o_flags |= ISZAPPED;
+				cur_weapon->o_charges += (10 + rnd(15));
 			    }
-			    else if (strcmp(name, "sleeping gas") == 0) {
-				if (no_command == 0) {
-				    msg("The sleeping gas puts you to sleep.");
-				    no_command = SLEEPTIME;
-				}
+			    if (cur_weapon != NULL && cur_armor != NULL)
+				msg("Your armor and %s are covered with dancing blue lights!", weaps[cur_weapon->o_which].w_name);
+			    else if (cur_armor != NULL)
+				msg("Your armor is covered with dancing blue lights!");
+			    else if (cur_weapon != NULL)
+				msg("Your %s is covered with dancing blue lights!", weaps[cur_weapon->o_which].w_name);
+			    else
+				msg("You are momentarily covered with dancing blue lights.");
+		    }
+		    else if(ISWEARING(R_FIRERESIST) &&
+			    (strcmp(name, "flame") == 0)) {
+			    player_damage = 0;
+			    msg("The flame bathes you harmlessly.");
+		    }
+		    else if(ISWEARING(R_COLDRESIST) &&
+			    (strcmp(name, "ice") == 0)) {
+			    player_damage = 0;
+			    msg("The ice cracks and quickly melts around you.");
+		    }
+		    else if (save(VS_MAGIC)) {
+			take_that[BOLT_LENGTH] += player_damage/2;
+			debug("player dodges %s for %d.", name,player_damage/2);
+		    }
+		    else {
+			debug("player zapped by %s for %d.", name, player_damage);
+			take_that[BOLT_LENGTH] += player_damage;
+		    }
+
+		    /* Check for gas with special effects */
+		    if (!save(VS_BREATH) && !ISWEARING(R_BREATHE)) {
+			if (strcmp(name, "nerve gas") == 0) {
+			    if (no_command == 0) {
+				msg("The nerve gas paralyzes you.");
+				no_command = FREEZETIME;
 			    }
-			    else if (strcmp(name, "slow gas") == 0
-				    && !ISWEARING(R_FREEDOM)) {
-				msg("You feel yourself moving %sslower.",
-					on(player, ISSLOW) ? "even " : "");
-				if (on(player, ISSLOW))
-				    lengthen(noslow, rnd(10) + 4);
-				else {
-				    turn_on(player, ISSLOW);
-				    player.t_turn = TRUE;
-				    fuse(noslow, 0, rnd(10)+4, AFTER);
-				}
+			}
+			else if (strcmp(name, "sleeping gas") == 0) {
+			    if (no_command == 0) {
+				msg("The sleeping gas puts you to sleep.");
+				no_command = SLEEPTIME;
 			    }
-			    else if (strcmp(name, "fear gas") == 0) {
-				if (!(on(player, ISFLEE) &&
-				      (player.t_dest == &shooter->t_pos)) &&
-				    (shooter != &player)) {
-				    if (off(player, SUPERHERO)) {
-					turn_on(player, ISFLEE);
-					player.t_dest = &shooter->t_pos;
-					msg("The fear gas terrifies you.");
-				    }
-				    else
-					msg("The fear gas has no effect.");
+			}
+			else if (strcmp(name, "slow gas") == 0
+				&& !ISWEARING(R_FREEDOM)) {
+			    msg("You feel yourself moving %sslower.",
+				    on(player, ISSLOW) ? "even " : "");
+			    if (on(player, ISSLOW))
+				lengthen(noslow, rnd(10) + 4);
+			    else {
+				turn_on(player, ISSLOW);
+				player.t_turn = TRUE;
+				fuse(noslow, 0, rnd(10)+4, AFTER);
+			    }
+			}
+			else if (strcmp(name, "fear gas") == 0) {
+			    if (!(on(player, ISFLEE) &&
+				  (player.t_dest == &shooter->t_pos)) &&
+				(shooter != &player)) {
+				if (off(player, SUPERHERO)) {
+				    turn_on(player, ISFLEE);
+				    player.t_dest = &shooter->t_pos;
+				    msg("The fear gas terrifies you.");
 				}
+				else
+				    msg("The fear gas has no effect.");
 			    }
 			}
 		    }
-		    else
-			msg("The %s whizzes by you.", name);
 		}
 		mvwaddch(cw, pos.y, pos.x, dirch);
 		draw(cw);
@@ -956,11 +1066,49 @@ at_hero:
 	pos.y += dir.y;
 	pos.x += dir.x;
     }
-    for (x = 0; x < y; x++)
+
+    /*
+     * Now that we have determined the damage for the length of the bolt,
+     * apply it to each monster (and then the player) in turn
+     */
+    for (x = 0; x < BOLT_LENGTH; x++) {
+	ch = winat(spotpos[x].y, spotpos[x].x);
+
+	if (take_that[x] != 0 && isalpha(ch)) {
+	    if ((item = find_mons(unc(spotpos[x]))) == NULL) {
+		debug("Can't find monster %c @ %d %d.", ch, unc(pos));
+		continue;
+	    }
+	    else tp = THINGPTR(item);
+	    mname = monsters[tp->t_index].m_name;
+
+	    debug("Zapped %s for %d (%d)",
+		mname, take_that[x], tp->t_stats.s_hpt-take_that[x]);
+	    if ((tp->t_stats.s_hpt -= take_that[x]) <= 0) {
+		msg("The %s kills the %s.", name,
+		    on(player, ISBLIND) ? "monster" : mname);
+		killed(NULL, item, FALSE, get_points);
+		ret_val = TRUE;
+	    }
+	    else if (get_points)
+	    {
+		runto(&spotpos[x], &hero);
+		summon(tp);
+	    }
+	}
 	if ( spotpos[x].y >= 0 && spotpos[x].x >= 0 &&
 			spotpos[x].y < LINES && spotpos[x].x < COLS)
 	    mvwaddch(cw, spotpos[x].y, spotpos[x].x,
 			show(spotpos[x].y, spotpos[x].x));
+    }
+    if (take_that[BOLT_LENGTH] != 0) {
+	if (terse)	msg("The %s hits you.", name);
+	else		msg("You are hit by the %s.", name);
+	if ((pstats.s_hpt -= take_that[BOLT_LENGTH]) <= 0) {
+	    death(reason);
+	    return;
+	}
+    }
 
     return(ret_val);
 }

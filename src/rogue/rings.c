@@ -1,3 +1,6 @@
+/*
+ * Last Modified: 05/25/86
+ */
 #include "curses.h"
 #include "rogue.h"
 
@@ -62,6 +65,10 @@ ring_on()
 	    pstats.s_intel += obj->o_ac;
 	when R_ADDWISDOM:
 	    pstats.s_wisdom += obj->o_ac;
+	when R_FREEDOM: {
+	    turn_off(player, ISHELD);
+	    hold_count = 0;
+	    }
 	when R_SEEINVIS:
 	    if (off(player, PERMBLIND)) {
 		turn_on(player, CANSEE);
@@ -129,10 +136,11 @@ ring_off()
 	msg("%s wearing such a ring.", terse ? "Not" : "You are not");
 	return;
     }
-    if (obj->o_which == R_LEVITATION)
-	msg("You float gently to the ground.");
-    if (dropcheck(obj))
+    if (dropcheck(obj)) {
+	if (obj->o_which == R_LEVITATION)
+	    msg("You float gently to the ground.");
 	msg("Was wearing %s.", inv_name(obj, TRUE));
+    }
     updpack(FALSE);
 }
 

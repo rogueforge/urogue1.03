@@ -1,4 +1,6 @@
-
+/*
+ * Last Modified: 05/25/86
+ */
 /*
  * Read a scroll and let it happen
  *
@@ -8,13 +10,19 @@
 #include <ctype.h>
 #include "rogue.h"
 
+/* Avoid Microsoft C compiler bug */
+#if defined(SCO5)
+#define register
+#define reg
+#endif
+
 read_scroll(which, blessed)
 register int which;
 bool blessed;
 {
     register struct object *obj, *nobj;
     register struct linked_list *item, *nitem;
-    register int i,j;
+    register int i,j,charm_power;
     register char ch, nch;
     bool cursed, is_scroll;
     char buf[LINELEN];
@@ -55,6 +63,104 @@ bool blessed;
 
     switch(which)
     {
+    struct linked_list *llp;
+    struct thing *tp;
+    char *name;
+    int mon_type;
+
+        case S_SUMMON:  
+ 	    if (cursed) {
+		creat_mons(&player, (short) 0, TRUE);
+		break;
+	    } 
+	    if (blessed)	/* Summon a possibly very high monster */
+		mon_type = pstats.s_lvl + rnd((NUMMONST-pstats.s_lvl-1));
+	    else
+		mon_type = 0;
+
+	    if ( (llp = summon_monster((short) mon_type, FALSE, FALSE))) {
+		tp = THINGPTR(llp);
+		name = monsters[tp->t_index].m_name;
+		msg("You have summoned a %s ",name);
+		fuse
+		(unsummon, (int) llp, WANDERTIME + rnd(pstats.s_lvl), AFTER); 
+	    }
+
+	when S_CHARM:
+	/*
+	 * Beauty and brains combined make a person charming.
+	 * Unique monsters can never be charmed.
+	 */
+	    charm_power = pstats.s_charisma>>1;
+	    if (pstats.s_intel>15) 
+		charm_power += (pstats.s_intel-15);
+	    if (cursed) {
+		/*
+		 * This scroll aggravates all the monsters on the current
+		 * level and sets them running towards the hero
+		 */
+		aggravate();
+		msg("You feel ugly.");
+	    }
+	    else if (blessed) { /* Charm all monsters on level */
+		if (mlist == NULL) msg("Nothing happens.");
+		else {
+		    register struct linked_list *mon;
+		    register struct thing *th;
+
+		    for (mon = mlist; mon != NULL; mon = next(mon)) {
+			th = (struct thing *) ldata(mon);
+			if (th->t_stats.s_intel<charm_power 
+			&& off(*th,ISUNIQUE)) {
+			    turn_on(*th, ISCHARMED);
+			    runto(&th->t_pos,&hero);
+			}
+		    }
+		    msg
+		    ("You hear beautiful music throughout the dungeon.");
+		}
+	    }
+	    else {
+		/*
+		 * Charm all monsters within 
+		 * two spaces of the hero.
+		 */
+		    register int x,y;
+		    register struct linked_list *mon;
+		    bool gotone=FALSE;
+
+		    for (x = hero.x-2; x <= hero.x+2; x++) {
+			for (y = hero.y-2; y <= hero.y+2; y++) {
+			    if (y > 0 && x > 0 && isalpha(mvwinch(mw, y, x))) {
+				if ((mon = find_mons(y, x)) != NULL) {
+				    register struct thing *th;
+
+				    gotone = TRUE;
+				    th = (struct thing *) ldata(mon);
+			            if (th->t_stats.s_intel<charm_power
+				    && off(*th,ISUNIQUE)) {
+			                turn_on(*th, ISCHARMED);
+			                runto(&th->t_pos,&hero);
+			            }
+				}
+			    }
+			}
+		    }
+		    msg("You hear beautiful music all around you.");
+		    if (!gotone) 
+			msg("Unfortunately, no one else does.");
+	    }
+
+	when S_REFLECT:
+	    if (on(player, CANREFLECT)) {
+		    msg("More shiny particles appear in front of you.");
+		    lengthen(ungaze, 5 + rnd(10));
+	    } else {
+		msg("Shiny particles materialize in front of you.");
+		turn_on(player, CANREFLECT);
+	        fuse(ungaze, 0, (blessed ? 3 : 1)*WANDERTIME, AFTER);
+	    }
+
 	when S_CONFUSE:
 	    /*
 	     * Scroll of monster confusion.  Give him that power.
@@ -180,7 +286,9 @@ bool blessed;
 	     * First look in a circle around him, next try his room
 	     * otherwise give up
 	     */
-	    if (cursed) {
+	    if (blessed)
+		summon_monster((short) 0, FALSE, TRUE);
+	    else if (cursed) {
 		i = rnd(4) + 3;
 		for(j=0; j<i; j++)
 		    creat_mons(&player, (short) 0, TRUE);
@@ -202,7 +310,7 @@ bool blessed;
 		if (is_scroll && s_know[S_IDENT] != TRUE) {
 		    msg("This scroll is an identify scroll.");
 		}
-		whatis(NULL);
+		whatis((struct linked_list *) NULL);
 	    }
 	    if (is_scroll)
 	        s_know[S_IDENT] = TRUE;
@@ -230,10 +338,8 @@ bool blessed;
 	     * Take all the things we want to keep hidden out of the window
 	     */
 	    for (i = 0; i < LINES; i++)
-		for (j = 0; j < COLS; j++)
-		{
-		    switch (nch = ch = mvwinch(hw, i, j))
-		    {
+		for (j = 0; j < COLS; j++) {
+		    switch (nch = ch = mvwinch(hw, i, j)) {
 			case SECRETDOOR:
 			    mvaddch(i, j, nch = DOOR);
 			case '-':
@@ -242,8 +348,7 @@ bool blessed;
 			case PASSAGE:
 			case ' ':
 			case STAIRS:
-			    if (mvwinch(mw, i, j) != ' ')
-			    {
+			    if (mvwinch(mw, i, j) != ' ') {
 				register struct thing *it;
 
 				it = (struct thing *) ldata(find_mons(i, j));
@@ -369,12 +474,34 @@ bool blessed;
 	    }
 	    else msg("You feel dizzy for a moment, but it quickly passes.");
 	when S_SCARE:
+	   /*
+	    * A blessed scroll of scare monster automatically transports
+	    * itself to the hero's feet
+	    *
+	    */
+	    if (blessed) {
+	        ch = mvwinch(stdscr, hero.y, hero.x);
+	        if (ch != FLOOR && ch != PASSAGE) {
+		    msg("Your feet tickle for a moment");
+	            return;
+		}
+                item = spec_item(SCROLL,S_SCARE,0,0);
+		obj = (struct object *) ldata(item);
+		obj->o_flags = ISCURSED;
+	        attach(lvl_obj, item);
+	        mvaddch(hero.y, hero.x, obj->o_type);
+	        obj->o_pos = hero;
+		msg("A wave of terror sweeps throughout the room");
+	    } else {
 	    /*
 	     * A monster will refuse to step on a scare monster scroll
 	     * if it is dropped.  Thus reading it is a mistake and produces
 	     * laughter at the poor rogue's boo boo.
 	     */
-	    msg("You hear maniacal laughter in the distance.");
+	        msg("You hear maniacal laughter in the distance.");
+		if (cursed) /* If cursed, monsters get mad */
+		    aggravate(); 
+	    }
 	when S_REMOVE:
 	    if (cursed) { /* curse all player's possessions */
 		for (nitem = pack; nitem != NULL; nitem = next(nitem)) {
@@ -396,8 +523,8 @@ bool blessed;
 	    else {
 		if ((nitem = get_item("remove the curse on",0)) != NULL) {
 		    nobj = OBJPTR(nitem);
-		    nobj->o_flags &= ~ISCURSED;
 		    msg("Removed the curse from %s.",inv_name(nobj,TRUE));
+		    nobj->o_flags &= ~ISCURSED;
 	    	    s_know[S_REMOVE] = TRUE;
 		}
 	    }
@@ -645,12 +772,13 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		if (blessed && !(lb->o_flags & ISSILVER)) {
 		    lb->o_hplus += rnd(3) + 1;
 		    lb->o_flags |= ISSILVER;
+		    lb->o_flags |= ISMETAL;
 		    msg("Your weapon has turned to silver!");
 		}
 		else if (cursed && (lb->o_flags & ISSILVER)) {
 		    lb->o_hplus -= (rnd(3) + 1);
 		    lb->o_flags &= ~ISSILVER;
-		    msg("Your weapon looks ordinary again.");
+		    msg("Your silver weapon has turned to steel.");
 		}
 		else if (lb->o_flags & ISSILVER) {
 		    msg("Nothing happens.");
@@ -658,6 +786,7 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 		else {
 		    lb->o_hplus += rnd(2);
 		    lb->o_flags |= ISSILVER;
+		    lb->o_flags |= ISMETAL;
 		    msg("Your weapon has turned to silver.");
 		}
 	    }
@@ -810,58 +939,65 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
  * Creat_mons creates the specified monster -- any if 0 
  */
 
-bool
+struct linked_list *
 creat_mons(person, monster, report)
 struct thing *person;	/* Where to create next to */
 short monster;
 bool report;
 {
     register int x, y;
-    register bool appear = 0;
-    struct thing play_copy;	/* A copy with no phasing */
+    register int distance;
+    register bool appear;
     coord mp;
-
-    /* Make sure phasing is off in the copy */
-    play_copy = *person;
-    turn_off(play_copy, CANINWALL);
-
     /*
      * Search for an open place
      */
-    for (y = person->t_pos.y-1; y <= person->t_pos.y+1; y++)
-	for (x = person->t_pos.x-1; x <= person->t_pos.x+1; x++)
-	{
-	    /*
-	     * Don't put a monster in top of the creator or player.
-	     */
-	    if (y == person->t_pos.y && x == person->t_pos.x)
-		continue;
-	    if (y == hero.y && x == hero.x) continue;
-
-	    /*
-	     * Or anything else nasty 
-	     */
-	    if (step_ok(y, x, NOMONST, &play_copy)) {
-		if (rnd(++appear) == 0)
-		{
-		    mp.y = y;
-		    mp.x = x;
+    debug("Creator @(%d, %d) ", person->t_pos.y, person->t_pos.x);
+#define MAX_CREATE_DIST 10
+    for (distance = 1; distance <= MAX_CREATE_DIST; distance++) {
+	appear = 0;
+	for (y = person->t_pos.y-distance; y <= person->t_pos.y+distance; y++)
+	    for (x = person->t_pos.x-distance; x <= person->t_pos.x+distance; x++)
+	    {
+		/* Don't put a monster in top of the creator or player. */
+		if ( x<0 || y<0)
+		    continue;
+		if (y == person->t_pos.y && x == person->t_pos.x)
+		    continue;
+		if (y == hero.y && x == hero.x)
+		    continue;
+		/* Or anything else nasty */
+		if (step_ok(y, x, NOMONST, NULL)) {
+		    if (rnd(max(1, (10*distance - ++appear) ) ) == 0)
+		    {
+			mp.y = y;
+			mp.x = x;
+			debug("Make monster dist %d appear %d @(%d, %d) ", distance, appear, mp.y, mp.x);
+			goto got_location;
+		    }
 		}
 	    }
-	}
+    }
+    appear = 0;
+got_location:
     if (appear) {
 	struct linked_list *nitem;
-
 	nitem = new_item(sizeof (struct thing));
 	new_monster(nitem, monster == 0 ? randmonster(FALSE, FALSE)
 					: monster, &mp, TRUE);
 	runto(&mp, &hero);
+	/* If the monster is on a trap, trap it */
+	if (isatrap(mvinch(mp.y, mp.x))) {
+	    debug("Monster trapped during creat_mons ");
+	    be_trapped( (struct thing *) ldata(nitem), &mp);
+	}
 	light(&hero);
-	return(TRUE);
+	return(nitem);
     }
     if (report) msg("You hear a faint cry of anguish in the distance.");
     return(FALSE);
 }
+
 /*
  *	This subroutine determines if an object that is a ring is
  *      being worn by the hero  by Bruce Dautrich 4/3/84

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Contains functions for dealing with things like
  * potions and scrolls
  *
@@ -20,8 +23,7 @@ register bool drop;
 {
     register char *pb;
 
-    switch(obj->o_type)
-    {
+    switch(obj->o_type) {
 	when SCROLL:
 	    if (obj->o_count == 1)
 		 sprintf(prbuf, "A %s%sscroll ", 
@@ -82,7 +84,11 @@ register bool drop;
 	    if (obj->o_count > 1)
 		sprintf(prbuf, "%d ", obj->o_count);
 	    else
-		strcpy(prbuf, "A ");
+		if ((obj->o_flags&(ISZAPPED|CANRETURN|ISPOISON|ISSILVER)) ||
+    		    ((obj->o_flags&(ISKNOW|ISZAPPED)) == (ISKNOW|ISZAPPED)))
+		    strcpy(prbuf, "A ");
+		else
+		    sprintf(prbuf, "A%s ", vowelstr(weaps[obj->o_which].w_name));
 	    pb = &prbuf[strlen(prbuf)];
 	    if ((obj->o_flags & ISKNOW) && (obj->o_flags & ISZAPPED))
 		sprintf(pb, "charged%s ", charge_str(obj));
@@ -148,7 +154,7 @@ register bool drop;
 		    vowelstr(r_stones[obj->o_which]),
 		    r_stones[obj->o_which]);
 	otherwise:
-	    debug("Picked up something funny");
+	    debug("Picked up something funny.");
 	    sprintf(prbuf, "Something bizarre %s", unctrl(obj->o_type));
     }
 
@@ -220,8 +226,7 @@ struct linked_list *item;
     /*
      * Take it out of the pack
      */
-    if (op->o_count >= 2 && op->o_group == NULL)
-    {
+    if (op->o_count >= 2 && op->o_group == NULL) {
 	nobj = new_item(sizeof *op);
 	op->o_count--;
 	op = (struct object *) ldata(nobj);
@@ -237,19 +242,19 @@ struct linked_list *item;
     if(ch == POOL) {
 	msg("Your %s sinks out of sight.",inv_name(op,TRUE));
 	discard(obj);
-	obj == NULL;
+	obj = NULL;
     }
     else if (levtype == POSTLEV) {
 	op->o_pos = hero;	/* same place as hero */
 	if (item == NULL)	/* if item wasn't sold */
 	    msg("Thanks for your donation to the fiend's flea market.");
         if (op->o_type != ARTIFACT)
-	    fall(obj,FALSE);
+	    fall(&player, obj,FALSE);
 	else {
 	    msg("You'll be sorry you ever got rid of that!");
 	    has_artifact &= ~(1 << op->o_which);
 	    discard(obj);
-	    obj == NULL;
+	    obj = NULL;
 	}
     }
     else {
@@ -287,23 +292,20 @@ register struct object *op;
 	op != cur_ring[RIGHT_1] && op != cur_ring[RIGHT_2] &&
 	op != cur_ring[RIGHT_3] && op != cur_ring[RIGHT_4]) 
 	    return TRUE;
-    if (op->o_flags & ISCURSED)
-    {
+    if (op->o_flags & ISCURSED) {
 	msg("You can't.  It appears to be cursed.");
 	return FALSE;
     }
     if (op == cur_weapon)
 	cur_weapon = NULL;
-    else if (op == cur_armor)
-    {
+    else if (op == cur_armor) {
 	waste_time();
 	cur_armor = NULL;
     }
     else if (op == cur_ring[LEFT_1] || op == cur_ring[LEFT_2] ||
 	op == cur_ring[LEFT_3] || op == cur_ring[LEFT_4] ||
 	op == cur_ring[RIGHT_1] || op == cur_ring[RIGHT_2] ||
-	op == cur_ring[RIGHT_3] || op == cur_ring[RIGHT_4])
-    {
+	op == cur_ring[RIGHT_3] || op == cur_ring[RIGHT_4]) {
 	if      (op == cur_ring[LEFT_1])  cur_ring[LEFT_1]  = NULL;
 	else if (op == cur_ring[LEFT_2])  cur_ring[LEFT_2]  = NULL;
 	else if (op == cur_ring[LEFT_3])  cur_ring[LEFT_3]  = NULL;
@@ -366,8 +368,7 @@ new_thing()
      */
     blesschance = rnd(100);
     cursechance = rnd(100);
-    switch (no_food > 3 ? 2 : pick_one(things, NUMTHINGS))
-    {
+    switch (no_food > 3 ? 2 : pick_one(things, NUMTHINGS)) {
 	when 0:
 	    cur->o_type = POTION;
 	    cur->o_which = pick_one(p_magic, MAXPOTIONS);
@@ -394,8 +395,7 @@ new_thing()
 	    cur->o_type = WEAPON;
 	    cur->o_which = rnd(MAXWEAPONS);
 	    init_weapon(cur, cur->o_which);
-	    if (cursechance < 10)
-	    {
+	    if (cursechance < 10) {
 		short bad=(rnd(10) < 1) ? 2 : 1;
 
 		cur->o_flags |= ISCURSED;
@@ -413,15 +413,13 @@ new_thing()
 	    for (j = 0; j < MAXARMORS; j++)
 		if (blesschance < armors[j].a_prob)
 		    break;
-	    if (j == MAXARMORS)
-	    {
+	    if (j == MAXARMORS) {
 		debug("Picked a bad armor %d", blesschance);
 		j = 0;
 	    }
 	    cur->o_which = j;
 	    cur->o_ac = armors[j].a_class;
-	    if (((k = rnd(100)) < 20) && j != MITHRIL)
-	    {
+	    if (((k = rnd(100)) < 20) && j != MITHRIL) {
 		cur->o_flags |= ISCURSED;
 		cur->o_ac += rnd(3)+1;
 	    }
@@ -438,8 +436,7 @@ new_thing()
 		cur->o_flags |= ISCURSED;
 	    else if (blesschance < r_magic[cur->o_which].mi_bless)
 		cur->o_flags |= ISBLESSED;
-	    switch (cur->o_which)
-	    {
+	    switch (cur->o_which) {
 		when R_ADDSTR:
 		case R_ADDWISDOM:
 		case R_ADDINTEL:
@@ -566,10 +563,8 @@ int nitems;
 	if (i <= magic->mi_prob)
 	    break;
     }
-    if (magic == end)
-    {
-	if (wizard)
-	{
+    if (magic == end) {
+	if (wizard) {
 	    msg("bad pick_one: %d from %d items", i, nitems);
 	    for (magic = start; magic < end; magic++)
 		msg("%s: %d%%", magic->mi_name, magic->mi_prob);
@@ -586,7 +581,7 @@ int nitems;
 
 char *
 blesscurse(flags)
-int flags;
+long flags;
 {
     if (flags & ISKNOW)  {
 	if (flags & ISCURSED) return("cursed ");

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * File for the fun ends
  * Death or a total win
  *
@@ -6,7 +9,11 @@
  */
 
 #include "curses.h"
+#if defined(RTU2) || defined(USGV5)
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
 #include <signal.h>
 #include <ctype.h>
 #include <sys/types.h>
@@ -14,7 +21,7 @@
 #include "mach_dep.h"
 #include "rogue.h"
 
-static char *rip[15] = {		
+static char *rip[] = {
 "                       __________",
 "                      /          \\",
 "                     /    REST    \\",
@@ -41,13 +48,13 @@ char	*killname();
 death(monst)
 register short monst;
 {
-    register char **dp = *rip, *killer; 	/**replace w rip**/
+    register char **dp = rip, *killer;
     register struct tm *lt;
-    long date;
+    time_t date;
     char buf[80];
     struct tm *localtime();
 
-    if (ISWEARING(R_RESURRECT)) {
+    if (ISWEARING(R_RESURRECT) || rnd(67) == 0) {
 	int die = TRUE;
 
 	if (resurrect-- == 0) 
@@ -64,7 +71,7 @@ register short monst;
 	    die = FALSE;
 	    msg("You feel sudden warmth and then nothingness.");
 	    teleport();
-	    if (ring_value(R_RESURRECT) > 0) {
+	    if (ring_value(R_RESURRECT) > 1 && rnd(10)) {
 		pstats.s_hpt = 2 * pstats.s_const;
 		pstats.s_const = max(pstats.s_const - 1, 3);
 	    }
@@ -96,6 +103,7 @@ register short monst;
 		pstats.s_hpt = pstats.s_const;
 		pstats.s_const = max(pstats.s_const - roll(2,2), 3);
 	    }
+	    chg_str(roll(1,4), TRUE, FALSE);
 	    pstats.s_lvl = max(pstats.s_lvl, 1);
 	    no_command += 2 + rnd(4);
 	    if (on(player, ISHUH))
@@ -113,7 +121,7 @@ register short monst;
 	}
 	else
 	    return;
-	}
+    }
     time(&date);
     lt = localtime(&date);
     clear();
@@ -122,7 +130,7 @@ register short monst;
     while (*dp)
 	printw("%s\n", *dp++);
     mvaddstr(14, 28-((strlen(whoami)+1)/2), whoami);
-    sprintf(buf, "%ld Points", pstats.s_exp );
+    sprintf(buf, "%d+%ld Points", pstats.s_lvl, pstats.s_exp );
     mvaddstr(15, 28-((strlen(buf)+1)/2), buf);
     killer = killname(monst);
     mvaddstr(17, 28-((strlen(killer)+1)/2), killer);
@@ -131,7 +139,7 @@ register short monst;
     idenpack();
     wrefresh(cw);
     refresh();
-    score(pstats.s_exp, KILLED, monst);
+    score((long) pstats.s_exp, pstats.s_lvl, KILLED, monst);
     exit(0);
 }
 
@@ -140,11 +148,14 @@ register short monst;
  */
 
 /* VARARGS2 */
-score(amount, flags, monst)
+score(amount, lvl, flags, monst)
 long amount;
 short monst;
+int flags;
+int lvl;
 {
     static struct sc_ent {
+	int sc_lvl;
 	long sc_score;
 	char sc_name[76];
 	long sc_gold;
@@ -157,9 +168,7 @@ short monst;
     register struct sc_ent *scp;
     register int i;
     register struct sc_ent *sc2;
-    register FILE *outf;
     register char *killer;
-    register int prflags = 0;
     register int fd;
     static char *reason[] = {
 	"killed",
@@ -172,19 +181,29 @@ short monst;
     extern int fd_score;
     struct passwd *pp, *getpwuid();
 
-    signal(SIGINT, byebye());
+
+    signal(SIGINT, byebye);
 #if defined(BSD4)
     (void) TtySetOriginalChars();
 #endif
-#if defined(USGV3) || defined(USGV5)
+#if defined(attron)
+    if (flags != SCOREIT) {
+	nocbreak();
+	nl();
+    }
+#else
+#if defined(USGV3) || defined(USGV5) || defined(RTU2)
     noraw();
     nl();
 #endif
+#endif attron
     if (flags != WINNER && flags != TOTAL && flags != SCOREIT) {
 	if (flags == CHICKEN)
 	    packend = "when you quit";
 	else
 	    packend = "at your untimely demise";
+	noecho();
+	nl();
 	mvaddstr(LINES - 1, 0, retstr);
 	refresh();
 	gets(prbuf);
@@ -198,10 +217,9 @@ short monst;
     if (fd_score < 0)
 	return;
 
-    outf = fdopen(fd_score, "w");
-
     for (scp = top_ten; scp < &top_ten[10]; scp++)
     {
+	scp->sc_lvl = 0L;
 	scp->sc_score = 0L;
 	for (i = 0; i < 76; i++)
 	    scp->sc_name[i] = rnd(255);
@@ -221,13 +239,6 @@ short monst;
 	fflush(stdout);
 	gets(prbuf);
     }
-    if (wizard) {
-	if (strncmp(prbuf, "edit", 4) == 0)
-	    prflags = 1;
-	else if (strncmp(prbuf, "force", 5) == 0)
-	    prflags = 2;
-    }
-
     encread((char *) top_ten, sizeof top_ten, fd_score);
     /*
      * Insert player in list if need be
@@ -235,9 +246,11 @@ short monst;
     if (!waswizard)
     {
 	struct	sc_ent	*sc3;
-	int uid = geteuid();
+	int uid = getuid();
 	for (scp = top_ten; scp < &top_ten[10]; scp++) {
-	    if (amount > scp->sc_score)
+	    if ( lvl > scp->sc_lvl)
+		break;
+	    if ( lvl == scp->sc_lvl && amount > scp->sc_score)
 		break;
 	    else if(scp->sc_uid == uid)
 		scp = &top_ten[9];
@@ -261,6 +274,7 @@ short monst;
 		}
 	    for (sc2 = &top_ten[9]; sc2 > scp; sc2--)
 		*sc2 = *(sc2-1);
+	    scp->sc_lvl = lvl;
 	    scp->sc_score = amount;
 	    scp->sc_gold = purse;
 	    scp->sc_uid = getuid();
@@ -274,7 +288,7 @@ short monst;
 		if (strcmp(scp->sc_name, pp->pw_name))
 		    strcat(scp->sc_name, prbuf);
 	    }
-	    sprintf(prbuf, ", Level %d %s", pstats.s_lvl, 
+	    sprintf(prbuf, " %s", 
 			cnames[player.t_ctype][min(pstats.s_lvl,11) - 1]);
 	    strcat(scp->sc_name, prbuf);
 	    scp->sc_flags = flags;
@@ -298,8 +312,11 @@ short monst;
     for (scp = top_ten; scp < &top_ten[10]; scp++) {
 
 	if (scp->sc_score) {
-	    printf("%d\t%ld\t%ld\t%s:\n", scp - top_ten + 1,
-		scp->sc_score, scp->sc_gold, scp->sc_name);
+	    printf("%d\t%ld+%ld\t%ld\t%s:\n", scp - top_ten + 1,
+		scp->sc_lvl,
+		scp->sc_score, 
+		scp->sc_gold, 
+		scp->sc_name);
 	    if (scp->sc_artifacts) {
 		char things[60];
 		int  i;
@@ -330,43 +347,20 @@ short monst;
 	    if (scp->sc_flags == 0) {
 		printf(" by");
 		killer = killname(scp->sc_monster);
-		printf(" %s", killer);
+		printf(" %s\n", killer);
 	    }
-	    if (prflags == 1)
-	    {
-		fflush(stdout);
-		gets(prbuf);
-		if (prbuf[0] == 'd')
-		{
-		    for (sc2 = scp; sc2 < &top_ten[9]; sc2++)
-			*sc2 = *(sc2 + 1);
-		    top_ten[9].sc_score = 0L;
-		    for (i = 0; i < 76; i++)
-			top_ten[9].sc_name[i] = rnd(255);
-		    top_ten[9].sc_gold = 0L;
-		    top_ten[9].sc_flags = RN;
-		    top_ten[9].sc_level = RN;
-		    top_ten[9].sc_monster = RN;
-		    scp--;
-		}
-	    }
-	    else if (prflags == 2)
-	    {
-		if (scp == top_ten)
-	            scp->sc_artifacts = 1;
-		  
-		printf(". (zapped)\n");
-	    }
-	    else
-		printf(".\n");
 	}
     }
-    fseek(outf, 0L, 0);
+    lseek(fd_score, 0L, 0);
     /*
      * Update the list file
      */
-    encwrite((char *) top_ten, sizeof top_ten, outf);
-    fclose(outf);
+    encwrite((char *) top_ten, sizeof top_ten, fd_score);
+    close(fd_score);
+    putchar('\n');
+    printf(retstr);
+    fflush(stdout);
+    gets(prbuf);
 }
 
 total_winner()
@@ -390,9 +384,33 @@ total_winner()
     addstr("                                                               \n");
     addstr("     Congratulations, you have made it to the light of day!    \n");
     standend();
-    addstr("\nYou have joined the elite ranks of those who have escaped the\n");
-    addstr("Dungeons of Doom alive.  You journey home and sell all your loot at\n");
-    addstr("a great profit and are admitted to the fighters guild.\n");
+    addstr("\nYou have joined the elite ranks of those who have \n");
+    addstr("escaped the Dungeons of Doom alive.  You journey home \n");
+    addstr("and sell all your loot at a great profit.\n");
+    addstr("The White Council approves the recommendation of\n");
+    if (player.t_ctype == C_FIGHTER)
+	addstr("the fighters guild and appoints you Lord Protector\n");
+    else if (player.t_ctype == C_ASSASIN)
+	addstr("the assasins guild and appoints you Master Murderer\n");
+    else if (player.t_ctype == C_NINJA)
+	addstr("the ninja guild and appoints you Shogun\n");
+    else if (player.t_ctype == C_ILLUSION)
+	addstr("the illusionists guild and appoints you Master Wizard\n");
+    else if (player.t_ctype == C_MAGICIAN)
+	addstr("the magicians guild and appoints you Master Wizard\n");
+    else if (player.t_ctype == C_CLERIC)
+	addstr("the temple priests and appoints you Master of the Flowers\n");
+    else if (player.t_ctype == C_DRUID)
+	addstr("the temple priests and appoints you Master of the Flowers\n");
+    else if (player.t_ctype == C_RANGER)
+	addstr("the rangers guild and appoints you Master Ranger\n");
+    else if (player.t_ctype == C_PALADIN)
+	addstr("the paladins guild and appoints you Master Paladin\n");
+    else if (player.t_ctype == C_THIEF) {
+	addstr("the thieves guild under protest and appoints you\n");
+	addstr("Master of the Highways\n");
+    }
+    addstr("of the Land Between the Mountains.\n");
     mvaddstr(LINES - 1, 0, spacemsg);
     refresh();
     wait_for(' ');
@@ -427,9 +445,9 @@ total_winner()
     mvprintw(c - 'a' + 1, 0,"   %6d  Gold Pieces          ", oldpurse);
     refresh();
     if (has_artifact == 255) 
-	score(pstats.s_exp, TOTAL);
+	score((long) pstats.s_exp, pstats.s_lvl, TOTAL, 0);
     else
-	score(pstats.s_exp, WINNER);
+	score((long) pstats.s_exp, pstats.s_lvl, WINNER, 0);
     exit(0);
 }
 
@@ -454,8 +472,7 @@ register short monst;
 	return(mons_name);
     }
     else
-	switch (monst)
-	{
+	switch (monst) {
 	    case D_ARROW:
 		return "an arrow";
 	    case D_DART:
@@ -549,12 +566,12 @@ char *howso;
 	refresh();
 }
 
-void byebye()
+void
+byebye()
 {
     extern bool _endwin;
 
     if (!_endwin) {
-        clear();
 	endwin();
     }
     printf("\n");

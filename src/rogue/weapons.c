@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Functions for dealing with problems brought about by weapons
  *
  */
@@ -87,14 +90,14 @@ missile(ydelta, xdelta, item, tp)
 	    }
 	    else if (obj->o_flags & ISLOST) {
 		if (obj->o_type == WEAPON)
-		    addmsg("The %s", weaps[obj->o_which]);
+		    addmsg("The %s", weaps[obj->o_which].w_name);
 		else
 		    addmsg(inv_name(obj, TRUE));
 		msg(" vanishes in a puff of greasy smoke.");
 		discard(item);
 	    }
 	    else {
-		fall(item, TRUE) ;
+		fall(&player, item, TRUE) ;
 		if (obj->o_flags & CANRETURN)
 		    msg("You have %s.", inv_name(obj, TRUE));
 	    }
@@ -156,22 +159,24 @@ do_motion(obj, ydelta, xdelta, tp)
  *	Drop an item someplace around here.
  */
 
-fall(item, pr)
-	register struct linked_list *item ;
-	bool pr ;
+fall(tp, item, pr)
+register struct linked_list *item ;
+register struct thing *tp;
+bool pr ;
 {
 	register struct object *obj ;
 	register struct room *rp ;
 	static coord fpos ;
 
 	obj = (struct object *) ldata(item) ;
-	rp = roomin(&hero);
+	rp = roomin(&(tp->t_pos));
 	if (obj->o_flags & CANRETURN) {
 	    add_pack(item, TRUE);
 	    return;
 	}
 	else if (fallpos(&obj->o_pos, &fpos, TRUE)) {
-		if (obj->o_flags & CANBURN && ntraps + 1 < MAXTRAPS + MAXTRAPS) {
+		if (obj->o_flags & CANBURN 
+			&& ntraps + 1 < MAXTRAPS + MAXTRAPS) {
 		    mvaddch(fpos.y, fpos.x, FIRETRAP);
 		    traps[ntraps].tr_type = FIRETRAP;
 		    traps[ntraps].tr_flags = ISFOUND;
@@ -196,7 +201,7 @@ fall(item, pr)
 	}
 	if (pr) {
 		if (obj->o_type == WEAPON)
-			addmsg("The %s", weaps[obj->o_which]);
+			addmsg("The %s", weaps[obj->o_which].w_name);
 		else
 			addmsg(inv_name(obj, TRUE));
 		msg(" vanishes as it hits the ground.");

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Read and execute the user commands
  *
  */
@@ -15,20 +18,22 @@
 
 command()
 {
+    static char fight_ch;
     register char ch;
     register int ntimes = 1;			/* Number of player moves */
-    static char countch, direction, newcount = FALSE;
-    bool an_after = FALSE;
+    static char countch, direction, newcount;
+    static bool an_after;
+    static bool summoned;
     static coord dta;
-#ifndef unctrl
+#if !defined(unctrl)
     char *unctrl();
 #endif
 
+    an_after = FALSE;
+    newcount = FALSE;
     if (on(player, ISHASTE)) 
 	ntimes++;
-    if (fighting && player.t_ctype == C_FIGHTER &&
-		(pstats.s_lvl > 12 || 
-		(pstats.s_lvl > 6 && pstats.s_lvl < 13 && rnd(2))))
+    if (fighting && att_bonus())
 	ntimes *=2;
     if (on(player, ISSLOW)) {
 	if (player.t_turn != TRUE) ntimes--;
@@ -37,9 +42,18 @@ command()
 
     /*
      * Let the daemons start up
+     *
+     * NOTE: summoned is not initialized deliberately so that i don't
+     * have to make it static external and initialize it in funny ways.
+     * this means that it is possible to have a bad value for summoned
+     * the very first time that command is entered.
      */
-    do_daemons(BEFORE);
-    do_fuses(BEFORE);
+    if (!summoned) {
+	do_daemons(BEFORE);
+	do_fuses(BEFORE);
+    }
+    summoned = FALSE;
+
     while (ntimes--)
     {
 	moving = FALSE;
@@ -67,7 +81,7 @@ command()
 	if (!no_command)
 	{
 	    if (fighting) {
-		/* do nothing */
+		ch = fight_ch;
 	    } else if (running) {
 		/* If in a corridor, if we are at a turn with only one
 		 * way to go, turn that way.
@@ -125,8 +139,6 @@ command()
 		    case 'q': case 'r': case 's': case 'm':
 		    case 't': case 'C': case 'I': case '.':
 		    case 'z': case 'p':
-		    case CTRL(K): case CTRL(L): case CTRL(H): case CTRL(J): 
-		    case CTRL(Y): case CTRL(U): case CTRL(B): case CTRL(N):
 			break;
 		    default:
 			count = 0;
@@ -143,18 +155,6 @@ command()
 		case 'H': case 'J': case 'K': case 'L':
 		case 'Y': case 'U': case 'B': case 'N':
 		    runch = tolower(ch);
-		    break;
-		case CTRL(H): case CTRL(J): case CTRL(K): case CTRL(L):
-	        case CTRL(Y): case CTRL(U): case CTRL(B): case CTRL(N):
-#define UNCTRL(x)	((x) + 'A' - 1)
-		    ch = UNCTRL(ch);
-#undef	UNCTRL
-		    runch = tolower(ch);
-		    if (!on(player, ISBLIND))
-		    {
-			door_stop = TRUE;
-			firstmove = TRUE;
-		    }
 		    break;
 	    }
 
@@ -192,6 +192,7 @@ command()
 		    do_move(delta.y, delta.x);
 		when 'F' : case 'f':
 		    if (!fighting) {
+			fight_ch = ch;
 			if (!get_dir()) {
 			    after = FALSE;
 			    break;
@@ -211,7 +212,7 @@ command()
 		when 'Q' : after = FALSE; quit();
 		when 'i' : after = FALSE; inventory(pack, 0);
 		when 'I' : after = FALSE; picky_inven();
-		when 'd' : drop(NULL);
+		when 'd' : drop((struct linked_list *) NULL);
 		when 'q' : quaff(-1, FALSE);
 		when 'r' : read_scroll(-1, FALSE);
 		when 'e' : eat();
@@ -233,7 +234,6 @@ command()
 		    if (get_dir()) steal();
 		    else after = FALSE;
 		when 'D' : dip_it();
-		when 'G' : gsense();
 		when '^' : set_trap(&player, hero.y, hero.x);
 		when 's' : search(FALSE);
 		when 'z' :
@@ -241,8 +241,12 @@ command()
 			do_zap(TRUE, NULL, FALSE);
 		    else
 			after = FALSE;
-		when 'p' : pray();
-		when 'C' : cast();
+		when 'p' : prayer();
+		    if (levtype == POSTLEV)
+			aggravate();
+		when 'C' : incant();
+		    if (levtype == POSTLEV)
+			aggravate();
 		when 'a' :
 		    if (get_dir())
 			affect();
@@ -322,7 +326,7 @@ command()
 		    {
 			when CTRL(V) : create_obj(0, 0, FALSE);
 			when CTRL(I) : inventory(lvl_obj, 0);
-			when CTRL(Z) : whatis(NULL);
+			when CTRL(Z) : whatis((struct linked_list *) NULL);
 			when CTRL(D) : msg("rnd(4)%d, rnd(40)%d, rnd(100)%d",
 						rnd(4),rnd(40),rnd(100));
 			when CTRL(F) : overlay(stdscr,cw);
@@ -400,17 +404,15 @@ command()
 			    max_stats.s_dext = 25;
 			    pstats.s_const = 25;
 			    max_stats.s_const = 25;
-			    /*
-			     * Give the rogue a sword 
-			     */
-			    item = spec_item(WEAPON, CLAYMORE, 10, 10);
-			    add_pack(item, TRUE);
-			    cur_weapon = (struct object *) ldata(item);
-			    cur_weapon->o_flags |= ISKNOW;
+			    /* Give the rogue a sword */
+			    if (cur_weapon == NULL || cur_weapon->o_which != CLAYMORE) {
+				item = spec_item(WEAPON, CLAYMORE, 10, 10);
+				add_pack(item, TRUE);
+				cur_weapon = (struct object *) ldata(item);
+				cur_weapon->o_flags |= ISKNOW;
+			    }
 
-			    /*
-			     * and a stick
-			     */
+			    /* and a kill-o-zap stick */
 			    item = spec_item(STICK, WS_ANNIH, 10000, 0);
 			    obj = (struct object *) ldata(item);
 			    obj->o_flags |= ISKNOW;
@@ -421,15 +423,61 @@ command()
 				ws_guess[WS_ANNIH] = NULL;
 			    }
 			    add_pack(item, TRUE);
-			    /*
-			     * and his suit of armor
-			     */
-			    item = spec_item(ARMOR, CRYSTAL_ARMOR, 15, 0);
-			    obj = (struct object *) ldata(item);
-			    obj->o_flags |= ISKNOW;
-			    obj->o_weight = armors[CRYSTAL_ARMOR].a_wght * 0.2;
-			    cur_armor = obj;
-			    add_pack(item, TRUE);
+
+			    /* and his suit of armor */
+			    if (cur_armor == NULL || cur_armor->o_which != CRYSTAL_ARMOR) {
+				item = spec_item(ARMOR, CRYSTAL_ARMOR, 15, 0);
+				obj = (struct object *) ldata(item);
+				obj->o_flags |= ISKNOW;
+				obj->o_weight = armors[CRYSTAL_ARMOR].a_wght * 0.2;
+				cur_armor = obj;
+				add_pack(item, TRUE);
+			    }
+
+			    /* and some rings (have to put them on, for now) */
+			    if (!ISWEARING(R_SEARCH)) {
+				item = spec_item(RING, R_SEARCH, 0, 0);
+				obj = (struct object *) ldata(item);
+				obj->o_flags |= ISKNOW;
+				r_know[R_SEARCH] = TRUE;
+				if (r_guess[R_SEARCH])
+				{
+				    cfree(r_guess[R_SEARCH]);
+				    r_guess[R_SEARCH] = NULL;
+				}
+				add_pack(item, TRUE);
+			    }
+			    if (!ISWEARING(R_LIGHT)) {
+				item = spec_item(RING, R_LIGHT, 0, 0);
+				obj = (struct object *) ldata(item);
+				obj->o_flags |= ISKNOW;
+				r_know[R_LIGHT] = TRUE;
+				if (r_guess[R_LIGHT])
+				{
+				    cfree(r_guess[R_LIGHT]);
+				    r_guess[R_LIGHT] = NULL;
+				}
+				add_pack(item, TRUE);
+			    }
+			    if (!ISWEARING(R_WIZARD)) {
+				item = spec_item(RING, R_WIZARD, 0, 0);
+				obj = (struct object *) ldata(item);
+				obj->o_flags |= ISKNOW;
+				r_know[R_WIZARD] = TRUE;
+				if (r_guess[R_WIZARD])
+				{
+				    cfree(r_guess[R_WIZARD]);
+				    r_guess[R_WIZARD] = NULL;
+				}
+				add_pack(item, TRUE);
+			    }
+
+			    /* Spiff him up a bit */
+			    quaff(P_CLEAR, TRUE);
+			    quaff(P_SEEINVIS, TRUE);
+			    quaff(P_PHASE, TRUE);
+			    quaff(P_SHERO, TRUE);
+			    read_scroll(S_ELECTRIFY, TRUE);
 			    purse += 50000;
 			    updpack(TRUE);
 			}
@@ -478,9 +526,10 @@ command()
 	do_fuses(AFTER);
 
 	/* Special abilities */
-	if ((player.t_ctype == C_THIEF) &&
+	if ((player.t_ctype == C_THIEF || player.t_ctype == C_ASSASIN ||
+	    player.t_ctype == C_NINJA) &&
 	    (rnd(100) < (2*pstats.s_dext + 5*pstats.s_lvl))) 
-	    search(TRUE);
+		    search(TRUE);
 	if (ISWEARING(R_SEARCH)) 
 	    search(FALSE);
 	if (ISWEARING(R_TELEPORT) && rnd(100) < 2) {
@@ -500,37 +549,9 @@ command()
 	    msg("You become tired of this nonsense.");
 	    fighting = after = FALSE;
 	}
-	if (on(player, ISELECTRIC)) {
-	    register int lvl;
-	    register struct linked_list *item;
-	    register struct thing *tp;
+	if (on(player, ISELECTRIC))
+	    electrificate();
 
-	    for (item = mlist; item != NULL; item = next(item)) {
-		tp = (struct thing *) ldata(item);
-		if (DISTANCE(tp->t_pos.y, tp->t_pos.x, hero.y, hero.x) < 5) {
-		    if ((tp->t_stats.s_hpt -= roll(2,4)) <= 0) {
-			msg("The %s is killed by an electric shock.",
-			    monsters[tp->t_index].m_name);
-			killed(item, TRUE, TRUE);
-			continue;
-		    }
-		    lvl = tp->t_stats.s_intel - 5;
-		    if (lvl < 0)
-			lvl = 10 + tp->t_stats.s_intel;
-		    if (rnd(lvl + 1)/5 == 0) {
-			turn_on(*tp, ISFLEE);
-			msg("The %s is shocked by electricity.",
-			    monsters[tp->t_index].m_name);
-		    }
-		    else
-			msg("The %s is zapped by your electricity.",
-			    monsters[tp->t_index].m_name);
-		    turn_on(*tp, ISRUN);
-		    turn_off(*tp, ISDISGUISE);
-		    fighting = after = running = FALSE;
-		}
-	    }
-	}
 	if (!fighting && (no_command == 0) && cur_weapon != NULL
 		&& rnd(on(player, STUMBLER) ? 399 : 9999) == 0
 		&& rnd(pstats.s_dext) < 
@@ -558,9 +579,10 @@ command()
 		}
 	    }
 	}
-	if (rnd(99999) == 0) {
+	if (rnd(999999) == 0) {
 	    new_level(THRONE);
 	    fighting = running = after = FALSE;
+	    summoned = TRUE;
 	}
     }
 }
@@ -582,9 +604,12 @@ quit()
     if (readchar() == 'y')
     {
 	clear();
+	wclear(cw);
+	wrefresh(cw);
 	move(LINES-1, 0);
 	draw(stdscr);
-	score(pstats.s_exp, CHICKEN, 0);
+	refresh();
+	score((long) pstats.s_exp, pstats.s_lvl, CHICKEN, 0);
 	byebye();
     }
     else
@@ -749,8 +774,10 @@ identify()
 	msg("");
 	return;
     }
-    if (isalpha(ch))
-	str = monsters[id_monst(ch)].m_name;
+    if (isalpha(ch)) {
+	id_monst(ch);
+	return;
+    }
     else switch(ch)
     {
 	case '|':
@@ -876,7 +903,9 @@ shell()
 #if defined(BSD4)
     (void) TtySetOriginalChars();
 #endif
+#if defined(USGV3) || defined(RTU2) || defined(attron)
     endwin();
+#endif
     in_shell = TRUE;
     fflush(stdout);
     /*
@@ -910,12 +939,14 @@ shell()
 #if defined(BSD4)
 	(void) TtySetGameChars();
 #endif
-	printf(retstr);
+#if defined(USGV3) || defined(RTU2)
 	noecho();
 	crmode();
+#endif
+	printf(retstr);
 	in_shell = FALSE;
 	wait_for('\n');
-#if defined(USGV3)
+#if defined(USGV3) || defined(RTU2)
 	nonl();
 #endif
 	clearok(cw, TRUE);
@@ -999,6 +1030,69 @@ bool mark;
 	else {
 	    guess[obj->o_which] = new((unsigned int) strlen(prbuf) + 1);
 	    strcpy(guess[obj->o_which], prbuf);
+	}
+    }
+}
+
+/*
+ * at_bonus:
+ *	bonus attacks for certain player classes
+ */
+
+att_bonus()
+{
+    register int bonus = FALSE;
+
+    if ((player.t_ctype == C_FIGHTER || player.t_ctype == C_PALADIN)
+	&& (pstats.s_lvl > 12 || 
+		(pstats.s_lvl > 6 && pstats.s_lvl < 13 && rnd(2))))
+	bonus = TRUE;
+    else if ((player.t_ctype == C_RANGER || player.t_ctype == C_NINJA)
+	&& (pstats.s_lvl > 14 || 
+		(pstats.s_lvl > 7 && pstats.s_lvl < 14 && rnd(2))))
+	bonus = TRUE;
+    return bonus;
+}
+
+electrificate()
+{
+    register int lvl;
+    register struct linked_list *item, *nitem;
+    register struct thing *tp;
+    register int damage;
+    register int affect_dist = 4 + player.t_stats.s_lvl/4;
+    char *mname;
+
+    for (item = mlist; item != NULL; item = nitem) {
+	nitem = next(item); /* Get next item now since monster may disappear */
+	tp = (struct thing *) ldata(item);
+	mname = monsters[tp->t_index].m_name;
+
+	if (DISTANCE(tp->t_pos.y, tp->t_pos.x, hero.y, hero.x) < affect_dist) {
+	    damage = roll(1,player.t_stats.s_lvl) + player.t_stats.s_lvl;
+	    debug("Charge does %d (%d)", damage, tp->t_stats.s_hpt - damage);
+	    if (on(*tp, NOBOLT)) {
+	       msg("The %s basks in your glow", mname);
+	       continue;
+	    }
+	    if ((tp->t_stats.s_hpt -= damage) <= 0) {
+		msg("The %s is killed by an electric shock.", mname);
+		killed(&player, item, TRUE, TRUE);
+		continue;
+	    }
+	    lvl = tp->t_stats.s_intel - 5;
+	    if (lvl < 0)
+		lvl = 10 + tp->t_stats.s_intel;
+	    if (rnd(lvl + 1)/5 == 0) {
+		turn_on(*tp, ISFLEE);
+		msg("The %s is shocked by electricity.", mname);
+	    }
+	    else msg("The %s is zapped by your electricity.", mname);
+
+	    summon(tp);
+	    turn_on(*tp, ISRUN);
+	    turn_off(*tp, ISDISGUISE);
+	    fighting = after = running = FALSE;
 	}
     }
 }

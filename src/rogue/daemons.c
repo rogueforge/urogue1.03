@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * All the daemon and fuse functions are in here
  *
  */
@@ -28,20 +31,38 @@ struct thing *tp;
     tp->t_quiet++;
     switch (tp->t_ctype) {
 	when C_MAGICIAN:
-	    limit = 4 - curp->s_lvl/2;
-	    new_points = curp->s_lvl;
+	    limit = 8 - curp->s_lvl/2;
+	    new_points = curp->s_lvl/2;
+	when C_ILLUSION:
+	    limit = 8 - curp->s_lvl/2;
+	    new_points = curp->s_lvl/2;
 	when C_THIEF:
-	    limit = 8 - curp->s_lvl;
-	    new_points = curp->s_lvl - 2;
+	    limit = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl/2 - 2;
+	when C_ASSASIN:
+	    limit = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl/2 - 2;
+	when C_NINJA:
+	    limit = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl/2 - 2;
 	when C_CLERIC:
-	    limit = 8 - curp->s_lvl;
-	    new_points = curp->s_lvl - 3;
+	    limit = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl/2 - 3;
+	when C_DRUID:
+	    limit = 16 - curp->s_lvl;
+	    new_points = curp->s_lvl/2 - 3;
 	when C_FIGHTER:
-	    limit = 16 - curp->s_lvl*2;
-	    new_points = curp->s_lvl - 5;
+	    limit = 32 - curp->s_lvl*2;
+	    new_points = curp->s_lvl/2 - 5;
+	when C_RANGER:
+	    limit = 32 - curp->s_lvl*2;
+	    new_points = curp->s_lvl/2 - 5;
+	when C_PALADIN:
+	    limit = 32 - curp->s_lvl*2;
+	    new_points = curp->s_lvl/2 - 5;
 	when C_MONSTER:
 	    limit = 16 - curp->s_lvl;
-	    new_points = curp->s_lvl - 6;
+	    new_points = curp->s_lvl/2 - 6;
 	otherwise:
 	    debug("What a strange character you are!");
 	    return;
@@ -53,7 +74,7 @@ struct thing *tp;
 		curp->s_hpt++;
 	}
 	else
-	    if (tp->t_quiet >= 3)
+	    if (tp->t_quiet >= 15)
 		curp->s_hpt += rnd(new_points)+1;
     }
     if (tp == &player) {
@@ -107,7 +128,8 @@ rollwand()
     {
 	/* Theives may not awaken a monster */
 	if ((roll(1, 6) == 4) &&
-	   ((player.t_ctype != C_THIEF) || (rnd(30) >= pstats.s_dext))) {
+        ((player.t_ctype != C_THIEF && player.t_ctype != C_ASSASIN &&
+        player.t_ctype != C_NINJA) || (rnd(30) >= pstats.s_dext))) {
 	    if (levtype != POSTLEV)
 	        wanderer();
 	    kill_daemon(rollwand);
@@ -259,7 +281,8 @@ res_strength()
     /* Otherwise, put player at the maximum strength */
     else {
 	pstats.s_str = max_stats.s_str + ring_value(R_ADDSTR) + 
-		(on(player, POWERSTR) ? 10 : 0);
+		(on(player, POWERSTR) ? 10 : 0) +
+		(on(player, SUPERHERO) ? 10 : 0);
     }
 
     updpack(TRUE);
@@ -453,7 +476,41 @@ undisguise()
     light(&hero);
 }
 
+
 /*
+ * Unsummon a monster
+ */
+unsummon(monst)
+int
+   monst;
+{
+struct thing
+    *tp;
+char
+    *mname;
+struct linked_list
+    *sum_monst;
+
+    sum_monst = (struct linked_list *) monst;
+    tp = THINGPTR(sum_monst);
+    mname = monsters[tp->t_index].m_name;
+    msg("The summoned %s phases out of existence", mname);
+    killed(NULL, sum_monst, FALSE, FALSE);
+}
+
+
+
+/*
+ * Ungaze: Turn off gaze reflection
+ */
+ungaze()
+{
+    msg("The shiny particles disappear.");
+    turn_off(player, CANREFLECT);
+}
+
+/*
+ *
  * shero:
  *	restore lost abilities from cursed potion of shero
  */

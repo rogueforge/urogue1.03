@@ -1,3 +1,6 @@
+/*
+ * Last Modified: 05/25/86
+ */
 #include "curses.h"
 #include "rogue.h"
 #include <ctype.h>
@@ -97,7 +100,7 @@ bool wakeup;
     /* Are we coming out of a wall into a corridor in a maze? */
     och = show(player.t_oldpos.y, player.t_oldpos.x);
     ch = show(hero.y, hero.x);
-  if (levtype == MAZELEV && (och == '|' || och == '-' || och == SECRETDOOR) &&
+    if (levtype == MAZELEV && (och == '|' || och == '-' || och == SECRETDOOR) &&
 	(ch != '|' && ch != '-' && ch != SECRETDOOR))
 	do_light = off(player, ISBLIND); /* Light it up if not blind */
 
@@ -218,8 +221,8 @@ bool wakeup;
     if (door_stop && !firstmove && passcount > 1)
 	running = FALSE;
 
-   /* Do we have to light up the area (just stepped into a new corridor)? */
-   if (do_light && wakeup && 	/* wakeup will be true on a normal move */
+    /* Do we have to light up the area (just stepped into a new corridor)? */
+    if (do_light && wakeup && 	/* wakeup will be true on a normal move */
 	!(rp->r_flags & ISDARK) &&   /* We have some light */
 	!ce(hero, player.t_oldpos))  /* Don't do anything if we didn't move */
 	    light(&hero);
@@ -453,9 +456,13 @@ bool blessed;
 aggravate()
 {
     register struct linked_list *mi;
+    register struct thing *tp;
 
-    for (mi = mlist; mi != NULL; mi = next(mi))
-	runto(&((struct thing *) ldata(mi))->t_pos, &hero);
+    for (mi = mlist; mi != NULL; mi = next(mi)) {
+        tp = (struct thing *) ldata(mi);
+	runto(&tp->t_pos, &hero);
+	turn_off(*tp, ISFRIENDLY);
+    }
 }
 
 /*
@@ -468,10 +475,15 @@ register char *str;
     switch (*str)
     {
 	case 'a':
+	case 'A':
 	case 'e':
+	case 'E':
 	case 'i':
+	case 'I':
 	case 'o':
+	case 'O':
 	case 'u':
+	case 'U':
 	    return "n";
 	default:
 	    return "";
@@ -541,6 +553,91 @@ get_dir()
     mpos = 0;
     return TRUE;
 }
+
+
+
+/*
+ * Incantation:
+ *   Chooses between a spell and a prayer
+ *
+ */
+incant()
+{
+char
+    ch;
+/*
+ * Check for spell casting ability
+ */
+    if (!(MAGICIAN_ABILITY) && !(ILLUSION_ABILITY) &&
+	!(CLERIC_ABILITY) && !(DRUID_ABILITY)) {
+	msg("You are not permitted to cast spells.");
+	return;
+    }
+
+
+get_incant:
+    msg("What class of spells? (* for list) ");
+    ch = readchar();
+
+    switch (ch) {
+	case 'i':
+	    if (ILLUSION_ABILITY)
+	        illusion_cast();
+            break;
+        case 'w': 
+	    if (MAGICIAN_ABILITY) 
+		magician_cast(); 
+	    break;
+	case 'c':
+	    if (CLERIC_ABILITY) 
+		cleric_pray(); 
+	    break;
+        case 'd': 
+	    if (DRUID_ABILITY) 
+		druid_pray(); 
+	    break;
+	case 's':
+	    if (FAMILIAR_ABILITY || wizard) { 
+	    short fam_type;
+	    char num_str[20];
+	        if (wizard) {
+		    msg("What monster do you want to be your familiar? ");
+		    ch = get_str(num_str,cw);
+		    if (ch == ESCAPE)
+		        fam_type = 0;
+		    else
+		        fam_type = (short) atoi(num_str);
+	        } else
+		    fam_type = 0;
+	    /* Only *one* familiar per game */
+	        summon_monster(fam_type,TRUE,FALSE);
+		turn_on(player,HASFAMILIAR);
+	    } else
+		msg("Hmm.  For some reason you can't summon a familiar.");
+	    break;
+	case '*':
+	    if (ILLUSION_ABILITY)
+	        add_line("(i)llusionist spells");
+	    if (MAGICIAN_ABILITY)
+	        add_line("(w)izard spells");
+	    if (CLERIC_ABILITY)
+	        add_line("(c)leric prayers");
+	    if (DRUID_ABILITY)
+	        add_line("(d)ruid prayers");
+	    if (FAMILIAR_ABILITY) 
+	        add_line("(s)ummon familiar");
+	    end_line();
+	goto get_incant;
+
+	case ESCAPE:
+	    msg("");
+	    return;
+
+	default:
+	    goto get_incant;
+    }
+}
+
 
 
 /*

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Procedures for saving and retrieving a characters
  * starting attributes, armour, and weapon.
  * New addition to version 1.3 by S. A. Hester  11/8/83
@@ -17,7 +20,7 @@ geta_player()
 
 	register struct linked_list *item;
 	register struct object *obj;
-	register char char_file[LINELEN];	/* Where the file should be! */
+	char char_file[LINELEN];		/* Where the file should be! */
 	struct	stat	stbuf, st2buf;
 	int	fd;
 	int	arm,wpt,hpadd,dmadd;
@@ -83,6 +86,18 @@ geta_player()
 			class = "cleric";
 		    when C_THIEF:
 			class = "thief";
+		    when C_PALADIN:
+		        class = "paladin";
+		    when C_RANGER:
+		        class = "ranger";
+		    when C_DRUID:
+		        class = "druid";
+		    when C_ILLUSION:
+		        class = "illusionist";
+		    when C_ASSASIN:
+		        class = "assasin";
+		    when C_NINJA:
+		        class = "ninja";
 		    otherwise:
 			class = "unknown";
 		}
@@ -185,8 +200,7 @@ puta_player(arm, wpt, hpadd, dmadd)
 int	arm, wpt, hpadd, dmadd;
 {
 
-	register char char_file[LINELEN];	/* Where the file should be! */
-	register FILE	*fp;
+	char char_file[LINELEN];		/* Where the file should be! */
 	register int	fd;
 	struct	stat	stbuf;
 	char	pbuf[LINELEN];
@@ -211,6 +225,18 @@ int	arm, wpt, hpadd, dmadd;
 		    class = "cleric";
 		when C_THIEF:
 		    class = "thief";
+		when C_PALADIN:
+		    class = "paladin";
+		when C_RANGER:
+		    class = "ranger";
+		when C_DRUID:
+		    class = "druid";
+		when C_ILLUSION:
+		    class = "illusionist";
+		when C_ASSASIN:
+		    class = "assasin";
+		when C_NINJA:
+		    class = "ninja";
 		otherwise:
 		    class = "unknown";
 	    }
@@ -260,6 +286,18 @@ int	arm, wpt, hpadd, dmadd;
 			class = "cleric";
 		    when C_THIEF:
 			class = "thief";
+		    when C_PALADIN:
+		        class = "paladin";
+		    when C_RANGER:
+		        class = "ranger";
+		    when C_DRUID:
+		        class = "druid";
+		    when C_ILLUSION:
+		        class = "illusionist";
+		    when C_ASSASIN:
+		        class = "assasin";
+		    when C_NINJA:
+		        class = "ninja";
 		    otherwise:
 			class = "unknown";
 		}
@@ -312,7 +350,7 @@ int	arm, wpt, hpadd, dmadd;
 	def_array[i][I_CHAR] = player.t_ctype;
 
 	/* OK. Now let's write this stuff out! */
-	if ((fp = fopen(char_file, "w+")) == NULL)
+	if ((fd = creat(char_file, 0644)) < 0)
 	{
 	    no_write = TRUE;
 	    sprintf(pbuf,"I can't seem to open/create %s", char_file);
@@ -323,13 +361,12 @@ int	arm, wpt, hpadd, dmadd;
 	    wait_for(' ');
 	    return(TRUE);
 	}
-	fd = fileno(fp);
 	fstat(fd, &stbuf);
 	write(fd, (char *)&(stbuf.st_ino), sizeof(stbuf.st_ino));
 	write(fd, (char *)&(stbuf.st_nlink), sizeof(stbuf.st_nlink));
 	write(fd, (char *)&(stbuf.st_ctime), sizeof(stbuf.st_ctime));
 	write(fd, (char *)&(stbuf.st_dev), sizeof(stbuf.st_dev));
-	encwrite((char *)def_array, sizeof(def_array), fp);
-	fclose(fp);
+	encwrite((char *)def_array, sizeof(def_array), fd);
+	close(fd);
 	return(TRUE);
 }

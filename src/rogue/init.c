@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * global variable initializaton
  *
  */
@@ -6,7 +9,6 @@
 #include "curses.h"
 #include <ctype.h>
 #include "rogue.h"
-
 
 static char *rainbow[] = {
 	"Red",		"Blue",		"Green",	"Yellow",
@@ -88,54 +90,108 @@ init_player()
     pstats.s_lvl = 1 ;
     pstats.s_exp = 0L ;
 
-    if (char_type == -1) {
-	/* See what type character will be */
-	wclear(hw) ;
-	touchwin(hw) ;
-	mvwaddstr(hw,2,0,"[1] Fighter\n[2] Magician\n[3] Cleric\n[4] Thief") ;
-	mvwaddstr(hw, 0, 0, "What character class do you desire? ") ;
-	draw(hw) ;
-	char_type = ((getchar() & 0177) - '0') ;
-	while (char_type < 1 || char_type > 4) {
-	    mvwaddstr(hw,0,0,"Please enter a character type between 1 and 4: ");
-	    draw(hw) ;
-	    char_type = ((getchar() & 0177) - '0') ;
-	}
-	char_type-- ;
-    }
-    player.t_ctype = char_type ;
+    do_getplayer();	/* get character class */
+
     player.t_quiet = 0;
-    max_stats.s_hpt = pstats.s_hpt = 15 + rnd(5);
     pstats.s_str = 8 + rnd(5) ;
     pstats.s_intel = 8 + rnd(5) ;
     pstats.s_wisdom = 8 + rnd(5) ;
     pstats.s_dext = 8 + rnd(5) ;
     pstats.s_const = 10 + rnd(8) ;
     pstats.s_charisma = 8 + rnd(4) ;
-    pstats.s_dmg = "1d4" ;
     pstats.s_arm = 10 ;
+    max_stats.s_hpt = pstats.s_hpt = 15 + rnd(5);
 
     /* Now for the special ability */
     switch (char_type) {
 	when C_FIGHTER:
 	    pstats.s_str = (special == 4) ? 18 : 16 ;
 	    pstats.s_const += rnd(4);
-	    pstats.s_dmg = "2d4" ;
 	    pstats.s_arm = 8;
 	when C_MAGICIAN:
 	    pstats.s_intel = (special == 4) ? 18 : 16 ;
+	when C_ILLUSION:
+	    pstats.s_intel = (special == 4) ? 18 : 16 ;
+	    pstats.s_dext = (special == 4) ? 18 : 14;
 	when C_CLERIC:
 	    pstats.s_wisdom = (special == 4) ? 18 : 16 ;
 	    pstats.s_str += rnd(4);
+	when C_DRUID:
+	    if(special == 4) {
+		pstats.s_wisdom += rnd(5);
+		pstats.s_charisma += rnd(4);
+	    }
+	    pstats.s_str += rnd(4);
+	    if(pstats.s_wisdom < 16)
+		pstats.s_wisdom = 16;
 	when C_THIEF:
 	    pstats.s_dext = (special == 4) ? 18 : 16 ;
+	when C_ASSASIN:
+	    pstats.s_dext = (special == 4) ? 18 : 16 ;
+	    pstats.s_intel = (special == 4) ? 18 : 16;
+	when C_NINJA:
+	    if(special == 4) {
+		pstats.s_dext += rnd(5);
+		pstats.s_str += rnd(4);
+		pstats.s_intel += rnd(3);
+	    }
+	    pstats.s_arm = 12;
+	    if(pstats.s_dext < 16)
+		    pstats.s_dext = 16;
+	when C_PALADIN:
+		pstats.s_charisma = 17;
+		if(special == 4) {
+			pstats.s_charisma += rnd(3);
+			pstats.s_wisdom += rnd(4);
+			pstats.s_str += rnd(5);
+		}
+		if(pstats.s_str < 16)
+			pstats.s_str = 16;
+		if(pstats.s_wisdom < 16)
+			pstats.s_wisdom = 16;
+	when C_RANGER:
+		if(special == 4) {
+			pstats.s_wisdom += rnd(4);
+			pstats.s_intel += rnd(4);
+			pstats.s_str += rnd(5);
+		}
+		if(pstats.s_str < 16)
+			pstats.s_str = 16;
+		if(pstats.s_wisdom <16)
+			pstats.s_wisdom = 16;
+		if(pstats.s_const < 14)
+			pstats.s_const = 14;
+		break ;
     }
+    if(char_type == C_ASSASIN || char_type == C_NINJA || char_type == C_FIGHTER)
+	pstats.s_dmg = "2d6";
+    else
+	pstats.s_dmg = "1d4";
     if (pstats.s_const > 15)
 	pstats.s_hpt += pstats.s_const - 15;
     max_stats = pstats ;
     pack = NULL ;
     pstats.s_carry = totalenc();
 }
+
+
+
+/*
+ * Initialize flags on startup
+ */
+init_flags()
+{
+    switch (player.t_ctype) {
+
+	case C_MAGICIAN:
+	case C_ILLUSION:
+	case C_CLERIC:
+	case C_DRUID:
+	    turn_on(player, CANSUMMON);
+    }
+}
+
+
 
 /*
  * Contains definitions and functions for dealing with things like
@@ -303,9 +359,28 @@ register int bound ;
     printf("\nBad percentages for %s:\n", name) ;
     for (end = &magic[bound] ; magic < end ; magic++)
 	printf("%3d%% %s\n", magic->mi_prob, magic->mi_name) ;
-    printf("[hit RETURN to continue]") ;
+    printf("[Hit RETURN to continue]") ;
     fflush(stdout) ;
     while ((getchar() & 0177) != '\n')
 	continue ;
 }
 
+do_getplayer()
+{
+    if (char_type == C_NOTSET) {
+	/* See what type character will be */
+	wclear(hw) ;
+	touchwin(hw) ;
+	mvwaddstr(hw,2,0, "[a] Fighter\n[b] Paladin\n[c] Ranger\n[d] Cleric\n[e] Druid\n[f] Magician");
+	waddstr(hw,"\n[g] Illusionist\n[h] Thief\n[i] Assasin\n[j] Ninja") ;
+	mvwaddstr(hw, 0, 0, "What character class do you desire? ") ;
+	draw(hw) ;
+	char_type = readchar() - 'a';
+	while (char_type < C_FIGHTER || char_type >= C_MONSTER) {
+	    mvwaddstr(hw, 0, 0, "Please enter a character in the displayed range: ");
+	    draw(hw);
+	    char_type = readchar() - 'a';
+	}
+    }
+    player.t_ctype = char_type ;
+}

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Code for one object to chase another
  *
  */
@@ -24,6 +27,9 @@ runners()
     for (item = mlist; item != NULL; item = nitem) {
 	nitem = next(item); /* Get next item now since monster may disappear */
 	tp = (struct thing *) ldata(item);
+
+	monst_dead = FALSE; /* Indicate that this monster is alive */
+
 	if (on(*tp, ISHELD) && rnd(tp->t_stats.s_lvl) > 11) {
 	    turn_off(*tp, ISHELD);
 	    turn_on(*tp, ISRUN);
@@ -38,8 +44,6 @@ runners()
 	if (off(*tp, ISHELD) && on(*tp, ISRUN)) {
 	    register bool flee;
 
-	    monst_dead = FALSE; /* Indicate that this monster is alive */
-
 	    /* Should monster run away? */
 	    flee = on(*tp, ISFLEE) ||
 		((tp->t_dest == &hero) && on(player, ISINWALL) &&
@@ -49,7 +53,12 @@ runners()
 		doctor(tp);
 		do_chase(tp, flee);
 	    }
-	    if (!monst_dead && on(*tp, ISHASTE)) {
+	    if (!monst_dead && (on(*tp, ISHASTE) ||
+			((on(*tp, CANFLY) || on(*tp, ISFAST)) && 
+			DISTANCE(hero.y, hero.x, tp->t_pos.y, tp->t_pos.x) >= 4))) {
+		debug("Monster %s @ (%d, %d) extra turn.", 
+			monsters[tp->t_index].m_name, 
+			tp->t_pos.y, tp->t_pos.x);
 		doctor(tp);
 		do_chase(tp, flee);
 	    }
@@ -84,6 +93,22 @@ register bool flee;
     if (th->t_no_move != 0) {
 	th->t_no_move--;
 	return;
+    }
+
+    /*
+     * Check for a "good" monster to hit.
+     */
+    if (on(*th,ISMEAN)) { 
+	register struct linked_list
+	    *mon_to_hit;
+	extern struct linked_list *find_mons_around();
+        if (
+	    (mon_to_hit = find_mons_around(th->t_pos.y, th->t_pos.x, FALSE))
+	   ) 
+	{
+	   mon_mon_attack(th,mon_to_hit,NULL,FALSE);
+	   return;
+	}
     }
 
     rer = roomin(&th->t_pos);	/* Find room of chaser */
@@ -172,12 +197,26 @@ register bool flee;
 	    /* merchants try to sell something */
 	    if (on(*th, CANSELL)) 
 		sell(th);
-	    else if (on(*th, ISCHARMED))
-		{}				/* future enhancements */
-	    else if (on(*th, ISFRIENDLY))
-		{}
-	    else
-		attack(th, NULL, FALSE);
+	    else if (on(*th, ISCHARMED)) {
+		register int x,y;
+		register struct linked_list *mon;
+		register struct thing *ick;
+
+		for (x = th->t_pos.x-1; x <= th->t_pos.x+1; x++)
+		for (y = th->t_pos.y-1; y <= th->t_pos.y+1; y++)
+		if (y > 0 && x > 0 && isalpha(mvwinch(mw, y, x)))
+		    if ((mon = find_mons(y, x)) != NULL) {
+		        ick = THINGPTR(mon);
+			if (!(good_monster(*ick)))
+			    mon_mon_attack(th,mon,NULL,FALSE);
+		    }
+	    }				
+	    else if (on(*th, ISFRIENDLY)) {
+		if (off(*th, ISCHARMED))
+		    turn_on(*th, ISCHARMED);
+	    }
+	    else if (off(*th, CANFLY) || (on(*th, CANFLY) && rnd(2)))
+		attack(th, (struct thing *) NULL, FALSE);
 	    return;
 	}
 	else if (on(*th, NOMOVE))
@@ -324,6 +363,19 @@ register bool flee;
     register bool next_player = FALSE;
 
     /*
+     * First take care of shooting directions
+     */
+    if (on(*tp, CANBREATHE) || on(*tp, CANSHOOT))
+    if (good_monster(*tp)) {
+        shoot_dir = find_shoot(tp, TRUE); /* find a mean monster to shoot */
+	if (wizard)
+	if (shoot_dir)
+	    msg("Found monster to shoot at %d,%d", shoot_dir->x,shoot_dir->y);
+    }
+    else 
+	shoot_dir = can_shoot(er, ee);    /* check if hero can be shot */
+
+    /*
      * If the thing is confused, let it move randomly. Invisible
      * Stalkers are slightly confused all of the time.
      */
@@ -333,7 +385,10 @@ register bool flee;
 	/*
 	 * get a valid random move
 	 */
-	ch_ret = *rndmove(tp);
+	{
+	    coord *foo = rndmove(tp);	/* bug in 4.2a compiler for RT PC */
+	    ch_ret = *foo;
+	}
 	dist = DISTANCE(ch_ret.y, ch_ret.x, ee->y, ee->x);
 
 	if (on(*tp, ISHUH) && rnd(20) == 0)  /* monster might lose confusion */
@@ -352,8 +407,7 @@ register bool flee;
     }
 
     /* If we can breathe, we may do so */
-    else if (on(*tp, CANBREATHE) && (shoot_dir = can_shoot(er, ee)) &&
-	     (rnd(100) < 67) &&
+    else if (on(*tp, CANBREATHE) && (shoot_dir) && (rnd(100) < 67) &&
 	     (off(player, ISDISGUISE) || (rnd(tp->t_stats.s_lvl) > 6)) &&
 	     (DISTANCE(er->y, er->x, ee->y, ee->x) < BOLT_LENGTH*BOLT_LENGTH)) {
 		register short chance;
@@ -362,6 +416,7 @@ register bool flee;
 		/* Will it breathe at random */
 		if (on(*tp, CANBRANDOM)) {
 		    if (rnd(level/20) == 0 && tp->t_index != NUMMONST+1)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBRANDOM);
 
 		    /* Select type of breath */
@@ -380,6 +435,7 @@ register bool flee;
 		/* Or can it breathe acid? */
 		else if (on(*tp, CANBACID)) {
 		    if (rnd(level/20) == 0)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBACID);
 		    breath = "acid";
 		}
@@ -387,6 +443,7 @@ register bool flee;
 		/* Or can it breathe fire */
 		else if (on(*tp, CANBFIRE)) {
 		    if (rnd(level/20) == 0)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBFIRE);
 		    breath = "flame";
 		}
@@ -394,6 +451,7 @@ register bool flee;
 		/* Or can it breathe electricity? */
 		else if (on(*tp, CANBBOLT)) {
 		    if (rnd(level/20) == 0)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBBOLT);
 		    breath = "lightning bolt";
 		}
@@ -401,6 +459,7 @@ register bool flee;
 		/* Or can it breathe gas? */
 		else if (on(*tp, CANBGAS)) {
 		    if (rnd(level/20) == 0)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBGAS);
 		    breath = "chlorine gas";
 		}
@@ -408,39 +467,44 @@ register bool flee;
 		/* Or can it breathe ice? */
 		else if (on(*tp, CANBICE)) {
 		    if (rnd(level/20) == 0)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBICE);
 		    breath = "ice";
 		}
 
 		else if (on(*tp, CANBPGAS)) {
 		    if (rnd(level/20) == 0)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBPGAS);
 		    breath = "nerve gas";
 		}
 
 		else if (on(*tp, CANBSGAS)) {
 		    if (rnd(level/20) == 0)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBSGAS);
 		    breath = "sleeping gas";
 		}
 
 		else if (on(*tp, CANBSLGAS)) {
 		    if (rnd(level/20) == 0)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBSLGAS);
 		    breath = "slow gas";
 		}
 
 		else {
 		    if (rnd(level/20) == 0)
+			if (!(good_monster(*tp)))
 			turn_off(*tp, CANBFGAS);
 		    breath = "fear gas";
 		}
 
 		/* Now breathe -- returns TRUE if kills itself */
+		/* save() call vs player happens on shoot_bolt */
 		monst_dead =
 		    shoot_bolt(tp, *er, *shoot_dir, FALSE, tp->t_index, breath,
-			       (save(VS_BREATH) ? tp->t_stats.s_hpt/2
-					        : tp->t_stats.s_hpt));
+			        roll(tp->t_stats.s_lvl, 6));
 
 		ch_ret = *er;
 		dist = DISTANCE(ch_ret.y, ch_ret.x, ee->y, ee->x);
@@ -454,9 +518,8 @@ register bool flee;
      */
     else if((off(*tp, ISFLEE) || rnd(DISTANCE(er->y,er->x,ee->y,ee->x)) > 2) && 
 	     on(*tp, CANSHOOT) && (off(player, ISDISGUISE) || 
-	     (rnd(tp->t_stats.s_lvl) > 6)) &&
-	    (shoot_dir = can_shoot(er, ee)) &&
-	    (weapon = get_hurl(tp))) {
+	     (rnd(tp->t_stats.s_lvl) > 6)) && (shoot_dir) && 
+	     (weapon = get_hurl(tp))) {
 		missile(shoot_dir->y, shoot_dir->x, weapon, tp);
 		ch_ret = *er;
 		dist = DISTANCE(ch_ret.y, ch_ret.x, ee->y, ee->x);
@@ -553,7 +616,7 @@ register bool flee;
 		    if (tp->t_wasshot && tp->t_stats.s_intel > 5 &&
 			ce(hero, *ee)) {
 			/* Move out of line of sight */
-			if (straight_shot(tryp.y, tryp.x, ee->y, ee->x, NULL)) {
+			if (straight_shot(tryp.y, tryp.x, ee->y, ee->x, (coord *) NULL)) {
 			    if (flee) thisdist -= SHOTPENALTY;
 			    else thisdist += SHOTPENALTY;
 			}
@@ -632,9 +695,8 @@ register coord *cp;
     register struct room *rp;
 
     for (rp = rooms; rp < &rooms[MAXROOMS]; rp++)
-	if (inroom(rp, cp)){
+	if (inroom(rp, cp))
 	    return rp;
-	    }
     return NULL;
 }
 
@@ -646,7 +708,7 @@ register coord *cp;
 struct linked_list *
 find_mons(y, x)
 register int y;
-register int x;
+int x;
 {
     register struct linked_list *item;
     register struct thing *th;
@@ -657,8 +719,48 @@ register int x;
 	if (th->t_pos.y == y && th->t_pos.x == x)
 	    return item;
     }
-      return NULL;
+    return NULL;
 }
+
+/*
+ * Find an unfriendly monster around us to hit 
+ */
+struct linked_list *
+find_mons_around(y, x, mean)
+int
+    y, x;
+bool
+    mean;
+{
+register int
+    row, col;
+register struct linked_list
+    *item;
+register struct thing
+    *tp;
+
+    for (row = x - 1; row <= x + 1; row++) {
+	for (col = y - 1; col <= y + 1; col++) {
+	    if (row == x && col == y)
+		continue;
+	    if (col > 0 && row > 0 && isalpha(mvwinch(mw, col, row))) {
+	        if ((item = find_mons(col, row))) {
+	            tp = THINGPTR(item);
+	            if (on(*tp,ISFRIENDLY) || 
+	                on(*tp,ISCHARMED)  || 
+	                on(*tp,ISFAMILIAR))  {
+	                if (!mean)
+		            return(item);
+	            } else
+		        if (mean)
+		            return(item);
+	        }
+	    }
+        }
+    }
+    return(NULL);
+}
+
 
 /*
  * diag_ok:
@@ -703,6 +805,47 @@ register int y, x;
 	    DISTANCE(y, x, hero.y, hero.x) < see_dist);
 }
 
+coord *
+find_shoot(tp, mean)
+struct thing *tp;
+bool mean;
+{
+struct room 
+    *rtp;
+int 
+    ulx,uly,xmx,ymx,xmon,ymon,tpx,tpy,row,col;
+static coord shoot_dir;
+struct linked_list *mon;
+struct thing *ick;
+
+    rtp = roomin(&tp->t_pos);		/* Find room of chaser */
+    ulx = rtp->r_pos.x;
+    uly = rtp->r_pos.y;
+    xmx = rtp->r_max.x;
+    ymx = rtp->r_max.y;
+
+    tpx = tp->t_pos.x;
+    tpy = tp->t_pos.y;
+
+    for (col = ulx; col < (ulx+xmx); col++)
+    for (row = uly; row < (uly+ymx); row++) { 
+	if (row > 0 && col > 0 && isalpha(mvwinch(mw, row, col))) {
+	    if ((mon = find_mons(row, col))) {
+	        ick = THINGPTR(mon);
+                xmon = ick->t_pos.x;
+                ymon = ick->t_pos.y;
+		if (!(good_monster(*ick))) {
+                    if (straight_shot(tpy, tpx, ymon, xmon, &shoot_dir)) 
+			return(&shoot_dir);
+		}
+	    }
+	}
+    }
+    return(NULL);
+}
+
+
+
 /* Can_shoot determines if the monster (er) has a direct line of shot 
  * at the player (ee).  If so, it returns the direction in which to shoot.
  */
@@ -732,7 +875,6 @@ register coord *er, *ee;
     if (!straight_shot(ery, erx, eey, eex, &shoot_dir)) return(NULL);
     else return(&shoot_dir);
 }
-
 
 /*
  * straight_shot:

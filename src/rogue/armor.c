@@ -1,8 +1,11 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * This file contains misc functions for dealing with armor
  */
 
-#include <curses.h>
+#include "curses.h"
 #include "rogue.h"
 
 /*

@@ -832,3 +832,213 @@
 1.02	August 13, 85
 1)	being zapped by a breath weapon while not wearing armor causes
 	core dumps
+
+1.03 Alpha, February 16, 86
+1)	added 100+ monsters to the monster table with new attributes
+	supported
+2)	added mike cooper's new character classes
+3)	added mike cooper's changes to inventory display management to
+	be more like Berkeley rogue 5.x
+4)	changed experience level management to allow effectively no
+	limit on experience level
+5)	spell and prayer points are now taken from the same pool
+6)	healing rate reduced to make life harder
+7)	code to correct sun compiler laziness that is handled by
+	other compilers
+8)	redo flag structure to extend to 400+ monster flags
+9)	display remaining spell points in menu of spells to cast/pray
+10)	healing rates reduced
+11)	control rewritten to do what it says in README
+12)	README updated to tell about the environment variable
+13)	MOTD, PAGER, NOPLAY, and NEWS files supported for various
+	messages and display of same
+14)	uptime output is used for load control
+15)	control uses the login name rather than uid for authorization
+16)	code for RTU2 and 4.2 RT PC versions added
+17)	fixed up some sun problems
+18)	FLYing and FAST monsters move twice as quickly when not next
+	to hero
+19)	melee attack bonus for various character classes computed
+	by a function instead of code in the if statement
+20)	CTRL-<dir> keys deleted and option used for determining
+	type of running
+21)	fixed saving throw modification for mithril armor
+22)	changed message for monsters stealing magic
+23)	changed environment variable to UROGUE
+24)	dungeon-level-dependent attributes start sooner now
+25)	more weapon flags
+26)	silver weapons become metal ones too
+27)	monsters appear more often
+
+1.03 Alpha, February 21, 86
+1)	added changes to circumvent compiler bug in 4.2BSD on the RT PC
+2)	corrected maximum number of levels displayed in player level
+	calculation
+3)	corrected calculation of needed experience points to gain a
+	new level after losing a level
+4)	thrown weapons at gas spores kill them
+5)	synchronized messages and experience level numbers when 
+	gaining levels
+
+1.03 Alpha, February 22, 86
+1)	Friendly Fiend appears in a trading post and follows you around
+2)	minimal code for support of CHARMED and FRIENDLY monsters
+3)	Friendly Fiend gets upset if you cast spells in his place
+
+1.03 Alpha, February 22, 86
+1)	fixed up Friendly Fiend handling when he has been hit or
+	"killed"
+2)	changed ninja experience level names
+3)	added paladin praying abilities at level 9 no matter what wisdom
+4)	reduced Friendly Fiends abilities
+5)	shops become normal levels for picking up objects when Friendly Fiend
+	is "killed"
+6)	handle a one room ordinary level properly
+7)	once Friendly is "dead", shop items are identified when picked up
+
+1.03 Alpha, February 28, 86
+1)	applied bug fix in inventory code sent by Mike Cooper
+2)	added AT&T 7300 sys5r2 support
+3)	implemented Jason Venner's improvements to handling getting the
+	load average
+
+1.03 Alpha, March 9, 86
+1)	applied fix to too many saves running out of file descriptors
+	submitted by Web Dove
+2)	applied fixes to messages and stuff for the quartermaster from
+	Mike Cooper
+
+1.03 Alpha, March 14, 86
+1)	applied bug fix by mike cooper in display of quartermaster's 
+	wares to sell
+2)	applied mike cooper's patches for sys5 curses support
+
+1.03 Alpha, March 15, 86
+1)	added flags for size of monster and size of weapon and initialization
+2)	changed whatis command to display all possible monsters that match
+	the characters
+
+1.03 Alpha, April 14, 86
+1)	incorporated random() and srandom() from 4.2BSD
+
+1.03 Alpha, April 18, 86
+1)	fixed segv in control.c using patch from mike cooper
+
+1.03 Alpha, April 19, 86
+1)	fixed screen clearing in initialization and termination for sys5
+2)	added option to print version number
+3)	doubled healing rate
+4)	potion of gain ability is much rarer now
+5)	Tiamat and Bahamut can now summon dragons (suggested by carl hommel)
+
+1.03 Alpha, April 20, 86
+1)	fixed up terminal state when exiting
+2)	removed wizard scorefile commands from rip.c
+3)	fixed testing for valid initialization of player class
+
+1.03 Alpha, April 28, 86
+1)	added SAVETIME and WARNTIME to allow installations to tune
+	how strict they are on load checking
+2)	changed treasure room generation and room darkness constants
+	to create them less often and starting deeper
+3)	require return at game termination to handle windowing
+	systems
+4)	changed #ifdef and #ifndef to #if defined() and #if !defined()
+
+1.03 Alpha, May 2, 86
+1)	fixed up missed #ifdef changes
+2)	fruit name initialization screws up on very long names
+3)	monsters with multiple turns getting killed on their first
+	turn should never get a second turn (Mike Laman fix)
+4)	dropping and picking up multiple stuff sometimes screws up count
+	(another Mike Laman fix)
+5)	enhancement by Carl Hommel to zapping: save = 1/2 damage, 
+	rather than no damage.  bolt damage peters off towards the end 
+	of the zap
+
+1.03 Alpha May 5, 86
+1)	changed order of message and flag clearing for normal scroll
+	of remove curse to have a more consistent message
+2)	the gold sense command has been removed and it is automatically
+	done for thieves whenever a new level is created
+
+1.03 Alpha May 11, 86
+1)	fixed minor formatting error in last prompt for carriage return
+	before exiting
+2)	tons of minor and major bug fixes by Mike Laman, some pointed to
+	by lint and others from looking at code, with more for me to fix
+	(sigh!), including sys5 curses things and temporary absence of
+	brain
+
+1.03 Alpha May 12, 86
+1)	putting on a ring of free action turns off being held and those
+	monsters can never hold hero again (ever)
+2)	diddled around some more with format of prompt before exiting
+3)	changed define of "reg" in curses.h to have less warning messages
+4)	added a single new monster
+5)	changed name of NUMUNIQUE define in rogue.h to NUMSUMMON
+6)	use vowelstr() in giving name of monster summoning hero
+
+1.03 ALpha May 19, 86
+1)	added a whole lot of things by Carl Hommel including different
+	algorithms for shooting bolts, new armor and weapons, and
+	general tidying up of things
+
+1.03 Alpha, May 20, 86
+1)	added 67 new monsters from Carl Hommel and miscellaneous bug fixes
+ 
+1.03 Alpha, May 21, 86
+1)	initial support for SCO/Microsoft Xenix implementation of sys5r2
+	supplied by Tom Haapanen
+2)	fixed monster flags in new monsters supplied by Carl
+3)	changed number of new monsters/level constant from 3 to 4
+	(this number is too high given the actual number of monsters in
+	the monster table and the levels one has to go down.  there
+	should be 320 non-summoning monsters to be about right)
+4)	healing rate restored to original value
+
+1.03 Alpha, May 22, 86
+1)	protected and claimed objects stay with the hero when he 
+	resurrects
+2)	no saving throw against magic missile
+3)	magic missile damage depends upon player exp level
+4)	electrification bug fixed and range depends on hero exp. level
+5)	stepping into a pool when electrified is painful
+6)	monsters summon only when low on hit points and damage taken
+	above changes by Carl Hommel
+7)	number of magic items per level increased
+8)	bunches of monsters created less frequently
+9)	summoning while running around reduced in probability
+10)	don't kick any daemons off when being summoned to give initiative
+	to the player
+11)	increase the number of objects in a throne room
+
+1.03 Alpha, May 24, 86
+1)	changed algorithm for creating monsters with CANSHOOT weapons
+	and increased probability slightly
+2)	added new monsters from Carl Hommel and a bunch of my own
+3)	rearranged the hero-summoning unique monsters to be strictly
+	in order of hit points
+4)	rearranged some of ordinary monsters to make progession of
+	experience points for killing monster more monotonic
+5)	fix handling of extra long monster names in wizard monster creation
+	and monster genocide
+
+1.03 Alpha, May 25, 86
+1)	more modifications in and around chase.c, command.c, and fight.c
+	to remove the electrification bug.  Carl's fixes removed one,
+	the one that Jason reported is still there.
+2)	maximum traps/dungeon level increased
+3)	massively rewrite Makefiles, installation procedure, and
+	various sources to reorganize sources
+
+1.03 Alpha, May 28, 86
+1)	charmed monsters, new spells for druid and illusionist,
+	monsters striking each other, etc.  by Nick Flor
+2)	save throw handling changed to be centralized in one routine,
+	blessed/cursed stick handling, and wizard ^O command improved
+	by Carl Hommel
+3)	fixed save throw test for monster and hero differentiation
+4)	monster is not allowed to hit itself
+
+------- End of File ------

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Draw the nine rooms on the screen
  *
  * @(#)rooms.c	3.8 (Berkeley) 6/15/81
@@ -61,7 +64,7 @@ do_rooms()
 	    } until(rp->r_pos.y > 0 && rp->r_pos.y < LINES-2);
 	    continue;
 	}
-	if (rnd(10) < level-1)
+	if (rnd(80) < level - 15)
 	    rp->r_flags |= ISDARK;
 	/*
 	 * Find a place and size for a random room
@@ -107,7 +110,7 @@ do_rooms()
 	/*
 	 * Put the monster in
 	 */
-	if (rnd(100) < (has_gold ? 80 : 25))
+	if (rnd(100) < (has_gold ? 90 : 40))
 	{
 	    item = new_item(sizeof *tp);
 	    tp = THINGPTR(item);

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Functions for dealing with linked lists of goodies
  *
  * @(#)list.c	8.0	(Bell Labs)	12/16/82
@@ -98,10 +101,10 @@ int size;
 
 char *
 new(size)
-int size;
+unsigned int size;
 {
     register char *space = ALLOC(size);
-    static errbuf[LINELEN];
+    static char errbuf[LINELEN];
 
     if (space == NULL) {
 	sprintf(errbuf,"Rogue ran out of memory (used = %d, wanted = %d).",

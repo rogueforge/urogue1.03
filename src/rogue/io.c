@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Various input/output functions
  */
 
@@ -6,6 +9,7 @@
 #include "mach_dep.h"
 #include <ctype.h>
 #include "rogue.h"
+#include "varargs.h"
 
 static char mbuf[2*BUFSIZ];
 static int newpos = 0;
@@ -17,10 +21,13 @@ static int newpos = 0;
 
 
 /*VARARGS1*/
-msg(fmt, args)
+msg(fmt, va_alist)
 char *fmt;
-int args;
+va_dcl
 {
+    va_list ap;
+
+
     /*
      * if the string is "", just clear the line
      */
@@ -34,18 +41,25 @@ int args;
     /*
      * otherwise add to the message and flush it out
      */
-    doadd(fmt, &args);
+    va_start(ap);
+    doadd(fmt, ap);
+    va_end(ap);
     endmsg();
 }
 
 /*
  * add things to the current message
  */
-addmsg(fmt, args)
+/*VARARGS1*/
+addmsg(fmt, va_alist)
 char *fmt;
-int args;
+va_dcl
 {
-    doadd(fmt, &args);
+    va_list ap;
+
+    va_start(ap);
+    doadd(fmt, ap);
+    va_end(ap);
 }
 
 /*
@@ -70,6 +84,7 @@ endmsg()
     draw(cw);
 }
 
+/*VARARGS1*/
 doadd(fmt, args)
 char *fmt;
 int **args;
@@ -81,6 +96,12 @@ int **args;
      */
     junk._flag = _IOWRT;  /* Under 3.0 IOUNK was IOSTRG */
     junk._ptr = &mbuf[newpos];
+#if defined(STDIO_BASE_P)
+    junk._base = junk._ptr;
+#endif STDIO_BASE_P
+#if defined(_NFILE)
+    junk._file = _NFILE;
+#endif _NFILE
     junk._cnt = 32767;
     _doprnt(fmt, args, &junk);
     putc('\0', &junk);
@@ -117,11 +138,11 @@ register struct thing *flgptr;
 	     * If it is a scroll, it might be a scare monster scroll
 	     * so we need to look it up to see what type it is.
 	     */
-	    if (flgptr || flgptr->t_ctype == C_MONSTER) {
+	    if (flgptr && flgptr->t_ctype == C_MONSTER) {
 		item = find_obj(y, x);
-		if (item != NULL &&
-		    (OBJPTR(item))->o_which==S_SCARE &&
-		    (flgptr == NULL || flgptr->t_stats.s_intel < 16))
+		if (item != NULL && (OBJPTR(item))->o_type == SCROLL &&
+		    (OBJPTR(item))->o_which == S_SCARE &&
+		    rnd(flgptr->t_stats.s_intel) < 12)
 			return(FALSE); /* All but smart ones are scared */
 	    }
 	    return(TRUE);
@@ -164,7 +185,7 @@ readchar()
     return (c & 0177);
 }
 
-#ifndef	unctrl
+#if !defined(unctrl)
 /*
  * unctrl:
  *	Print a readable version of a certain character
@@ -276,8 +297,7 @@ line_two:
 	s_exp == stat_ptr->s_exp		&& 
         s_pur == purse && 
 	s_ac == (cur_armor != NULL ? (cur_armor->o_ac - 10 + stat_ptr->s_arm)
-		: stat_ptr->s_arm) -
-		ring_value(R_PROTECT) && 
+		: stat_ptr->s_arm) - ring_value(R_PROTECT) && 
 	s_lvl == level 				&& 
 	s_hungry == hungry_state		) return;
 	
@@ -288,11 +308,11 @@ line_two:
 	for (hpwidth = 0; temp; hpwidth++)
 	    temp /= 10;
     }
-    sprintf(buf, "Lvl:%d  Au:%d  Hp:%*d(%*d)  Ac:%d  Exp:%d/%ld  %s",
+    sprintf(buf, "Lvl:%d  Au:%d  Hp:%*d(%*d)  Ac:%d  Exp:%d+%ld  %s",
 	level, purse, hpwidth, stat_ptr->s_hpt, hpwidth, max_ptr->s_hpt,
 	(cur_armor != NULL ? (cur_armor->o_ac - 10 + stat_ptr->s_arm)
-		: stat_ptr->s_arm) -
-	ring_value(R_PROTECT), stat_ptr->s_lvl, stat_ptr->s_exp,
+		: stat_ptr->s_arm) - ring_value(R_PROTECT),
+	stat_ptr->s_lvl, stat_ptr->s_exp,
 	cnames[player.t_ctype][min(stat_ptr->s_lvl-1, 10)]);
 
     /*
@@ -303,8 +323,7 @@ line_two:
     s_hp = stat_ptr->s_hpt;
     s_exp = stat_ptr->s_exp; 
     s_ac = (cur_armor != NULL ? (cur_armor->o_ac - 10 + stat_ptr->s_arm)
-		: stat_ptr->s_arm) - 
-		ring_value(R_PROTECT);
+	: stat_ptr->s_arm) - ring_value(R_PROTECT);
     mvwaddstr(cw, LINES - 1, 0, buf);
     switch (hungry_state)
     {
@@ -393,20 +412,6 @@ char *message;
 }
 
 /*
- * dbotline:
- *	Displays message on bottom line and waits for a space to return
- */
-dbotline(scr,message)
-WINDOW *scr;
-char *message;
-{
-	mvwaddstr(scr,LINES-1,0,message);
-	draw(scr);
-	wait_for(' ');	
-}
-
-
-/*
  * restscr:
  *	Restores the screen to the terminal
  */
@@ -415,4 +420,78 @@ WINDOW *scr;
 {
 	clearok(scr,TRUE);
 	touchwin(scr);
+}
+/*
+ * add_line:
+ *    Add a line to the list of discoveries
+ */
+
+/* VARARGS1 */
+add_line(fmt, arg)
+char *fmt, *arg;
+{
+    register WINDOW *tw;
+
+    if (line_cnt == 0) {
+        wclear(hw);
+        if (inv_type == INV_SLOW)
+            mpos = 0;
+    }
+    if (inv_type == INV_SLOW) {
+        if (*fmt != '\0')
+            msg(fmt, arg);
+        line_cnt++;
+    } else {
+        if (line_cnt >= LINES - 1 || fmt == NULL) {
+            if (fmt == NULL && !newpage && inv_type == INV_OVER) {
+                tw = newwin(line_cnt + 2, COLS, 0, 0);
+                overwrite(hw, tw);
+                wstandout(tw);
+                mvwaddstr(tw, line_cnt, 0, spacemsg);
+                wstandend(tw);
+                touchwin(tw);
+                wrefresh(tw);
+                wait_for(' ');
+#if defined(BSD4)
+                if (CE) {
+                    werase(tw);
+                    wrefresh(tw);
+                }
+#endif
+                delwin(tw);
+                touchwin(cw);
+            } else {
+                wstandout(hw);
+                mvwaddstr(hw, LINES - 1, 0, spacemsg);
+                wstandend(hw);
+                wrefresh(hw);
+                wait_for(' ');
+                clearok(curscr, TRUE);
+                wclear(hw);
+            }
+            newpage = TRUE;
+            line_cnt = 0;
+        }
+        if (fmt != NULL && !(line_cnt == 0 && *fmt == '\0')) {
+            mvwprintw(hw, line_cnt++, 0, fmt, arg);
+            lastfmt = fmt;
+            lastarg = arg;
+        }
+    }
+}
+
+/*
+ * end_line:
+ *    End the list of lines
+ */
+end_line()
+{
+    if (inv_type != INV_SLOW)
+        if (line_cnt == 1 && !newpage) {
+            mpos = 0;
+            msg(lastfmt, lastarg);
+        } else
+            add_line(NULL);
+    line_cnt = 0;
+    newpage = FALSE;
 }

@@ -1,52 +1,46 @@
+DISTRIBDIR	= /usr/herbie/tmp
+INSTALLDIR	= /usr/herbie/bin
+CURSES		= -lcurses
+TERMCAP		=
 
-INSD=/usr/tmp
-LIB=rogue/ur.lib
-DISTRIB = Makefile.install namefinder.o control.o $(LIB)
-SOURCES = Makefile Makefile.install namefinder.c control.c tunable.c tunable.h lav.c
+urogue: library
+	cc commands/tunable.o rogue/libsrogue.o -o urogue $(CURSES) $(TERMCAP)
+	@chmod 711 urogue
+	@ls -l urogue
+	@size urogue
 
-TUNABLE = tunable.o
+install: urogue
+	@-mkdir $(INSTALLDIR)
+	cp commands/control $(INSTALLDIR)
+	cp urogue $(INSTALLDIR)
+	chmod 4711 $(INSTALLDIR)/urogue
 
-GET = co
+distrib: library
+	@-mkdir $(DISTRIBDIR)
+	@chmod 755 $(DISTRIBDIR)
+	@-rm -f $(DISTRIBDIR)/*
+	cp distfiles/Makefile.INST $(DISTRIBDIR)/Makefile
+	cp distfiles/README commands/tunable.c commands/control.o $(DISTRIBDIR)
+	cp rogue/libsrogue.o $(DISTRIBDIR)
+	@chmod 644 $(DISTRIBDIR)/*
 
-all: install
+library: control
+	cd hdrs; make rogue.h
+	cd rogue ; make libsrogue.o
 
-allclean: rogueclean distribclean clean
+control:
+	cd commands; make control
 
-$(SOURCES):
-	@$(GET) $@
+print: commands/print_a commands/print_i commands/print_m commands/print_w
+	cd commands; make print
 
-install: $(DISTRIB)
-	@-mkdir $(INSD)
-##	@chmod 755 $(INSD)
-	@-rm -f $(INSD)/*
-	cp Makefile.install $(INSD)/Makefile
-	cp BUGS README lav.c tunable.c $(LIB) control.o namefinder.o $(INSD)
-	@chmod 644 $(INSD)/*
-	
-control: control.o $(TUNABLE)
-	cc -O control.o $(TUNABLE) -s -o control
+clean:
+	cd commands; make clean
+	cd rogue; make clean
+	rm -f core urogue
 
-clobber:
-	rm -rf control namefinder *.o
+tags:
+	cd rogue; make tags
 
-tunable.o: tunable.h
-control.o: tunable.h
-namefinder.o: tunable.h
-
-$(LIB): tunable.o
-	@echo "making rogue distrib..."
-	@cd rogue ; make distrib
-
-rogue:
-	@echo "making rogue..."
-	@cd rogue ; make rogue
-
-clean: clobber
-
-rogueclean:
-	@echo "making rogue clean"
-	@cd rogue ; make clean
-	
-distribclean:
-	@echo "making distrib clean"
-	rm -rf $(INSD)
+lint:
+	cd rogue; make lint

@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Function(s) for dealing with potions
  */
 
@@ -149,9 +152,15 @@ bool blessed;
 			add_const(cursed);
 		    else switch (ctype) {
 			when C_FIGHTER: add_strength(cursed);
+			when C_PALADIN: add_strength(cursed);
+			when C_RANGER: add_strength(cursed);
 			when C_MAGICIAN: add_intelligence(cursed);
+			when C_ILLUSION: add_intelligence(cursed);
 			when C_CLERIC:	add_wisdom(cursed);
+			when C_DRUID:	add_wisdom(cursed);
 			when C_THIEF:	add_dexterity(cursed);
+			when C_ASSASIN:	add_dexterity(cursed);
+			when C_NINJA:	add_dexterity(cursed);
 			otherwise:	msg("You're a strange type!");
 		    }
 		}
@@ -260,7 +269,7 @@ bool blessed;
 
 		    th = (struct thing *) ldata(titem);
 		    for(pitem=th->t_pack; pitem!=NULL; pitem=next(pitem)) {
-			if (is_magic(ldata(pitem))) {
+			if (is_magic((struct thing *) ldata(pitem))) {
 			    show = TRUE;
 			    mvwaddch(hw, th->t_pos.y, th->t_pos.x, MAGIC);
 			}
@@ -561,26 +570,37 @@ bool blessed;
     }
     if (is_potion) discard(item);
     updpack(TRUE);
- }
+}
 
- /* Lower a level of experience */
+/* Lower a level of experience */
 
- lower_level(who)
- short who;
- {
-    int fewer, nsides;
+lower_level(who)
+short who;
+{
+    int fewer, nsides, i;
 
     if (--pstats.s_lvl == 0) {
 	death(who);		/* All levels gone */
 	return;
     }
     msg("You suddenly feel less skillful.");
-    pstats.s_exp /= 2;
+    pstats.s_exp = 1L;
+    init_exp();
+    for (i = 2; i <= pstats.s_lvl; i++) {
+	if (max_stats.s_exp < 0x3fffffffL) 	/* 2^30 - 1 */
+	    max_stats.s_exp *= 2L;		/* twice as many for next */
+    }
     switch (player.t_ctype) {
 	when C_FIGHTER:		nsides = 12;
+	when C_PALADIN:		nsides = 12;
+	when C_RANGER:		nsides = 12;
 	when C_MAGICIAN:	nsides = 4;
+	when C_ILLUSION:	nsides = 4;
 	when C_CLERIC:		nsides = 8;
+	when C_DRUID:		nsides = 8;
 	when C_THIEF:		nsides = 6;
+	when C_ASSASIN:		nsides = 6;
+	when C_NINJA:		nsides = 6;
     }
     fewer = max(1, roll(1,nsides) + const_bonus());
     pstats.s_hpt -= fewer;
@@ -591,34 +611,35 @@ bool blessed;
 	death(who);
 	return;
     }
- }
+}
 
- /*
+/*
  * res_dexterity:
  *	Restore player's dexterity
  */
 
- res_dexterity()
- {
+res_dexterity()
+{
     if (lost_dext) {
 	chg_dext(lost_dext, FALSE, FALSE);
 	lost_dext = 0;
     }
     else {
 	pstats.s_dext = max_stats.s_dext + ring_value(R_ADDHIT) +
-		(on(player, POWERDEXT) ? 10 : 0);
+		(on(player, POWERDEXT) ? 10 : 0) +
+		(on(player, SUPERHERO) ? 5 : 0);
     }
 
- }
+}
 
 
- /*
+/*
  * res_wisdom:
  *	Restore player's wisdom
  */
 
- res_wisdom()
- {
+res_wisdom()
+{
     int ring_str;
 
     /* Discount the ring value */
@@ -630,15 +651,15 @@ bool blessed;
 
     /* Redo the rings */
     pstats.s_wisdom += ring_str;
- }
+}
 
- /*
+/*
  * res_intelligence:
  *	Restore player's intelligence
  */
 
- res_intelligence()
- {
+res_intelligence()
+{
     int ring_str;
 
     /* Discount the ring value */
@@ -650,16 +671,16 @@ bool blessed;
 
     /* Redo the rings */
     pstats.s_intel += ring_str;
- }
+}
 
 
- /*
+/*
  * Increase player's strength
  */
 
- add_strength(cursed)
- bool cursed;
- {
+add_strength(cursed)
+bool cursed;
+{
 
     if (cursed) {
 	msg("You feel slightly weaker now.");
@@ -674,15 +695,15 @@ bool blessed;
 	else
 	    chg_str(1, TRUE, FALSE);
     }
- }
+}
 
 
- /*
+/*
  * Increase player's intelligence
  */
- add_intelligence(cursed)
- bool cursed;
- {
+add_intelligence(cursed)
+bool cursed;
+{
     int ring_str;	/* Value of ring strengths */
 
     /* Undo any ring changes */
@@ -705,16 +726,16 @@ bool blessed;
 
     /* Now put back the ring changes */
     pstats.s_intel += ring_str;
- }
+}
 
 
- /*
+/*
  * Increase player's wisdom
  */
 
- add_wisdom(cursed)
- bool cursed;
- {
+add_wisdom(cursed)
+bool cursed;
+{
     int ring_str;	/* Value of ring strengths */
 
     /* Undo any ring changes */
@@ -737,16 +758,16 @@ bool blessed;
 
     /* Now put back the ring changes */
     pstats.s_wisdom += ring_str;
- }
+}
 
 
- /*
+/*
  * Increase player's dexterity
  */
 
- add_dexterity(cursed)
- bool cursed;
- {
+add_dexterity(cursed)
+bool cursed;
+{
     /* Now do the potion */
     if (cursed) {
 	msg("You feel less dextrous now.");
@@ -760,17 +781,17 @@ bool blessed;
 	}
 	else
 	    chg_dext(1, TRUE, FALSE);
-   }
- }
+    }
+}
 
 
- /*
+/*
  * Increase player's constitution
  */
 
- add_const(cursed)
- bool cursed;
- {
+add_const(cursed)
+bool cursed;
+{
     /* Do the potion */
     if (cursed) {
 	msg("You feel slightly less healthy now.");
@@ -786,4 +807,4 @@ bool blessed;
     /* Adjust the maximum */
     if (max_stats.s_const < pstats.s_const - (on(player, POWERCONST) ? 10 : 0))
 	max_stats.s_const = pstats.s_const;
- }
+}

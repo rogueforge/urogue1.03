@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * This file contains functions for dealing with artifacts
  */
 
@@ -72,7 +75,7 @@ apply()
 		    return;
 	    }
 	}
-	if (rnd(pstats.s_lvl) < 8)
+	if (rnd(pstats.s_lvl) < 6)
 	    do_minor(obj);
 	turn_on(player, POWEREAT);
 }
@@ -168,14 +171,14 @@ struct object *tr;
 {
     register int which;
 
-    which = rnd(110);
+    which = rnd(115);
     if (wizard) {
 	msg("Which minor effect? (%d)", which);
 	if(get_str(prbuf,cw) == NORM) {
 	    which = atoi(prbuf);
-	    if(which < 0 || which > 109) {
+	    if(which < 0 || which > 104) {
 		msg("Invalid selection.");
-		which = rnd(110);
+		which = rnd(105);
 	    }
 	}
     }
@@ -281,7 +284,7 @@ struct object *tr;
 		    fuse(un_itch, 0, roll(4,6), AFTER);
 		}
 		else 
-		    lengthen(un_itch, 0, roll(4,6), AFTER);
+		    lengthen(un_itch, roll(4,6));
 	when 21:
 		if (off(player, ISBLIND))
 		   msg("Your skin begins to flake and peel.");
@@ -532,8 +535,10 @@ struct object *tr;
 
 		for (item = pack; item != NULL; item = next(item)) {
 		    obj = OBJPTR(item);
-		    if (obj->o_type != ARTIFACT && rnd(8) == 0)
+		    if (obj->o_type != ARTIFACT && rnd(8) == 0) {
 			obj->o_flags |= ISCURSED;
+			obj->o_flags &= ~ISBLESSED;
+		    }
 		}
 		if (off(player, ISUNSMELL))
 		    msg("You smell a faint trace of burning sulfur.");
@@ -693,7 +698,7 @@ struct object *tr;
 		    traps[ntraps].tr_show = FIRETRAP;
 		    traps[ntraps].tr_pos.x = fires.x;
 		    traps[ntraps].tr_pos.y = fires.y;
-		    if ((rp == roomin(&hero)) != NULL)
+		    if ((rp = roomin(&hero)) != NULL)
 			rp->r_flags &= ~ISDARK;
 		}
 	}
@@ -755,17 +760,7 @@ struct object *tr;
 		    cur_weapon->o_dplus = -rnd(3);
 		else
 		    cur_weapon->o_dplus -= rnd(3);
-		cur_weapon->o_flags |= ISCURSED;
-		cur_weapon->o_flags |= ISLOST;
-		cur_weapon->o_flags &= ~ISOWNED;
-		cur_weapon->o_flags &= ~CANRETURN;
-		cur_weapon->o_flags &= ~ISPOISON;
-		cur_weapon->o_flags &= ~ISZAPPED;
-		cur_weapon->o_flags &= ~ISKNOW;
-		cur_weapon->o_flags &= ~ISPROT;
-		cur_weapon->o_flags &= ~ISSILVER;
-		cur_weapon->o_flags &= ~CANBURN;
-		cur_weapon->o_flags &= ~ISHOLY;
+		cur_weapon->o_flags = ISCURSED|ISLOST;
 		cur_weapon->o_ac = 0;
     }
 }
@@ -778,7 +773,7 @@ do_phial()
     register int which;
 
     /* Prompt for action */
-    msg("How do you wish to apply the Phial of Galadriel? (* for list): ");
+    msg("How do you wish to apply the Phial of Galadriel (* for list)? ");
 
     which = (short) ((getchar() & 0177) - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
@@ -786,17 +781,11 @@ do_phial()
 	return;
     }
     if (which < 0 || which > 1) {
+	add_line( "[a] light");
+	add_line( "[b] monster confusion");
+	end_line();
 	msg("");
-	clearok(cw, TRUE);
-	touchwin(cw);
-
-	wclear(hw);
-	touchwin(hw);
-	mvwaddstr(hw, 2, 0, "[a]	light");
-	mvwaddstr(hw, 3, 0, "[b]	monster confusion");
-	wmove(hw, 0, 0);
-	wprintw(hw, "Which power do you wish to use?");
-	draw(hw);
+	msg("Which power do you wish to use? ");
 	which = (short) ((getchar() & 0177) - 'a');
 	while (which < 0 || which > 1) {
 	    if (which == (short) ESCAPE - (short) 'a') {
@@ -804,16 +793,10 @@ do_phial()
 		return;
 	    }
 	    msg("");
-	    wmove(hw, 0, 0);
-	    wclrtoeol(hw);
-	    waddstr(hw, "Please enter one of the listed powers. ");
-	    draw(hw);
+	    msg("Please enter one of the listed powers: ");
 	    which = (short) ((getchar() & 0177) - 'a');
 	}
-	mvwaddstr(hw, 0, 0, "Your attempt is successful.--More--");
-	wclrtoeol(hw);
-	draw(hw);
-	wait_for(' ');
+	msg("Your attempt is successful.");
     }
     else
 	msg("Your attempt is successsful.");
@@ -835,7 +818,7 @@ do_palantir()
     register int which, limit;
 
     /* Prompt for action */
-    msg("How do you wish to apply the Palantir of Might? (* for list): ");
+    msg("How do you wish to apply the Palantir of Might (* for list)? ");
 
     limit = 3;
     if (is_carrying(TR_SCEPTRE))
@@ -850,39 +833,26 @@ do_palantir()
     }
     if (which < 0 || which > limit) {
 	msg("");
-	clearok(cw, TRUE);
-	touchwin(cw);
-
-	wclear(hw);
-	touchwin(hw);
-	mvwaddstr(hw, 2, 0, "[a]	monster detection");
-	mvwaddstr(hw, 3, 0, "[b]	gold detection");
-	mvwaddstr(hw, 4, 0, "[c]	magic detection");
-	mvwaddstr(hw, 5, 0, "[d]	food detection");
+	add_line( "[a] monster detection");
+	add_line( "[b] gold detection");
+	add_line( "[c] magic detection");
+	add_line( "[d] food detection");
 	if (limit >= 4)
-	    mvwaddstr(hw, 6, 0, "[e]	teleportation");
+	    add_line( "[e] teleportation");
 	if (limit >= 5)
-	    mvwaddstr(hw, 7, 0, "[f]	clear thought");
-	wmove(hw, 0, 0);
-	wprintw(hw, "Which power do you wish to use?");
-	draw(hw);
+	    add_line( "[f] clear thought");
+	end_line();
+	msg("Which power do you wish to use?");
 	which = (short) ((getchar() & 0177) - 'a');
 	while (which < 0 || which > limit) {
 	    if (which == (short) ESCAPE - (short) 'a') {
 		after = FALSE;
 		return;
 	    }
-	    msg("");
-	    wmove(hw, 0, 0);
-	    wclrtoeol(hw);
-	    waddstr(hw, "Please enter one of the listed powers. ");
-	    draw(hw);
+	    msg("Please enter one of the listed powers: ");
 	    which = (short) ((getchar() & 0177) - 'a');
 	}
-	mvwaddstr(hw, 0, 0, "Your attempt is successful.--More--");
-	wclrtoeol(hw);
-	draw(hw);
-	wait_for(' ');
+	msg("Your attempt is successful.");
     }
     else
 	msg("Your attempt is successful.");
@@ -906,7 +876,7 @@ do_silmaril()
     register int which;
 
     /* Prompt for action */
-    msg("How do you wish to apply the Silamril of Ea? (* for list): ");
+    msg("How do you wish to apply the Silamril of Ea (* for list)? ");
 
     which = (short) ((getchar() & 0177) - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
@@ -915,17 +885,11 @@ do_silmaril()
     }
     if (which < 0 || which > 2) {
 	msg("");
-	clearok(cw, TRUE);
-	touchwin(cw);
-
-	wclear(hw);
-	touchwin(hw);
-	mvwaddstr(hw, 2, 0, "[a]	magic mapping");
-	mvwaddstr(hw, 3, 0, "[b]	petrification");
-	mvwaddstr(hw, 4, 0, "[c]	stairwell downwards");
-	wmove(hw, 0, 0);
-	wprintw(hw, "Which power do you wish to use?");
-	draw(hw);
+	add_line( "[a] magic mapping");
+	add_line( "[b] petrification");
+	add_line( "[c] stairwell downwards");
+	end_line();
+	msg("Which power do you wish to use?");
 	which = (short) ((getchar() & 0177) - 'a');
 	while (which < 0 || which > 2) {
 	    if (which == (short) ESCAPE - (short) 'a') {
@@ -933,16 +897,10 @@ do_silmaril()
 		return;
 	    }
 	    msg("");
-	    wmove(hw, 0, 0);
-	    wclrtoeol(hw);
-	    waddstr(hw, "Please enter one of the listed powers. ");
-	    draw(hw);
+	    msg("Please enter one of the listed powers: ");
 	    which = (short) ((getchar() & 0177) - 'a');
 	}
-	mvwaddstr(hw, 0, 0, "Your attempt is successful.--More--");
-	wclrtoeol(hw);
-	draw(hw);
-	wait_for(' ');
+	msg("Your attempt is successful.");
     }
     else
 	msg("Your attempt is successful.");
@@ -966,7 +924,7 @@ do_amulet()
     register int which, limit;
 
     /* Prompt for action */
-    msg("How do you wish to apply the Amulet of Yendor? (* for list): ");
+    msg("How do you wish to apply the Amulet of Yendor (* for list)? ");
 
     limit = 0;
     if (is_carrying(TR_PURSE))
@@ -978,17 +936,11 @@ do_amulet()
     }
     if (which < 0 || which > limit) {
 	msg("");
-	clearok(cw, TRUE);
-	touchwin(cw);
-
-	wclear(hw);
-	touchwin(hw);
-	mvwaddstr(hw, 2, 0, "[a]	level evaluation");
+	add_line( "[a] level evaluation");
 	if (limit >= 1)
-	    mvwaddstr(hw, 3, 0, "[b]	invisibility");
-	wmove(hw, 0, 0);
-	wprintw(hw, "Which power do you wish to use?");
-	draw(hw);
+	    add_line( "[b] invisibility");
+	end_line();
+	msg("Which power do you wish to use?");
 	which = (short) ((getchar() & 0177) - 'a');
 	while (which < 0 || which > limit) {
 	    if (which == (short) ESCAPE - (short) 'a') {
@@ -996,16 +948,10 @@ do_amulet()
 		return;
 	    }
 	    msg("");
-	    wmove(hw, 0, 0);
-	    wclrtoeol(hw);
-	    waddstr(hw, "Please enter one of the listed powers. ");
-	    draw(hw);
+	    msg("Please enter one of the listed powers: ");
 	    which = (short) ((getchar() & 0177) - 'a');
 	}
-	mvwaddstr(hw, 0, 0, "Your attempt is successful.--More--");
-	wclrtoeol(hw);
-	draw(hw);
-	wait_for(' ');
+	msg("Your attempt is successful.");
     }
     else
 	msg("Your attempt is successful.");
@@ -1082,7 +1028,7 @@ struct object *obj;
     register int which, limit;
 
     /* Prompt for action */
-    msg("How do you wish to apply the Magic Purse of Yendor? (* for list): ");
+    msg("How do you wish to apply the Magic Purse of Yendor (* for list)? ");
 
     which = (short) ((getchar() & 0177) - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
@@ -1096,19 +1042,13 @@ struct object *obj;
 
     if (which < 0 || which > limit) {
 	msg("");
-	clearok(cw, TRUE);
-	touchwin(cw);
-
-	wclear(hw);
-	touchwin(hw);
-	mvwaddstr(hw, 2, 0, "[a]	inventory");
-	mvwaddstr(hw, 3, 0, "[b]	add to bag");
-	mvwaddstr(hw, 4, 0, "[c]	remove from bag");
+	add_line( "[a] inventory");
+	add_line( "[b] add to bag");
+	add_line( "[c] remove from bag");
 	if (limit >= 3)
-	    mvwaddstr(hw, 5, 0, "[d]	see invisible");
-	wmove(hw, 0, 0);
-	wprintw(hw, "Which power do you wish to use?");
-	draw(hw);
+	    add_line( "[d] see invisible");
+	end_line();
+	msg("Which power do you wish to use?");
 	which = (short) ((getchar() & 0177) - 'a');
 	while (which < 0 || which > limit) {
 	    if (which == (short) ESCAPE - (short) 'a') {
@@ -1116,16 +1056,10 @@ struct object *obj;
 		return;
 	    }
 	    msg("");
-	    wmove(hw, 0, 0);
-	    wclrtoeol(hw);
-	    waddstr(hw, "Please enter one of the listed powers. ");
-	    draw(hw);
+	    msg("Please enter one of the listed powers: ");
 	    which = (short) ((getchar() & 0177) - 'a');
 	}
-	mvwaddstr(hw, 0, 0, "Your attempt is successful.--More--");
-	wclrtoeol(hw);
-	draw(hw);
-	wait_for(' ');
+	msg("Your attempt is successful.");
     }
     else
 	msg("Your attempt is successful.");
@@ -1145,7 +1079,7 @@ struct object *obj;
 		    if (add_pack(item, FALSE) == FALSE) {
 			op = (struct object *) ldata(item);
 			op->o_pos = hero;
-			fall(item, TRUE);
+			fall(&player, item, TRUE);
 		    }
 		}
 	}
@@ -1164,7 +1098,7 @@ do_sceptre()
     register int which, limit;
 
     /* Prompt for action */
-    msg("How do you wish to apply the Sceptre of Might? (* for list): ");
+    msg("How do you wish to apply the Sceptre of Might (* for list)? ");
 
     which = (short) ((getchar() & 0177) - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
@@ -1180,24 +1114,18 @@ do_sceptre()
 
     if (which < 0 || which > limit) {
 	msg("");
-	clearok(cw, TRUE);
-	touchwin(cw);
-
-	wclear(hw);
-	touchwin(hw);
-	mvwaddstr(hw, 2, 0, "[a]	cancellation");
-	mvwaddstr(hw, 3, 0, "[b]	polymorph monster");
-	mvwaddstr(hw, 4, 0, "[c]	slow monster");
-	mvwaddstr(hw, 5, 0, "[d]	teleport monster");
-	mvwaddstr(hw, 6, 0, "[e]	monster confusion");
-	mvwaddstr(hw, 7, 0, "[f]	paralyze monster");
+	add_line( "[a] cancellation");
+	add_line( "[b] polymorph monster");
+	add_line( "[c] slow monster");
+	add_line( "[d] teleport monster");
+	add_line( "[e] monster confusion");
+	add_line( "[f] paralyze monster");
 	if (limit >= 6)
-	    mvwaddstr(hw, 8, 0, "[g]	drain life");
+	    add_line( "[g] drain life");
 	if (limit >= 7)
-	    mvwaddstr(hw, 9, 0, "[h]	smell monster");
-	wmove(hw, 0, 0);
-	wprintw(hw, "Which power do you wish to use?");
-	draw(hw);
+	    add_line( "[h] smell monster");
+	end_line();
+	msg("Which power do you wish to use?");
 	which = (short) ((getchar() & 0177) - 'a');
 	while (which < 0 || which > limit) {
 	    if (which == (short) ESCAPE - (short) 'a') {
@@ -1205,16 +1133,10 @@ do_sceptre()
 		return;
 	    }
 	    msg("");
-	    wmove(hw, 0, 0);
-	    wclrtoeol(hw);
-	    waddstr(hw, "Please enter one of the listed powers. ");
-	    draw(hw);
+	    msg("Please enter one of the listed powers: ");
 	    which = (short) ((getchar() & 0177) - 'a');
 	}
-	mvwaddstr(hw, 0, 0, "Your attempt is successful.--More--");
-	wclrtoeol(hw);
-	draw(hw);
-	wait_for(' ');
+	msg("Your attempt is successful.");
     }
     else
 	msg("Your attempt is successful.");
@@ -1227,9 +1149,9 @@ do_sceptre()
 	    if(get_str(prbuf,cw) == NORM) {
 		which = atoi(prbuf);
 		if(which < 0 || which > 5) {
-		msg("Invalid selection.");
-		which = rnd(6);
-		msg("Rolled %d.", which);
+			msg("Invalid selection.");
+			which = rnd(6);
+			msg("Rolled %d.", which);
 		}
 	    }
 	}
@@ -1264,7 +1186,7 @@ do_wand()
     register int which, i;
 
     /* Prompt for action */
-    msg("How do you wish to apply the Wand of Orcus? (* for list): ");
+    msg("How do you wish to apply the Wand of Orcus (* for list)? ");
 
     which = (short) ((getchar() & 0177) - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
@@ -1274,18 +1196,12 @@ do_wand()
 
     if (which < 0 || which >= MAXSTICKS) {
 	msg("");
-	clearok(cw, TRUE);
-	touchwin(cw);
-
-	wclear(hw);
-	touchwin(hw);
 	for (i = 0; i < MAXSTICKS; i++) {
-	    sprintf(prbuf, "[%c]	%s", i + 'a', ws_magic[i].mi_name);
-	    mvwprintw(hw, i+2, 0, prbuf);
+	    sprintf(prbuf, "[%c] %s", i + 'a', ws_magic[i].mi_name);
+	    add_line(prbuf);
 	}
-	wmove(hw, 0, 0);
-	wprintw(hw, "Which power do you wish to use?");
-	draw(hw);
+	end_line();
+	msg("Which power do you wish to use?");
 	which = (short) ((getchar() & 0177) - 'a');
 	while (which < 0 || which >= MAXSTICKS) {
 	    if (which == (short) ESCAPE - (short) 'a') {
@@ -1293,16 +1209,10 @@ do_wand()
 		return;
 	    }
 	    msg("");
-	    wmove(hw, 0, 0);
-	    wclrtoeol(hw);
-	    waddstr(hw, "Please enter one of the listed powers. ");
-	    draw(hw);
+	    msg("Please enter one of the listed powers: ");
 	    which = (short) ((getchar() & 0177) - 'a');
 	}
-	mvwaddstr(hw, 0, 0, "Your attempt is successful.--More--");
-	wclrtoeol(hw);
-	draw(hw);
-	wait_for(' ');
+	msg("Your attempt is successful.");
     }
     else
 	msg("Your attempt is successful.");
@@ -1335,7 +1245,7 @@ do_crown()
     register int which, limit;
 
     /* Prompt for action */
-    msg("How do you wish to apply the Crown of Might? (* for list): ");
+    msg("How do you wish to apply the Crown of Might (* for list)? ");
 
     which = (short) ((getchar() & 0177) - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
@@ -1351,28 +1261,22 @@ do_crown()
 
     if (which < 0 || which > limit) {
 	msg("");
-	clearok(cw, TRUE);
-	touchwin(cw);
-
-	wclear(hw);
-	touchwin(hw);
-	mvwaddstr(hw, 2, 0, "[a]	add strength");
-	mvwaddstr(hw, 3, 0, "[b]	add intelligence");
-	mvwaddstr(hw, 4, 0, "[c]	add wisdom");
-	mvwaddstr(hw, 5, 0, "[d]	add dexterity");
-	mvwaddstr(hw, 6, 0, "[e]	add constitution");
-	mvwaddstr(hw, 7, 0, "[f]	normal strength");
-	mvwaddstr(hw, 8, 0, "[g]	normal intelligence");
-	mvwaddstr(hw, 9, 0, "[h]	normal wisdom");
-	mvwaddstr(hw, 10, 0, "[i]	normal dexterity");
-	mvwaddstr(hw, 11, 0, "[j]	normal constitution");
+	add_line( "[a] add strength");
+	add_line( "[b] add intelligence");
+	add_line( "[c] add wisdom");
+	add_line( "[d] add dexterity");
+	add_line( "[e] add constitution");
+	add_line( "[f] normal strength");
+	add_line( "[g] normal intelligence");
+	add_line( "[h] normal wisdom");
+	add_line( "[i] normal dexterity");
+	add_line( "[j] normal constitution");
 	if (limit >= 10)
-	    mvwaddstr(hw, 12, 0, "[k]	disguise");
+	    add_line( "[k] disguise");
 	if (limit >= 11)
-	    mvwaddstr(hw, 13, 0, "[l]	super heroism");
-	wmove(hw, 0, 0);
-	wprintw(hw, "Which power do you wish to use?");
-	draw(hw);
+	    add_line( "[l] super heroism");
+	end_line();
+	msg("Which power do you wish to use?");
 	which = (short) ((getchar() & 0177) - 'a');
 	while (which < 0 || which > limit) {
 	    if (which == (short) ESCAPE - (short) 'a') {
@@ -1380,16 +1284,10 @@ do_crown()
 		return;
 	    }
 	    msg("");
-	    wmove(hw, 0, 0);
-	    wclrtoeol(hw);
-	    waddstr(hw, "Please enter one of the listed powers. ");
-	    draw(hw);
+	    msg("Please enter one of the listed powers: ");
 	    which = (short) ((getchar() & 0177) - 'a');
 	}
-	mvwaddstr(hw, 0, 0, "Your attempt is successful.--More--");
-	wclrtoeol(hw);
-	draw(hw);
-	wait_for(' ');
+	msg("Your attempt is successful.");
     }
     else
 	msg("Your attempt is successful.");
@@ -1610,7 +1508,7 @@ register struct linked_list **bag;
 	return NULL;
     }
     for(;;) {
-	msg("remove what? (* for list): ");
+	msg("remove what (* for list)? ");
 	ch = readchar();
 	mpos = 0;
 	if (ch == ESCAPE) {		/* abort if escape hit */
@@ -1619,21 +1517,17 @@ register struct linked_list **bag;
 	    return NULL;
 	}
 	if (ch == '*') {
-	    wclear(hw);
+	    char b[LINELEN];
+
 	    pit = *bag;		/* point to bag */
 	    cnt = 0;
 	    for (ch = 'a'; pit != NULL ; pit = next(pit), ch++) {
 		pob = OBJPTR(pit);
-		wprintw(hw,"%c) %s\n\r",pit->l_letter,inv_name(pob,FALSE));
-		if (++cnt >= LINES - 2 && next(pit) != NULL) {
-		    cnt = 0;
-		    dbotline(hw, spacemsg);
-		    wclear(hw);
-		}
+		sprintf(b,"%c) %s",pit->l_letter,inv_name(pob,FALSE));
+		add_line(b);
 	    }
-	    wmove(hw, LINES - 1,0);
-	    wprintw(hw,"remove what? ");
-	    draw(hw);		/* write screen */
+	    end_line();
+	    msg("remove what? ");
 	    anr = FALSE;
 	    do {
 		ch = readchar();
@@ -1642,7 +1536,6 @@ register struct linked_list **bag;
 		if (isalpha(ch) || ch == ESCAPE)
 		    anr = TRUE; 
 	    } while(!anr);		/* do till we got it right */
-	    restscr(cw);		/* redraw orig screen */
 	    if(ch == ESCAPE) {
 		after = FALSE;
 		msg("");		/* clear top line */
@@ -1676,18 +1569,9 @@ register struct linked_list *list;
     n_objs = 0;
     for (ch = 'a'; list != NULL; ch++, list = next(list)) {
 	obj = (struct object *) ldata(list);
-	switch (n_objs++) {
-	    case 0:
-		sprintf(inv_temp, "%c) %s", list->l_letter, 
-			inv_name(obj, FALSE));
-		break;
-	    case 1:
-		wclear(hw);
-		waddstr(hw, inv_temp);
-		waddch(hw, '\n');
-	    default:
-		wprintw(hw, "%c) %s\n", list->l_letter, inv_name(obj, FALSE));
-	}
+	sprintf(inv_temp, "%c) %s", list->l_letter, inv_name(obj, FALSE));
+	add_line(inv_temp);
+	n_objs++;
     }
     if (n_objs == 0) {
 	msg("Your bag is empty." );
@@ -1697,11 +1581,7 @@ register struct linked_list *list;
 	msg(inv_temp);
 	return;
     }
-    mvwaddstr(hw, LINES-1, 0, spacemsg);
-    draw(hw);
-    wait_for(' ');
-    clearok(cw, TRUE);
-    touchwin(cw);
+    end_line();
 }
 
 bag_char(obj,bag)

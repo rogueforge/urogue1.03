@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Stuff to do with encumberence
  *
  * @(#)encumb.c	7.0	(Bell Labs)	10/08/82
@@ -142,7 +145,7 @@ wghtchk()
 	    extinguish(wghtchk);
 	    msg("Your pack is too heavy for you.");
 	    do {
-		dropchk = drop(NULL);
+		dropchk = drop((struct linked_list *) NULL);
 		if(dropchk == NULL) {
 		    mpos = 0;
 		    msg("You must drop something.");

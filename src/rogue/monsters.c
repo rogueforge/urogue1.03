@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * File with various monster functions in it
  *
  */
@@ -9,13 +12,74 @@
 #include "mach_dep.h"
 
 /*
+ * summon_monster:
+ *     Summon a monster.
+ */
+struct linked_list *
+summon_monster(type,familiar,quiet)
+short
+    type; 
+bool
+    familiar,quiet;
+{
+register struct linked_list
+    *mp;
+register struct thing
+    *tp;
+short
+    monster;
+
+    if (type == 0) {	/* Summon a random monster modified by level */
+    register int
+	index;
+
+	index = pstats.s_lvl + rnd(pstats.s_lvl);
+	if (index >= 100)
+	    index = 100 + rnd(25);
+
+	monster = index;
+    } else
+	monster = type;
+
+    turn_on(player, SUMMONING);
+    if ( !(mp = creat_mons(&player, monster, FALSE))) {
+        msg("Summon failed.");
+	turn_off(player, SUMMONING);
+	return(NULL);
+    }
+    else {
+	if (!quiet) {
+	    msg("A %s appears out of nowhere!",monsters[monster].m_name);
+	    if (familiar)
+	        msg("I am here to do your bidding master.");
+	    else
+		msg("Oh my goodness!  Are you Larry? ");
+	}
+	tp = THINGPTR(mp);
+	turn_on(*tp,ISCHARMED); /* Summoned monsters are always charmed */
+	if (familiar) {
+	    if (familiar_ptr)
+		killed(NULL, familiar_ptr, FALSE, FALSE);
+	    turn_on(*tp, ISREGEN); 	/* Familiars can regenerate */
+	    turn_on(*tp, ISSCAVENGE);   /* and pick up things */
+	    turn_on(*tp, ISFAMILIAR);
+	    familiar_ptr = mp;
+	    familiar_type = monster;
+	}
+	turn_off(player, SUMMONING);
+	return(mp);
+    }
+}
+
+/*
  * randmonster:
  *	Pick a monster to show up.  The lower the level,
  *	the meaner the monster.
  */
 
-short randmonster(wander, no_unique)
-register bool wander, no_unique;
+short
+randmonster(wander, no_summon)
+register bool wander, no_summon;
 {
     register int d, cur_level, range, i; 
 
@@ -37,11 +101,11 @@ register bool wander, no_unique;
 	d = NLEVMONS*(cur_level - 1) + (rnd(range) - (range - 1 - NLEVMONS));
 	if (d < 1)
 	    d = rnd(NLEVMONS) + 1;
-	if (d > NUMMONST - NUMUNIQUE - 1) {
-	    if (no_unique)
-		d = rnd(range) + (NUMMONST - NUMUNIQUE - 1) - (range - 1);
+	if (d > NUMMONST - NUMSUMMON - 1) {
+	    if (no_summon)
+		d = rnd(range) + (NUMMONST - NUMSUMMON - 1) - (range - 1);
 	    else if (d > NUMMONST - 1)
-		d = rnd(range+NUMUNIQUE) + (NUMMONST-1) - (range+NUMUNIQUE-1);
+		d = rnd(range+NUMSUMMON) + (NUMMONST-1) - (range+NUMSUMMON-1);
 	}
     }
     while  ( wander ? !monsters[d].m_wander || !monsters[d].m_normal 
@@ -57,8 +121,8 @@ register bool wander, no_unique;
 new_monster(item, type, cp, max_monster)
 struct linked_list *item;
 short type;
+register coord *cp;
 bool max_monster;
-coord *cp;
 {
     register struct thing *tp;
     register struct monster *mp;
@@ -75,8 +139,8 @@ coord *cp;
     tp->t_ctype = C_MONSTER;
     tp->t_no_move = 0;
     tp->t_doorgoal = -1;
-    bcopy (cp, &tp->t_oldpos, sizeof (coord));
-    tp->t_pos = tp->t_oldpos;  
+    tp->t_pos = *cp;
+    tp->t_oldpos = *cp;
     tp->t_oldch = mvwinch(cw, cp->y, cp->x);
     mvwaddch(mw, cp->y, cp->x, tp->t_type);
     mp = &monsters[tp->t_index];
@@ -120,8 +184,8 @@ coord *cp;
 	tp->t_stats.s_dext += roll(2,(max_level-50)/8);
 
     /* Set the initial flags */
-    for (i=0; i<4; i++) tp->t_flags[i] = 0;
-    for (i=0; i<10; i++)
+    for (i=0; i<16; i++) tp->t_flags[i] = 0;
+    for (i=0; i<16; i++)
 	turn_on(*tp, mp->m_flags[i]);
 
     /* suprising monsters don't always surprise you */
@@ -151,7 +215,7 @@ coord *cp;
     tp->maxstats = tp->t_stats;
 
     /* If the monster can shoot, it may have a weapon */
-    if (on(*tp, CANSHOOT) && (rnd(100) < 25 || max_monster)) {
+    if (on(*tp, CANSHOOT) && (rnd(9) < 6 || max_monster)) {
 	struct linked_list *item, *item1;
 	register struct object *cur, *cur1;
 
@@ -250,31 +314,45 @@ coord *cp;
 
 wanderer()
 {
-    register int i;
+    register int i, count = 0;
     register struct room *hr = roomin(&hero);
     register struct linked_list *item;
     register struct thing *tp;
     coord cp;
     char *loc;
+    int which;
 
     /* Find a place for it -- avoid the player's room */
     do {
 	do {
+	    count++;
 	    i = rnd_room();
-	} until(hr != &rooms[i] || levtype == MAZELEV || levtype == THRONE);
+	} until(hr != &rooms[i] || levtype == MAZELEV 
+			|| levtype == THRONE || count > 500);
 	rnd_pos(&rooms[i], &cp);
-    } until (step_ok(cp.y, cp.x, NOMONST, NULL));
+    } until (step_ok(cp.y, cp.x, NOMONST, (struct thing *) NULL));
 
     /* Create a new wandering monster */
     item = new_item(sizeof *tp);
-    new_monster(item, randmonster(TRUE, FALSE), &cp, FALSE);
+    which = randmonster(TRUE, FALSE);
+    new_monster(item, which, &cp, FALSE);
     tp = THINGPTR(item);
     turn_on(*tp, ISRUN);
     turn_off(*tp, ISDISGUISE);
     tp->t_dest = &hero;
 
-    /*  Assign the position to the monster  */
-    bcopy (&cp, &tp->t_pos, sizeof cp);
+    tp->t_pos = cp;	/* Assign the position to the monster */
+
+    i = rnd(7);
+    if (on(*tp, ISSWARM) && i < 5)
+	count = roll(2,4);
+    else if (on(*tp, ISFLOCK) && i < 5)
+	count = roll(1,4);
+    else
+	count = 0;
+
+    for (i = 1; i <= count; i++)
+	creat_mons(tp, which, FALSE);
 
     i = DISTANCE(cp.x, cp.y, hero.x, hero.y);
 
@@ -307,15 +385,23 @@ int y, x;
     register char *mname;
 
     if ((it = find_mons(y, x)) == NULL) {
-	debug("Can't find monster in show");
+	debug("Can't find monster in show.");
 	return(NULL);
     }
     tp = THINGPTR(it);
     ch = tp->t_type;
 
+    if ((good_monster(*tp)) || on(player, SUMMONING)) {
+	tp->t_dest = &hero;
+	turn_on(*tp, ISRUN);
+	turn_off(*tp, ISDISGUISE);
+	return(it);
+    }
+
     rp = roomin(&hero);	/* Get the current room for hero */
     trp = roomin(&tp->t_pos); /* Current room for monster */
     mname = monsters[tp->t_index].m_name;
+
 
     /*
      * Let greedy ones guard gold
@@ -361,9 +447,12 @@ int y, x;
 	 * Confusion
 	 */
 	if (on(*tp, CANHUH)) {
-	    if (!save(VS_MAGIC - 
-		    ((cur_armor != NULL && cur_armor->o_which == MITHRIL) 
-				? -5 : 0))) {
+	    if (on(player, CANREFLECT)) {
+		msg("You reflect the gaze of the %s.", mname);
+		msg("The %s is confused !!!", mname);
+		turn_on(*tp, ISHUH);
+	    } else 
+	    if (!save(VS_MAGIC)) {
 		if (off(player, ISCLEAR) && off(player, ISINVIS)) {
 		    if (on(player, ISHUH))
 			lengthen(unconfuse, rnd(20)+HUHDURATION);
@@ -383,8 +472,14 @@ int y, x;
 	}
 
 	/* Sleep */
-	if (on(*tp, CANSNORE) && no_command == 0 &&
-	    !save(VS_PARALYZATION)) {
+        if (on(*tp, CANSNORE)) 
+
+	if (on(player, CANREFLECT)) {
+	    msg("You reflect the gaze of the %s", mname);
+	    msg("The %s falls asleep !!!", mname);
+	    tp->t_no_move += SLEEPTIME;
+	} else
+	if (no_command == 0 && !save(VS_PARALYZATION)) {
  	    if (on(player, ISINVIS))
 		msg("The gaze of the %s has no effect.", mname);
 	    else if (ISWEARING(R_ALERT))
@@ -398,27 +493,65 @@ int y, x;
 
 	/* Fear */
 	if (on(*tp, CANFRIGHTEN)) {
-	    turn_off(*tp, CANFRIGHTEN);
-	    if (!save(VS_WAND - 
-		    ((cur_armor != NULL && cur_armor->o_which == MITHRIL)
-				 ? -5 : 0)) &&
-	        !(on(player, ISFLEE) && (player.t_dest == &tp->t_pos))) {
-		    if (off(player, SUPERHERO) && off(player, ISINVIS)) {
-			turn_on(player, ISFLEE);
-			player.t_dest = &tp->t_pos;
-			msg("The sight of the %s terrifies you.", mname);
-		    }
-		    else
-			msg("My, the %s looks ugly.", mname);
+	    if (on(player, CANREFLECT)) {
+		msg("The %s looks at you and sees its reflection. ", mname);
+		msg("The %s is terrified by its reflection !!!", mname);
+		turn_on(*tp, ISFLEE);
+	    } else {
+	        turn_off(*tp, CANFRIGHTEN);
+	        if (!save(VS_WAND) &&
+	            !(on(player, ISFLEE) && (player.t_dest == &tp->t_pos))) {
+		        if (off(player, SUPERHERO) && off(player, ISINVIS)) {
+			    turn_on(player, ISFLEE);
+			    player.t_dest = &tp->t_pos;
+			    msg("The sight of the %s terrifies you.", mname);
+		        }
+		        else
+			    msg("My, the %s looks ugly.", mname);
+	        }
 	    }
 	}
 
+	/*
+	 * slow
+	 */
+	if (on(*tp, LOOKSLOW)) {
+	    if (on(player, CANREFLECT)) {
+		msg("You reflect the gaze of the %s.", mname);
+		msg("The %s is slowing down !!!", mname);
+		turn_on(*tp, ISSLOW);
+	    } 
+	    else
+	    if (!save(VS_MAGIC)) {
+		if (on(player, ISHASTE)) { /* Already sped up */
+		    extinguish(nohaste);
+		    nohaste();
+		}
+		else {
+		    msg("You feel yourself moving %sslower.",
+			    on(player, ISSLOW) ? "even " : "");
+		    if (on(player, ISSLOW))
+			lengthen(noslow, rnd(4) + 4);
+		    else if (!ISWEARING(R_FREEDOM)) {
+			turn_on(player, ISSLOW);
+			player.t_turn = TRUE;
+			fuse(noslow, 0, rnd(4)+4, AFTER);
+		    }
+		}
+	    }
+	    turn_off(*tp, LOOKSLOW); 
+	}
+
 	/* blinding creatures */
-	if (on(*tp, CANBLIND) && off(player, ISBLIND) && !ISWEARING(R_SEEINVIS)
+	if (on(*tp, CANBLIND)) 
+	if (on(player, CANREFLECT)) {
+	    msg("You reflect the gaze of the %s.", mname);
+	    msg("The %s is blinded !!!", mname);
+	    turn_on(*tp, ISHUH);
+	} else
+	if (off(player, ISBLIND) && !ISWEARING(R_SEEINVIS)
 		&& off(player, ISINVIS)
-		&& !save(VS_WAND - 
-		    ((cur_armor != NULL && cur_armor->o_which == MITHRIL)
-			? -5 : 0))) {
+		&& !save(VS_WAND)) {
 	    msg("The gaze of the %s blinds you.", mname);
 	    turn_on(player, ISBLIND);
 	    fuse(sight, 0, rnd(30)+20, AFTER);
@@ -426,10 +559,17 @@ int y, x;
 	}
 
 	/* Turning to stone */
-	if (on(*tp, LOOKSTONE)) {
+	if (on(*tp, LOOKSTONE)) 
+	if (on(player, CANREFLECT)) {
+	    msg("You reflect the gaze of the %s.", mname);
+	    msg("The %s is turned to stone !!!", mname);
+	    killed(player, it, FALSE, TRUE);
+        } else {
+
 	    turn_off(*tp, LOOKSTONE);
 
-	    if (on(player, CANINWALL) || on(player, ISINVIS))
+	    if (on(player, CANINWALL) || on(player, ISINVIS) || 
+		on(player, CANREFLECT))
 		msg("The gaze of the %s has no effect.", mname);
 	    else {
 		if (!save(VS_PETRIFICATION) && rnd(100) < 3) {
@@ -475,39 +615,24 @@ genocide()
     register struct thing *mp;
     register int i;
     register struct linked_list *nip;
-    register int num_monst = NUMMONST-1, pres_monst=1, num_lines=2*(LINES-3);
+    register int pres_monst=1, num_lines=LINES-3;
     register short which_monst;
-    char monst_name[40];
+    char monst_name[LINELEN*2];
 
     /* Print out the monsters */
-    while (num_monst > 0) {
-	register left_limit;
-
-	if (num_monst < num_lines) left_limit = (num_monst+1)/2;
-	else left_limit = num_lines/2;
-
+    while (pres_monst < NUMMONST) {
 	wclear(hw);
 	touchwin(hw);
 
-	/* Print left column */
 	wmove(hw, 2, 0);
-	for (i=0; i<left_limit; i++) {
+	for (i=0; i<num_lines && pres_monst < NUMMONST; i++) {
 	    sprintf(monst_name, "[%d] %s\n",
 				pres_monst, monsters[pres_monst].m_name);
 	    waddstr(hw, monst_name);
 	    pres_monst++;
 	}
 
-	/* Print right column */
-	for (i=0; i<left_limit && pres_monst<=NUMMONST-1; i++) {
-	    sprintf(monst_name, "[%d] %s",
-				pres_monst, monsters[pres_monst].m_name);
-	    wmove(hw, i+2, COLS/2);
-	    waddstr(hw, monst_name);
-	    pres_monst++;
-	}
-
-	if ((num_monst -= num_lines) > 0) {
+	if (pres_monst < NUMMONST) {
 	    mvwaddstr(hw, LINES-1, 0, morestr);
 	    draw(hw);
 	    wait_for(' ');
@@ -553,23 +678,21 @@ get_monst:
 
 
 /*
- * id_monst returns the index of the monster given its letter
+ * id_monst lists the monsters with the displayed by the character
+ *          unless there is only one in which case it is returned
+ *          as the string
  */
 
-short
+void
 id_monst(monster)
 register char monster;
 {
-    register short result;
+    register int i;
 
-    result = NLEVMONS*level;
-    if (result > NUMMONST) result = NUMMONST;
-
-    for(; result>0; result--)
-	if (monsters[result].m_appear == monster) return(result);
-    for (result=(NLEVMONS*level)+1; result <= NUMMONST; result++)
-	if (monsters[result].m_appear == monster) return(result);
-    return(0);
+    for (i = 1; i <= NUMMONST+2; i++)
+	if (monsters[i].m_appear == monster)
+	    add_line("A %s ", monsters[i].m_name);
+    end_line();
 }
 
 
@@ -585,7 +708,7 @@ register struct thing *tp;
     if (on(*tp, DIDHOLD) && (--hold_count == 0)) turn_off(player, ISHELD);
 
     /* If it has lowered player, give him back a level, maybe */
-    if (on(*tp, DIDDRAIN) && rnd(2) == 0) raise_level();
+    if (on(*tp, DIDDRAIN) && rnd(3) == 0) raise_level();
 
     /* If frightened of this monster, stop */
     if (on(player, ISFLEE) &&
@@ -616,6 +739,7 @@ register struct thing *tp;
     register int i, j, min_worth, nitems, goods, chance, which_item, w;
     register struct object *obj;
     char buffer[LINELEN];
+    char dbuf[LINELEN];
     struct {
 	int which;
 	int plus1, plus2;
@@ -797,13 +921,16 @@ register struct thing *tp;
 	msg("The %s eyes your small purse and departs.",
 			monsters[NUMMONST].m_name);
 	/* Get rid of the monster */
-	killed(item, FALSE, FALSE);
-	monst_dead = TRUE;
+	killed(NULL, item, FALSE, FALSE);
 	return;
     }
 
     /* Display the goods */
-    msg("The %s shows you his wares.--More--", monsters[NUMMONST].m_name);
+    msg("The %s shows you his wares.", monsters[NUMMONST].m_name);
+    wstandout(cw);
+    mvwaddstr(cw, 0, mpos, morestr);
+    wstandend(cw);
+    draw(cw);
     wait_for(' ');
     msg("");
     clearok(cw, TRUE);
@@ -812,30 +939,31 @@ register struct thing *tp;
     wclear(hw);
     touchwin(hw);
     for (i=0; i < nitems; i++) {
-	mvwaddch(hw, i+2, 0, '[');
-	waddch(hw, (char) ((short) 'a' + i));
-	waddstr(hw, "] ");
+	if (selection[i].worth > purse)
+	    continue;
+	wmove(hw, i+2, 0);
+	sprintf(dbuf,"[%c] ", (char) ((short) 'a' + i));
 	switch (goods) {
 	    when ARMOR:
-		waddstr(hw, "Some ");
+		strcat(dbuf, "Some ");
 	    when WEAPON:
 		if (selection[i].count == 1)
-		    waddstr(hw, " A ");
+		    strcat(dbuf, "A ");
 		else {
 		    sprintf(buffer, "%2d ", selection[i].count);
-		    waddstr(hw, buffer);
+		    strcat(dbuf, buffer);
 		}
 	    when STICK:
-		waddstr(hw, "A ");
-		waddstr(hw, ws_type[selection[i].which]);
-		waddstr(hw, " of ");
+		strcat(dbuf, "A ");
+		strcat(dbuf, ws_type[selection[i].which]);
+		strcat(dbuf, " of ");
 	    when RING:
-		waddstr(hw, "A ring of ");
+		strcat(dbuf, "A ring of ");
 	}
-	waddstr(hw, selection[i].name);
+	strcat(dbuf, selection[i].name);
 	if (selection[i].count > 1)
-	    waddstr(hw, "s");
-	sprintf(buffer, "    Price:  %d", selection[i].worth);
+	    strcat(dbuf, "s");
+	sprintf(buffer, "%-50s Price:  %d", dbuf, selection[i].worth);
 	waddstr(hw, buffer);
     }
     sprintf(buffer, "Purse:  %d", purse);
@@ -843,22 +971,16 @@ register struct thing *tp;
     mvwaddstr(hw, 0, 0, "How about one of the following goods? ");
     draw(hw);
     /* Get rid of the monster */
-    killed(item, FALSE, FALSE);
-    monst_dead = TRUE;
+    killed(NULL, item, FALSE, FALSE);
 
     which_item = (short) ((getchar() & 0177) - 'a');
     while (which_item < 0 || which_item >= nitems) {
 	if (which_item == (short) ESCAPE - (short) 'a') {
 	    return;
 	}
-	mvwaddstr(hw, 0, 0, "Please enter one of the listed items. ");
+	mvwaddstr(hw, 0, 0, "Please enter one of the listed items: ");
 	draw(hw);
 	which_item = (short) ((getchar() & 0177) - 'a');
-    }
-
-    if (selection[which_item].worth > purse) {
-	msg("You cannot afford it.");
-	return;
     }
 
     purse -= selection[which_item].worth;
@@ -884,8 +1006,7 @@ register struct thing *tp;
     }
 
     if (add_pack(item, FALSE) == FALSE) {
-
 	obj->o_pos = hero;
-	fall(item, TRUE);
+	fall(&player, item, TRUE);
     }
 }

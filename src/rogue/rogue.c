@@ -1,3 +1,6 @@
+/*
+ * Last Modified: 05/25/86
+ */
 #include "curses.h"
 #include "rogue.h"
 /*
@@ -10,17 +13,25 @@ struct thing player;			/* The rogue */
 struct thing *beast;			/* The last beast that attacked us */
 struct object *cur_armor;		/* What a well dresssed rogue wears */
 struct object *cur_ring[8];		/* Which rings are being worn */
+struct linked_list *familiar_ptr = NULL;/* A ptr to the familiar */
 struct linked_list *lvl_obj = NULL; 
 struct linked_list *mlist = NULL;
 struct object *cur_weapon = NULL;
 struct real_pass rpass;			/* For protection's sake! */
+
+#if defined(USGV5)
+int _tty_ch;
+#if !defined(attron)
+SGTTY _tty;
+#endif NOT attron
+#endif
+
 int def_array[MAXPDEF][MAXPATT];	/* Pre-def'd chars */
-int char_type = -1;			/* what type of character is player */
+bool char_type = C_NOTSET;		/* what type of character is player */
 int foodlev = 1;			/* how fast he eats food */
 int ntraps;				/* Number of traps on this level */
 int trader = 0;				/* no. of purchases */
 int curprice = -1;			/* current price of item */
-int no_move;				/* Number of turns held in place */
 int seed;				/* Random number seed */
 int dnum;				/* Dungeon number */
 int max_level;				/* Deepest player has gone */
@@ -42,7 +53,6 @@ int lost_str=0;
 int lastscore = -1;
 int hold_count = 0;
 int trap_tries = 0;
-int pray_time = 0;
 int spell_power = 0;
 int has_artifact = 0;
 int picked_artifact = 0;
@@ -50,6 +60,13 @@ int msg_index = 0;
 int luck = 0;
 int resurrect = 0;
 int auth_or[MAXAUTH];
+bool inv_type = INV_OVER;		/* Overwrite style of inventory */
+int line_cnt;				/* Inventory stuff */
+int newpage;				/* Inventory stuff */
+int familiar_type = 0;			/* The type of familiar */
+int times_prayed = 0;			/* The number of times prayed */
+char *lastfmt;
+char *lastarg;
 char curpurch[15];			/* name of item ready to buy */
 char PLAYER = VPLAYER;			/* what the player looks like */
 char take;				/* Thing the rogue is taking */
@@ -87,12 +104,11 @@ bool playing = TRUE;
 bool running = FALSE; 
 bool fighting = FALSE; 
 bool wizard = FALSE;
-bool notify = TRUE; 
 bool fight_flush = FALSE; 
 bool terse = FALSE; 
 bool door_stop = FALSE;
 bool jump = FALSE; 
-bool slow_invent = FALSE; 
+bool doorstop = TRUE;
 bool firstmove = FALSE; 
 bool askme = FALSE;
 bool moving = FALSE;
@@ -101,78 +117,103 @@ bool monst_dead = FALSE;
 coord delta;				/* Change indicated to get_dir() */
 LEVTYPE levtype;			/* type of level i'm on */
 
-char *spacemsg =	"--Press space to continue--";
+char *spacemsg =	"--Press SPACE to continue--";
 char *morestr  =	"--More--";
-char *retstr   =	"[Press return to continue]";
+char *retstr   =	"[Press RETURN to continue]";
 
 /*
  * weapons and their attributes
+ * Average Damage = (min_damage + max_damage) / 2)
+ * AD of 2D5+3 = (5 + 13) / 2 = 9
+ * AD of 3D6   = (3 + 18) / 2 = 10.5
  */
 struct init_weps weaps[MAXWEAPONS] = {
-    { "mace",		"2d4",  "1d3", NONE,		ISMETAL, 100, 8 },
-    { "long sword",	"1d12", "1d2", NONE,		ISMETAL, 60, 15 },
+    /* Missile weapons */
+    { "sling",		"0d0",  "0d0", NONE,  		ISLITTLE, 5, 1 },
+    {   "rock",		"1d2",  "1d4", SLING,		ISMANY|ISMISL|ISLITTLE, 5, 1 },
+    {   "sling bullet",	"1d1",	"1d8", SLING,		ISSHARP|ISMANY|ISMISL|ISMETAL|ISLITTLE, 3, 1 },
     { "short bow",	"1d1",  "1d1", NONE,		0, 40, 75 },
-    { "arrow",		"1d1",  "1d6", BOW,		ISMANY|ISMISL, 5, 1 },
-    { "dagger",		"1d6",  "1d4", NONE,		ISMETAL|ISMISL, 10, 2 },
-    { "rock",		"1d2",  "1d4", SLING,		ISMANY|ISMISL, 5, 1 },
-    { "two-handed sword","3d6",  "1d2", NONE,		ISMETAL, 250, 30 },
-    { "sling",		"0d0",  "0d0", NONE,  		0, 5, 1 },
-    { "dart",		"1d1",  "1d3", NONE,  		ISMANY|ISMISL, 5, 1 },
-    { "crossbow",	"1d1",  "1d1", NONE,  		0, 100, 15 },
-    { "crossbow bolt",	"1d2", "1d12", CROSSBOW,	ISMANY|ISMISL, 7, 1 },
-    { "spear",		"1d6",  "1d8", NONE,		ISMETAL|ISMISL, 50, 2 },
-    { "trident",	"3d4",  "1d4", NONE,		ISMETAL, 50, 25 },
-    { "spetum",		"2d6",  "1d3", NONE,		ISMETAL, 50, 12 },
-    { "bardiche",	"3d4",  "1d2", NONE,		ISMETAL, 125, 6 },
-    { "short pike",	"1d12", "1d8", NONE,		ISMETAL, 80, 18 },
-    { "bastard sword",	"2d8",  "1d2", NONE,		ISMETAL, 100, 20 },
-    { "halberd",	"2d6",  "1d3", NONE,		ISMETAL, 175, 10 },
-    { "battle axe", 	"1d8",	"1d3", NONE,		ISMETAL, 80, 10 },
-    { "arrow", 		"1d2",	"2d8", BOW,		ISSILVER|ISMANY|ISMISL, 10, 3 },
-    { "hand axe", 	"1d6",	"1d2", NONE,		ISMETAL, 50, 8 },
-    { "club",	 	"1d4",	"1d2", NONE,		0, 30, 2 },
-    { "flail",	 	"1d7+1","1d4", NONE,		ISMETAL, 150, 10 },
-    { "glaive", 	"1d10",	"1d3", NONE,		ISMETAL, 80, 8 },
-    { "guisarme", 	"2d4",	"1d3", NONE,		ISMETAL, 80, 6 },
-    { "hammer", 	"1d3",	"1d5", NONE,		ISMETAL|ISMISL, 50, 4 },
-    { "javelin", 	"1d4",	"1d6", NONE,		ISMISL, 10, 3 },
-    { "morning star", 	"2d4",	"1d3", NONE,		ISMETAL, 125, 8 },
-    { "partisan", 	"1d6",	"1d2", NONE,		ISMETAL, 80, 4 },
-    { "silver arrow",	"1d1",	"1d80", NONE,		ISMISL|ISMANY,60, 4 },
-    { "long pike", 	"2d8",	"2d6", NONE,		ISMETAL, 80, 6 },
-    { "scimitar", 	"1d8",	"1d2", NONE,		ISMETAL, 40, 8 },
-    { "sling bullet", 	"1d1",	"1d8", SLING,		ISMANY|ISMISL|ISMETAL, 3, 1 },
-    { "quarter staff", 	"1d6",	"1d2", NONE,		0, 50, 8 },
-    { "broad sword", 	"2d4",	"1d3", NONE,		ISMETAL, 75, 15 },
-    { "short sword", 	"1d6",	"1d2", NONE,		ISMETAL, 35, 8 },
-    { "shuriken", 	"1d1",	"2d5", NONE,		ISMANY|ISMISL, 4, 3 },
-    { "boomerang", 	"1d1",	"1d8", NONE,		CANRETURN|ISMANY|ISMISL, 10, 3 },
-    { "burning oil",	"0d0",  "2d10+5",NONE,		CANBURN|ISMANY|ISMISL, 20, 3},
-    { "claymore",	"3d7",  "1d2", NONE,		ISMETAL, 300, 27 },
-    { "crysknife",	"3d3",  "1d3", NONE,		ISPOISON, 120, 10 },
+    {   "arrow",	"1d1",  "1d6", BOW,		ISSHARP|ISMANY|ISMISL|ISLITTLE, 5, 1 },
+    {   "arrow",	"1d2",	"2d8", BOW,		ISSHARP|ISSILVER|ISMANY|ISMISL|ISLITTLE, 10, 3 },
+    {   "fire arrow",	"1d2",	"2d8", BOW,		ISSHARP|CANBURN|ISMANY|ISMISL|ISLITTLE, 10, 3 },
     { "footbow",	"1d1",  "1d1", NONE,  		0, 90, 10 },
-    { "footbow bolt",	"1d2", "1d10", FOOTBOW,		ISMANY|ISMISL, 5, 1 },
-    { "katana", 	"4d12",	"2d6", NONE,		ISMETAL, 350, 10 },
-    { "leuku", 		"1d6",	"1d5", NONE,		ISMETAL, 40, 3 },
-    { "tomahawk", 	"1d6",	"1d6", NONE,		0, 45, 7 },
-    { "pertuska",	"2d5",  "1d3", NONE,		ISMETAL, 160, 10 },
-    { "sabre",		"2d6",	"1d3", NONE,		ISMETAL, 120, 20},
-    { "cutlass",	"1d10", "1d2", NONE,		ISMETAL, 55, 12 },
-    { "grenade",	"1d1", "1d2/4d8", NONE,		ISMANY, 10, 3 },
-};
+    {   "footbow bolt",	"1d2", "1d10", FOOTBOW,		ISSHARP|ISMANY|ISMISL|ISLITTLE, 5, 1 },
+    { "crossbow",	"1d1",  "1d1", NONE,  		0, 100, 15 },
+    {   "crossbow bolt","1d2", "1d12", CROSSBOW,	ISSHARP|ISMANY|ISMISL|ISLITTLE, 7, 1 },
 
+    /* Useful throwing weapons */
+    { "dart",		"1d1",  "1d3", NONE,  		ISSHARP|ISMANY|ISMISL|ISLITTLE, 5, 1 },
+    { "dagger",		"1d6",  "1d4", NONE,		ISSHARP|ISMETAL|ISMANY|ISMISL|ISLITTLE, 10, 2 },
+    { "hammer", 	"1d3",	"1d5", NONE,		ISMETAL|ISMISL, 50, 4 },
+    { "leuku", 		"1d6",	"1d5", NONE,		ISSHARP|ISMETAL|ISBIG, 40, 3 },
+    { "javelin", 	"1d4",	"1d6", NONE,		ISSHARP|ISMISL|ISBIG, 10, 3 },
+    { "tomahawk", 	"1d6",	"1d6", NONE,		ISSHARP|ISMISL, 45, 7 },
+    { "machete", 	"1d7",	"1d6", NONE,		ISSHARP|ISMETAL|ISMISL, 45, 4 },
+    { "throwing axe",	"1d3",	"1d6+2", NONE,		ISSHARP|ISMETAL|ISMISL, 50, 8 },
+    { "short spear",	"1d6",  "1d8", NONE,		ISSHARP|ISMISL, 50, 2 },
+    { "boomerang", 	"1d1",	"1d8", NONE,		CANRETURN|ISMANY|ISMISL|ISLITTLE, 10, 3 },
+    { "long spear",	"1d8", "1d10", NONE,		ISSHARP|ISMETAL|ISMISL|ISBIG, 50, 2 },
+    { "shuriken", 	"1d1",	"2d5", NONE,		ISSHARP|ISMETAL|ISMANY|ISMISL|ISLITTLE, 4, 1 },
+    { "burning oil",	"0d0",  "2d10+5",NONE,		CANBURN|ISMANY|ISMISL|ISLITTLE, 20, 3},
+    { "grenade",	"1d1", "1d2/4d8", NONE,		ISMANY|ISSMALL, 10, 3 },
+    { "club",	 	"1d4",	"1d2", NONE,		0, 30, 2 },
+    { "pitchfork",	"1d5",  "2d2", NONE,		ISSHARP|ISMETAL, 15, 5 },
+    { "short sword", 	"1d6",	"1d2", NONE,		ISSHARP|ISMETAL, 35, 8 },
+    { "hand axe", 	"1d6",	"1d2", NONE,		ISSHARP|ISMETAL, 50, 8 },
+    { "partisan", 	"1d6",	"1d2", NONE,		ISSHARP|ISMETAL|ISBIG, 80, 4 },
+    { "grain flail", 	"1d6",	"1d4", NONE,		ISSHARP|ISMETAL, 100, 10 },
+    { "singlestick", 	"1d4+2","1d2", NONE,		0, 30, 2 },
+    { "rapier", 	"1d6+1","1d2", NONE,		ISSHARP|ISMETAL, 7, 75 },
+    { "sickle", 	"1d6+1","1d2", NONE,		ISSHARP|ISMETAL, 30, 15 },
+    { "hatchet", 	"1d6+1","1d4", NONE,		ISSHARP|ISMETAL, 50, 10 },
+    { "scimitar", 	"1d8",	"1d2", NONE,		ISSHARP|ISMETAL, 40, 8 },
+    { "light mace",	"2d4",  "1d3", NONE,		0, 100, 8 },
+    { "morning star", 	"2d4",	"1d3", NONE,		ISMETAL, 125, 8 },
+    { "broad sword", 	"2d4",	"1d3", NONE,		ISSHARP|ISMETAL, 75, 15 },
+    { "miner's pick",	"2d4",	"1d2", NONE,		ISSHARP|ISMETAL, 60, 4 },
+    { "guisarme", 	"2d4",	"1d3", NONE,		ISSHARP|ISMETAL|ISBIG, 80, 6 },
+    { "war flail", 	"1d6+2","1d4", NONE,		ISSHARP|ISMETAL|ISBIG, 150, 10 },
+    { "crysknife",	"3d3",  "1d3", NONE,		ISSHARP|ISPOISON|ISMANY|ISLITTLE, 12, 2 },
+    { "battle axe", 	"1d8+2","1d3", NONE,		ISSHARP|ISMETAL, 80, 10 },
+    { "cutlass",	"1d10", "1d2", NONE,		ISSHARP|ISMETAL, 55, 12 },
+    { "glaive", 	"1d10",	"1d3", NONE,		ISSHARP|ISMETAL|ISBIG, 80, 8 },
+    { "pertuska",	"2d5",  "1d3", NONE,		ISSHARP|ISMETAL|ISBIG, 160, 10 },
+    { "long sword",	"1d12", "1d2", NONE,		ISSHARP|ISMETAL|ISBIG, 60, 15 },
+    { "lance",		"1d12", "1d8", NONE,		ISSHARP|ISBIG, 80, 18 },
+    { "short pike",	"1d12", "1d8", NONE,		ISSHARP|ISMETAL|ISBIG, 80, 18 },
+    { "sabre",		"2d6",	"1d3", NONE,		ISSHARP|ISMETAL, 120, 20},
+    { "spetum",		"2d6",  "1d3", NONE,		ISSHARP|ISMETAL|ISBIG, 50, 40 },
+    { "halberd",	"2d6",  "1d3", NONE,		ISSHARP|ISMETAL|ISBIG, 175, 10 },
+    { "trident",	"3d4",  "1d4", NONE,		ISSHARP|ISMETAL|ISBIG, 50, 40 },
+    { "war pick",	"3d4",  "1d2", NONE,		ISSHARP|ISMETAL|ISBIG, 75, 25 },
+    { "bardiche",	"3d4",  "1d2", NONE,		ISSHARP|ISMETAL|ISBIG, 125, 6 },
+    { "heavy mace",	"3d4",  "1d3", NONE,		ISBIG, 100, 8 },
+    { "great scythe", 	"2d6+2","1d2", NONE,		ISSHARP|ISMETAL|ISBIG, 100, 8 },
+    { "quarter staff", 	"3d5",	"1d2", NONE,		ISBIG, 70, 8 },
+    { "bastard sword",	"2d8",  "1d2", NONE,		ISSHARP|ISMETAL|ISBIG, 100, 20 },
+    { "long pike", 	"2d8",	"2d6", NONE,		ISSHARP|ISMETAL|ISBIG, 80, 6 },
+    { "two-handed flail","2d6+2","1d4", NONE,		ISSHARP|ISMETAL|ISBIG, 200, 30 },
+    { "two-handed maul","4d4",  "1d3", NONE,		ISBIG, 200, 8 },
+    { "two-handed pick","2d9",	"1d2", NONE,		ISSHARP|ISMETAL|ISBIG, 175, 30 },
+    { "two-handed sword","3d6",	"1d2", NONE,		ISSHARP|ISMETAL|ISBIG, 250, 30 },
+    { "claymore",	"3d7",  "1d2", NONE,		ISSHARP|ISMETAL|ISBIG, 200, 27 },
+};
 struct init_armor armors[MAXARMORS] = {
-	{ "leather armor",		10,  8,   70, 100 },
+	{ "soft leather",		03,  9,   35,  50 },
+	{ "cuirboilli",			06,  8,   50, 130 },
+	{ "heavy leather",		10,  8,   70, 100 },
 	{ "ring mail",			20,  7,   50, 250 },
-	{ "studded leather armor",	31,  7,   50, 200 },
+	{ "studded leather",		31,  7,   50, 200 },
 	{ "scale mail",			43,  6,   70, 250 },
 	{ "padded armor",		55,  6,  150, 150 },
 	{ "chain mail",			67,  5,  100, 300 },
+	{ "brigandine",			75,  5,  200, 280 },
 	{ "splint mail",		77,  4,  150, 350 },
 	{ "banded mail",		87,  4,  150, 350 },
+	{ "superior chain",	 	90,  3,  500, 350 },
 	{ "plate mail",		 	93,  3,  400, 400 },
 	{ "plate armor",		97,  2,  650, 450 },
-	{ "mithril",			99,  1, 10000, 100 },
+	{ "mithril",			99,  2, 10000, 100 },
 	{ "crystalline armor",		100, 0, 5500, 300 },
 };
 
@@ -193,8 +234,8 @@ struct magic_item s_magic[MAXSCROLLS] = {
     { "light",			 75, 100, 25, 15 },
     { "hold monster",		 25, 200, 33, 20 },
     { "sleep",			 25,  50, 20, 10 },
-    { "enchantment",		135, 130, 14, 9 },
-    { "identify",		160, 100, 0, 15 },
+    { "enchantment",		110, 130, 14, 9 },
+    { "identify",		150, 100, 0, 15 },
     { "scare monster",		 35, 190, 27, 21 },
     { "gold detection",		 15, 110, 20, 20 },
     { "teleportation",		 50, 165, 10, 20 },
@@ -205,29 +246,32 @@ struct magic_item s_magic[MAXSCROLLS] = {
     { "cure disease",		 70, 160, 0, 0 },
     { "acquirement",		  5, 2500, 50, 15 },
     { "protection",		 40, 150, 0, 0 },
-    { "nothing",		 70, 50, 0, 0 },
-    { "magic hitting",		 30, 875, 25, 15 },
-    { "ownership",		 20, 550, 25, 15 },
-    { "food detection",		 20, 150, 25, 15 },
+    { "nothing",		 60, 50, 0, 0 },
+    { "magic hitting",		 10, 875, 25, 15 },
+    { "ownership",		 10, 550, 25, 15 },
+    { "food detection",		 40, 150, 25, 15 },
     { "electrification",	 20, 450, 0, 0 },
+    { "charm monster",		 10, 1500, 25, 15},
+    { "summon monster",          10, 1500, 25, 15},
+    { "gaze reflection",         35, 200, 25, 15}, 
 };
 
 struct magic_item p_magic[MAXPOTIONS] = {
     { "clear thought",		 90, 380, 27, 15 },
-    { "gain ability",		140, 250, 15, 15 },
+    { "gain ability",		 40, 250, 15, 15 },
     { "see invisible",		 64, 170, 25, 15 },
     { "healing",		140, 130, 27, 27 },
     { "monster detection",	 60, 120, 15, 20 },
     { "magic detection",	 60, 105, 20, 15 },
     { "raise level",		  1, 900, 11, 10 },
-    { "haste self",		110, 200, 30, 5 },
-    { "restore abilities",	160, 140, 0, 0 },
+    { "haste self",		160, 200, 30, 5 },
+    { "restore abilities",	200, 140, 0, 0 },
     { "phasing",		 45, 240, 21, 20 },
     { "invisibility",		 30, 200, 0, 15 },
     { "acute scent",		 30, 200, 20, 15 },
     { "acute hearing",		 30, 200, 20, 15 },
     { "super heroism",		 10, 800, 20, 15 },
-    { "disguise",		 30, 500, 0, 15 },
+    { "disguise",		 40, 500, 0, 15 },
 };
 
 struct magic_item r_magic[MAXRINGS] = {
@@ -288,7 +332,7 @@ struct magic_item ws_magic[MAXSTICKS] = {
 
 struct magic_item fd_data[MAXFOODS] = {
     { "food ration",					400, 2, 20, 20 },
-    { "fruit-with-very-long-name",			300, 1, 0, 0 },
+    { "fruit-with-very-long-name-that-i-am-padding-out-to-be-greater-than-eighty-characters-so-that-a-test-in-options.c-will-work",			300, 1, 0, 0 },
     { "cram",						120, 3, 0, 0 },
     { "honey cake",					 80, 10, 0, 0 },
     { "lemba",						 50, 50, 0, 0 },
@@ -307,9 +351,9 @@ struct init_artifact arts[MAXARTIFACT] = {
 };
 
 /*
- * these are the spells that a magic user can cast
+ * these are the spells that a magician can cast
  */
-struct spells magic_spells[MAXSPELLS] = {
+struct spells magic_spells[MAXSPELLS_M] = {
 	{ P_TFIND,		3,	TYP_POTION,	FALSE },
 	{ S_IDENT,		5,	TYP_SCROLL,	FALSE },
 	{ P_MFIND,		7,	TYP_POTION,	FALSE },
@@ -334,9 +378,36 @@ struct spells magic_spells[MAXSPELLS] = {
 };
 
 /*
+ * these are the spells that an illusionist can cast
+ */
+struct spells illusion_spells[MAXSPELLS_I] = {
+	{ S_LIGHT,		3,	TYP_SCROLL,	TRUE  },
+	{ S_IDENT,		5,	TYP_SCROLL,	FALSE },
+	{ P_MFIND,		7,	TYP_POTION,	FALSE },
+	{ S_CONFUSE,		15,	TYP_SCROLL,	FALSE },
+	{ S_REMOVE,		15,	TYP_SCROLL,	FALSE },
+	{ S_TELEP,		15,	TYP_SCROLL,	FALSE },
+	{ P_DISGUISE,		15,	TYP_POTION,	FALSE },
+	{ P_INVIS,		20,	TYP_POTION,	FALSE },
+	{ P_SEEINVIS,		25,	TYP_POTION,	TRUE  },
+	{ S_SLEEP,		25,	TYP_SCROLL,	FALSE },
+	{ WS_MISSILE,		25,	TYP_STICK,	FALSE },
+	{ WS_SLOW_M,		30,	TYP_STICK,	FALSE },
+	{ S_REFLECT,		30,	TYP_SCROLL,	FALSE },
+	{ S_ELECTRIFY,		30,	TYP_SCROLL,	FALSE },
+	{ WS_CANCEL,		30,	TYP_STICK,	FALSE },
+	{ S_PROTECT,		30,	TYP_SCROLL,	FALSE },
+	{ WS_PARALYZE,		30,	TYP_STICK,	FALSE },
+	{ P_PHASE,		40,	TYP_POTION,	FALSE },
+	{ S_HOLD,		50,	TYP_SCROLL,	FALSE },
+	{ S_PETRIFY,		50,	TYP_SCROLL,	FALSE },
+	{ S_SCARE,		75,	TYP_SCROLL,	TRUE  },
+};
+
+/*
  * these are the spells that a cleric can cast
  */
-struct spells cleric_spells[MAXPRAYERS] = {
+struct spells cleric_spells[MAXPRAYERS_C] = {
 	{ P_MFIND,		3,	TYP_POTION,	FALSE },
 	{ P_TFIND,		7,	TYP_POTION,	FALSE },
 	{ S_IDENT,		15,	TYP_SCROLL,	FALSE },
@@ -351,34 +422,115 @@ struct spells cleric_spells[MAXPRAYERS] = {
 	{ S_TELEP,		40,	TYP_SCROLL,	FALSE },
 };
 
-char *cnames[4][11] = {
-{	"Veteran",		"Warrior",	
-	"Swordsman",		"Hero",
-	"Swashbuckler",		"Myrmidon",	
+/*
+ * these are the spells that a druid can cast
+ */
+struct spells druid_spells[MAXPRAYERS_D] = {
+	{ P_MFIND,		3,	TYP_POTION,	FALSE },
+	{ P_TFIND,		7,	TYP_POTION,	FALSE },
+	{ S_IDENT,		15,	TYP_SCROLL,	FALSE },
+	{ S_REMOVE,		20,	TYP_SCROLL,	FALSE },
+	{ P_HEALING,		30,	TYP_POTION,	FALSE },
+	{ S_CURING,		35,	TYP_SCROLL,	FALSE },
+	{ P_CLEAR,		35,	TYP_POTION,	FALSE },
+	{ P_SEEINVIS,		35,	TYP_POTION,	TRUE  },
+	{ P_RESTORE,		35,	TYP_POTION,	FALSE },
+	{ S_TELEP,		40,	TYP_SCROLL,	FALSE },
+	{ S_CHARM,     		40,     TYP_SCROLL,	FALSE },
+	{ S_SUMMON,		50,	TYP_SCROLL,     FALSE },
+};
+
+char *cnames[10][15] = {
+{	"Veteran",		"Warrior",
+	"Swordsman",		"Hero",				/* Fighter */
+	"Swashbuckler",		"Myrmidon",
 	"Champion",		"Superhero",
-	"Lord",			"Lord",		
+	"Lord",			"Lord",
+	"Lord",			"Lord",
+	"Lord",			"Lord",
 	"Lord"
 },
-{	"Prestidigitator",	"Evoker",	
-	"Conjurer",		"Theurgist",
-	"Thaumaturgist",	"Magician",	
-	"Enchanter",		"Warlock",
-	"Sorcerer",		"Necromancer",
-	"Wizard"
+{	"Gallant",		"Keeper",
+	"Protector",		"Defender",			/* Paladin */
+	"Warder",		"Guardian",
+	"Chevalier",		"Justiciar",
+	"Paladin",		"Paladin",
+	"Paladin",		"Paladin",
+	"Paladin",		"Paladin",
+	"Paladin"
+},
+{	"Runner",		"Strider",
+	"Scout",		"Courser",			/* Ranger */
+	"Tracker",		"Guide",
+	"Pathfinder",		"Ranger",
+	"Ranger Knight",	"Ranger Lord",
+	"Ranger Lord",		"Ranger Lord",
+	"Ranger Lord",		"Ranger Lord",
+	"Ranger Lord"
 },
 {	"Acolyte",		"Adept",
-	"Priest",		"Curate",
+	"Priest",		"Curate",			/* Cleric */
 	"Prefect",		"Canon",
 	"Lama",			"Patriarch",
 	"High Priest",		"High Priest",
+	"High Priest",		"High Priest",
+	"High Priest",		"High Priest",
 	"High Priest"
 },
+{	"Aspirant",			"Ovate",		/* Druid */
+	"Initiate of the 1st Circle",	"Initiate of the 2nd Circle",
+	"Initiate of the 3rd Circle",	"Initiate of the 4th Circle",
+	"Initiate of the 5th Circle",	"Initiate of the 6th Circle",
+	"Initiate of the 7th Circle",	"Initiate of the 8th Circle",
+	"Initiate of the 9th Circle",	"Druid",
+	"Archdruid",			"The Great Druid",
+	"The Grand Druid"
+},
+
+{	"Prestidigitator",	"Evoker",
+	"Conjurer",		"Theurgist",			/* Magic User */
+	"Thaumaturgist",	"Magician",
+	"Enchanter",		"Warlock",
+	"Sorcerer",		"Necromancer",
+	"Wizard",		"Wizard",
+	"Wizard",		"Wizard",
+	"Wizard"
+},
+{	"Prestidigitator",	"Minor Trickster",
+	"Trickster",		"Master Trickster",	       /* Illusionist */
+	"Cabalist",		"Visionist",
+	"Phantasmist",		"Apparitionist",
+	"Spellbinder",		"Illusionist",
+	"Illusionist",		"Illusionist",
+	"Illusionist",		"Illusionist",
+	"Illusionist"
+},
 {	"Rogue",		"Footpad",
-	"Cutpurse",		"Robber",
+	"Cutpurse",		"Robber",			/* Thief */
 	"Burglar",		"Filcher",
 	"Sharper",		"Magsman",
 	"Thief",		"Master Thief",
+	"Master Thief",		"Master Thief",
+	"Master Thief",		"Master Thief",
 	"Master Thief"
+},
+{	"Bravo",		"Rutterkin",
+	"Waghalter",		"Murderer",			/* Assasin */
+	"Thug",			"Killer",
+	"Cutthroat",		"Executioner",
+	"Assassin",		"Expert Assassin",
+	"Senior Assassin",	"Chief Assassin",
+	"Prime Assassin",	"Guildmaster Assassin",
+	"Grandfather of Assassins"
+},
+{	"Ninja",		"Ninja",
+	"Ninja",		"Ninja",			/* Ninja */
+	"Ninja",		"Ninja",
+	"Ninja",		"Ninja",
+	"Ninja",		"Ninja",
+	"Ninja",		"Ninja",
+	"Ninja",		"Ninja",
+	"Ninja"
 }
 } ;
 
@@ -393,7 +545,6 @@ struct h_list helpstr[] = {
     'u',	"	up & right",
     'b',	"	down & left",
     'n',	"	down & right",
-    '<',	"CTRL><dir> run til adjacent",
     '<',	"SHIFT><dir> run that way",
     'm',	"<dir>	move onto without picking up",
     't',	"<dir>	throw something",
@@ -416,15 +567,14 @@ struct h_list helpstr[] = {
     'c',	"	call object (generic)",
     'M',	"	mark object (specific)",
     'o',	"	examine/set options",
-    'C',	"	cast a spell",
-    'p',	"	pray",
+    'C',	"	cast a spell/say a prayer",
+    'p',	"	pray to a deity",
     'a',	"	affect the undead",
     '^',	"	set a trap",
-    'G',	"	sense gold",
     'D',	"	dip something (into a pool)",
     CTRL(T),	"<dir>	take (steal) from (direction)",
     CTRL(R),	"	redraw screen",
-    CTRL(P),	"	repeat last message",
+    CTRL(P),	"	back up to 10 previous messages",
     ESCAPE,	"	cancel command",
     'v',	"	print program version number",
     '!',	"	shell escape",

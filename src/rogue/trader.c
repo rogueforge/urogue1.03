@@ -1,4 +1,7 @@
 /*
+ * Last Modified: 05/25/86
+ */
+/*
  * Anything to do with trading posts
  *
  * @(#)trader.c	8.0	(Bell Labs)	12/16/82
@@ -34,7 +37,7 @@ do_post()
 	draw_room(rp);				/* draw the only room */
 	i = roll(4,10);				/* 10 to 40 items */
 	for (; i > 0 ; i--) {			/* place all the items */
-	    ll = new_thing(FALSE);		/* get something */
+	    ll = new_thing();			/* get something */
 	    attach(lvl_obj, ll);
 	    op = OBJPTR(ll);
 	    switch(luck) {
@@ -85,11 +88,16 @@ price_it()
 	    "great bargain",
 	    "quality product",
 	    "exceptional find",
+	    "unbeatable value",
+	    "rare beauty",
+	    "superior product",
+	    "steal",
 	};
 	reg struct linked_list *item;
 	reg struct object *obj;
 	reg int worth;
 	reg char *str;
+	reg int which;
 
 	if (!open_market())		/* after buying hours */
 	    return FALSE;
@@ -102,8 +110,9 @@ price_it()
 	    return FALSE;
 	}
 	str = typ_name(obj);
-	msg("That %s is a %s for only %d pieces of gold.",str,
-	    bargain[rnd(3)],worth);
+	which = rnd(7);
+	msg("That %s is a%s %s for only %d pieces of gold.",str,
+		vowelstr(bargain[which]), bargain[which],worth);
 	curprice = worth;		/* save price */
 	strcpy(curpurch,str);		/* save item */
 	return TRUE;
@@ -150,7 +159,7 @@ buy_it()
 	 * The hero bought the item here
 	 */
 	mpos = 0;
-	wh = add_pack(NULL,FALSE);	/* try to put it in his pack */
+	wh = add_pack((struct linked_list *) NULL, FALSE);	/* try to put it in his pack */
 	if (wh) {			/* he could get it */
 	    purse -= curprice;		/* take his money */
 	    ++trader;			/* another transaction */
