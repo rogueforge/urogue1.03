@@ -1,5 +1,5 @@
 /*
- * Last Modified: 07/09/86
+ * Last Modified: 09/16/86
  */
 /*
  * Procedures for saving and retrieving a characters
@@ -27,6 +27,8 @@
 
 static int def_array[MAXPDEF][MAXPATT];	/* Pre-def'd chars */
 
+char *which_class();
+
 geta_player()
 {
 
@@ -34,7 +36,7 @@ geta_player()
 	struct	stat	stbuf, st2buf;
 	int	fd;
 	char	pbuf[2*LINELEN];
-	short    cnt,i;
+	short    i;
 
 	strcpy(char_file,home);
 	strcat(char_file, ROGDEFS);
@@ -67,91 +69,37 @@ geta_player()
 	wclear(hw);
 	touchwin(hw);
 
-	cnt = 0;
-	for(i=0; i<MAXPDEF; i++)
-	    if(def_array[i][I_STR])
-		cnt++;
-
-	if(!cnt){
-		mvwaddstr(hw,5,5,"You have no saved characters!");
-		mvwaddstr(hw, LINES - 1, 0, spacemsg);
-		wrefresh(hw);
-		wait_for(' ');
-		return FALSE;
-	}
-
-	sprintf(pbuf, "You have %d character%c: ",cnt,(cnt==1)? 0 : 's');
-	mvwaddstr(hw,5,5,pbuf);
-	for(i=0;i<MAXPDEF;i++)
-	    if(def_array[i][I_STR]) {
-		char	*class;
-		switch(def_array[i][I_CTYPE]) {
-		    when C_FIGHTER:
-			class = "fighter";
-		    when C_MAGICIAN:
-			class = "magician";
-		    when C_CLERIC:
-			class = "cleric";
-		    when C_THIEF:
-			class = "thief";
-		    when C_PALADIN:
-		        class = "paladin";
-		    when C_RANGER:
-		        class = "ranger";
-		    when C_DRUID:
-		        class = "druid";
-		    when C_ILLUSION:
-		        class = "illusionist";
-		    when C_ASSASIN:
-		        class = "assasin";
-		    when C_NINJA:
-		        class = "ninja";
-		    otherwise:
-			class = "unknown";
-		}
-		sprintf(pbuf, "%d. (%s): Int: %d Str: %d Wis: %d Dex: %d Con: %d Cha: %d Pow: %d Hpt: %d",
-			    i+1,
-			  class,
-		    def_array[i][I_INTEL],
-		    def_array[i][I_STR],
-		    def_array[i][I_WISDOM],
-		    def_array[i][I_DEXT],
-		    def_array[i][I_CONST],
-		    def_array[i][I_CHARISMA],
-		    def_array[i][I_POWER],
-		    def_array[i][I_HPT]);
-		mvwaddstr(hw,6+i,0,pbuf);
-		
-	    }
+	print_stored();
 	mvwaddstr(hw,0,0,"Do you wish to select a character? ");
 	wrefresh(hw);
 	if ((getchar() & 0177) != 'y')	return FALSE;
-again:
-	wmove(hw, LINES - 1, 0);
-	wclrtoeol(hw);
-	mvwaddstr(hw,0,0,"Enter the number of a pre-defined character:");
-	wclrtoeol(hw);
-	wrefresh(hw);
-	get_str(pbuf, hw);
-	i = atoi(pbuf) - 1;
-	while(i < 0 || i > MAXPDEF-1) {
-	    mvwaddstr(hw,0,0,"Use the range 1 to");
-	    wprintw(hw," %d!",MAXPDEF);
+	do {
+	    wmove(hw, LINES - 1, 0);
+	    wclrtoeol(hw);
+	    mvwaddstr(hw,0,0,"Enter the number of a pre-defined character: ");
 	    wclrtoeol(hw);
 	    wrefresh(hw);
 	    get_str(pbuf, hw);
 	    i = atoi(pbuf) - 1;
-	}
-	if(def_array[i][I_STR] == 0) {
-	    mvwaddstr(hw,0,0,"Please enter the number of a known character: ");
-	    wclrtoeol(hw);
-	    wstandout(hw);
-	    mvwaddstr(hw, LINES - 1, 0, spacemsg);
-	    wstandend(hw);
-	    wrefresh(hw);
-	    wait_for(' ');
-	    goto again;
-	}
+	    if (i < 0 || i > MAXPDEF-1) {
+		wstandout(hw);
+		mvwaddstr(hw,1,0,"Please use the range 1 to");
+		wprintw(hw," %d.",MAXPDEF);
+		wstandend(hw);
+		wclrtoeol(hw);
+		wrefresh(hw);
+	    }
+	    else if (def_array[i][I_STR] == 0) {
+		wstandout(hw);
+		mvwaddstr(hw,1,0,"Please enter the number of a known character: ");
+		wstandend(hw);
+		wclrtoeol(hw);
+	    }
+	    else {
+		mvwaddstr(hw,1,0,"");
+		wclrtoeol(hw);
+	    }
+	} while (i < 0 || i > MAXPDEF-1 || def_array[i][I_STR] == 0);
 
 	/* Set some global ones things */
 	pstats.s_str = def_array[i][I_STR];
@@ -160,10 +108,10 @@ again:
 	pstats.s_dext = def_array[i][I_DEXT];
 	pstats.s_const = def_array[i][I_CONST];
 	pstats.s_charisma = def_array[i][I_CHARISMA];
-	max_stats.s_hpt = pstats.s_hpt = def_array[i][I_HPT];
-	max_stats.s_power = pstats.s_power = def_array[i][I_POWER];
-	char_type = def_array[i][I_CTYPE];
-	player.t_ctype = def_array[i][I_CTYPE];
+	pstats.s_hpt = def_array[i][I_HPT];
+	pstats.s_power = def_array[i][I_POWER];
+	player.t_ctype = char_type = def_array[i][I_CTYPE];
+	max_stats = pstats;
 	return TRUE;
 }
 
@@ -181,113 +129,46 @@ puta_player()
 	strcpy(char_file,home);
 	strcat(char_file, ROGDEFS );
 
-	wclear(hw);
-	touchwin(hw);
-	switch(player.t_ctype) {
-	when C_FIGHTER:
-	    class = "fighter";
-	when C_MAGICIAN:
-	    class = "magician";
-	when C_CLERIC:
-	    class = "cleric";
-	when C_THIEF:
-	    class = "thief";
-	when C_PALADIN:
-	    class = "paladin";
-	when C_RANGER:
-	    class = "ranger";
-	when C_DRUID:
-	    class = "druid";
-	when C_ILLUSION:
-	    class = "illusionist";
-	when C_ASSASIN:
-	    class = "assasin";
-	when C_NINJA:
-	    class = "ninja";
-	otherwise:
-	    class = "unknown";
-	}
-
-	wclear(hw);
+	class = which_class(player.t_ctype);
 	sprintf(pbuf, "You have a %s with the following attributes:",class);
 	mvwaddstr(hw,2,0,pbuf);
-	sprintf(pbuf, "Int: %d Str: %d Wis: %d Dex: %d Const: %d Charisma: %d Hpt: %d Pow: %d",
+	wclrtoeol(hw);
+	sprintf(pbuf, "Int: %d Str: %d Wis: %d Dex: %d Con: %d Cha: %d Pow: %d Hpt: %d",
 	    pstats.s_intel,
 	    pstats.s_str,
 	    pstats.s_wisdom,
 	    pstats.s_dext,
 	    pstats.s_const,
 	    pstats.s_charisma,
-	    pstats.s_hpt,
-	    pstats.s_power);
+	    pstats.s_power,
+	    pstats.s_hpt);
+	mvwaddstr(hw,3,0,"");
+	wclrtoeol(hw);
 	mvwaddstr(hw,4,0,pbuf);
+	wclrtoeol(hw);
+	mvwaddstr(hw,5,0,"");
+	wclrtoeol(hw);
 	mvwaddstr(hw,0,0,"Would you like to save this character?");
 	wclrtoeol(hw);
 	wrefresh(hw);
 	if((getchar() & 0177) != 'y')
 	    return(TRUE);
 
-	wstandout(hw);
-	mvwaddstr(hw,8,0,"YOUR CURRENT CHARACTERS:");
-	wstandend(hw);
-	wclrtoeol(hw);
-	for(i=0;i<MAXPDEF;i++) {
-	    if(def_array[i][I_STR]) {
-		switch(def_array[i][I_CTYPE]) {
-		    when C_FIGHTER:
-			class = "fighter";
-		    when C_MAGICIAN:
-			class = "magician";
-		    when C_CLERIC:
-			class = "cleric";
-		    when C_THIEF:
-			class = "thief";
-		    when C_PALADIN:
-		        class = "paladin";
-		    when C_RANGER:
-		        class = "ranger";
-		    when C_DRUID:
-		        class = "druid";
-		    when C_ILLUSION:
-		        class = "illusionist";
-		    when C_ASSASIN:
-		        class = "assasin";
-		    when C_NINJA:
-		        class = "ninja";
-		    otherwise:
-			class = "unknown";
-		}
-		sprintf(pbuf, "%d. (%s): Int: %d Str: %d Wis: %d Dex: %d Con: %d Cha: %d Pow: %d Hpt: %d",
-			    i+1,
-			  class,
-		    def_array[i][I_INTEL],
-		    def_array[i][I_STR],
-		    def_array[i][I_WISDOM],
-		    def_array[i][I_DEXT],
-		    def_array[i][I_CONST],
-		    def_array[i][I_CHARISMA],
-		    def_array[i][I_POWER],
-		    def_array[i][I_HPT]);
-		mvwaddstr(hw,11+i,0,pbuf);
-		
-	    }
-	    else {
-		sprintf(pbuf, "%d.  ### NO CHARACTER DEFINED ###", i+1);
-		mvwaddstr(hw,11+i,0,pbuf);
-	    }
-	}
-	mvwaddstr(hw,0,0,"Enter a number which this character is to be saved as:");
-	wrefresh(hw);
-	get_str(pbuf, hw);
-	i = atoi(pbuf) - 1;
-	while(i < 0 || i > MAXPDEF-1) {
-	    mvwaddstr(hw,0,0,"Use the range 1 to");
-	    wprintw(hw," %d!",MAXPDEF);
+	do {
+	    mvwaddstr(hw,0,0,"Overwrite which number? ");
 	    wclrtoeol(hw);
 	    wrefresh(hw);
 	    get_str(pbuf, hw);
 	    i = atoi(pbuf) - 1;
-	}
+	    if (i < 0 || i > MAXPDEF-1) {
+		wstandout(hw);
+		mvwaddstr(hw,1,0,"Use the range 1 to");
+		wprintw(hw," %d!",MAXPDEF);
+		wstandend(hw);
+		wclrtoeol(hw);
+		wrefresh(hw);
+	    }
+	} while (i < 0 || i > MAXPDEF-1);
 	/* Set some global stuff */
 	def_array[i][I_STR] = pstats.s_str;
 	def_array[i][I_INTEL] = pstats.s_intel;
@@ -321,20 +202,90 @@ puta_player()
 
 do_getplayer()
 {
-    if (char_type == C_NOTSET) {
-	/* See what type character will be */
-	wclear(hw) ;
-	touchwin(hw) ;
-	mvwaddstr(hw,2,0, "[a] Fighter\n[b] Paladin\n[c] Ranger\n[d] Cleric\n[e] Druid\n[f] Magician");
-	waddstr(hw,"\n[g] Illusionist\n[h] Thief\n[i] Assasin\n[j] Ninja") ;
-	mvwaddstr(hw, 0, 0, "What character class do you desire? ") ;
-	wrefresh(hw) ;
-	char_type = readchar() - 'a';
-	while (char_type < C_FIGHTER || char_type >= C_MONSTER) {
-	    mvwaddstr(hw, 0, 0, "Please enter a character in the displayed range: ");
-	    wrefresh(hw);
+    if (char_type == C_NOTSET)
+	do {
+	    /* See what type character will be */
+	    mvwaddstr(hw,3,0, "[a] Fighter\t[b] Paladin\t[c] Ranger\n[d] Cleric\t[e] Druid\t[f] Magician\n[g] Illusionist\t[h] Thief\t[i] Assasin\t[j] Ninja");
+	    mvwaddstr(hw, 0, 0, "What character class do you desire? ") ;
+	    wrefresh(hw) ;
 	    char_type = readchar() - 'a';
-	}
-    }
+	    if (char_type < C_FIGHTER || char_type >= C_MONSTER) {
+		wstandout(hw);
+		mvwaddstr(hw, 1, 0, "Please enter a letter from a - j");
+		wstandend(hw);
+		wclrtoeol(hw);
+		wrefresh(hw);
+	    }
+	    else {
+		mvwaddstr(hw, 1, 0, "");
+		wclrtoeol(hw);
+	    }
+	} while (char_type < C_FIGHTER || char_type >= C_MONSTER);
     player.t_ctype = char_type ;
+}
+
+print_stored()
+{
+	register int i;
+	char	*class;
+	char	pbuf[2*LINELEN];
+
+	wstandout(hw);
+	mvwaddstr(hw,9,0,"YOUR CURRENT CHARACTERS:");
+	wstandend(hw);
+	wclrtoeol(hw);
+	for(i=0;i<MAXPDEF;i++) {
+	    if(def_array[i][I_STR]) {
+		class = which_class(def_array[i][I_CTYPE]);
+		sprintf(pbuf, "%d. (%s): Int: %d Str: %d Wis: %d Dex: %d Con: %d Cha: %d Pow: %d Hpt: %d",
+			    i+1,
+			  class,
+		    def_array[i][I_INTEL],
+		    def_array[i][I_STR],
+		    def_array[i][I_WISDOM],
+		    def_array[i][I_DEXT],
+		    def_array[i][I_CONST],
+		    def_array[i][I_CHARISMA],
+		    def_array[i][I_POWER],
+		    def_array[i][I_HPT]);
+		mvwaddstr(hw,11+i,0,pbuf);
+	    }
+	    else {
+		sprintf(pbuf, "%d.  ### NONE ###", i+1);
+		mvwaddstr(hw,11+i,0,pbuf);
+	    }
+	}
+}
+
+char *
+which_class(c_class)
+int c_class;
+{
+	char	*class;
+
+	switch(c_class) {
+	    case C_FIGHTER:
+		class = "fighter";
+	    case C_MAGICIAN:
+		class = "magician";
+	    case C_CLERIC:
+		class = "cleric";
+	    case C_THIEF:
+		class = "thief";
+	    case C_PALADIN:
+	        class = "paladin";
+	    case C_RANGER:
+	        class = "ranger";
+	    case C_DRUID:
+	        class = "druid";
+	    case C_ILLUSION:
+	        class = "illusionist";
+	    case C_ASSASIN:
+	        class = "assasin";
+	    case C_NINJA:
+	        class = "ninja";
+	    default:
+		class = "monster";
+	}
+	return(class);
 }
