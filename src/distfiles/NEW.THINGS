@@ -1565,4 +1565,7 @@
 1.03 Alpha, Jan 8, 87
 1)	temporary fix of stacking code by Nick Flor
 
+1.03 Alpha, Jan 13, 87
+1)	fix of "Invalid command ^@" from Mike Laman
+
 -------	End of File ------

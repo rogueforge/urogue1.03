@@ -105,7 +105,7 @@ do_rooms()
 	 */
 	if (rnd(100) < (has_gold ? 80 : 40)) {
 	    short which;
-	    int i;
+	    int i, count;
 
 	    item = new_item(sizeof *tp);
 	    tp = THINGPTR(item);
