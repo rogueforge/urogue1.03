@@ -1,5 +1,5 @@
 /*
- * Last Modified: 08/12/86
+ * Last Modified: 11/03/86
  */
 /*
  * File with various monster functions in it
@@ -57,16 +57,38 @@ bool familiar,print_message;
     turn_on(*tp,ISCHARMED); /* Summoned monsters are always charmed */
 
     if (familiar) {
-	long ff_on;
-	long ff_off;
+	int i;
+	static long fam_on[] = { ISREGEN, CANSHOOT, CANWIELD, HASARMOR,
+				 ISFAMILIAR, 0 };
+	static long fam_off[] = { ISMEAN, ISHUH, ISINVIS, CANINWALL,
+				  CANSURPRISE, NOMOVE, ISSHADOW, ISGREED,
+				  ISFAST, CANFLY, 0 };
 
-	ff_on = ISREGEN | CANSHOOT | CANWIELD | HASARMOR | ISFAMILIAR;
-	ff_off = ISMEAN | ISHUH | ISINVIS | CANSURPRISE | NOMOVE | ISSHADOW | ISGREED | ISFAST | CANFLY;
-	turn_on(*tp, ff_on);
-	turn_off(*tp, ff_off);
+	for (i = 0; fam_on[i]; i++)
+	    turn_on(*tp, fam_on[i]);
+	for (i = 0; fam_off[i]; i++)
+	    turn_off(*tp, fam_off[i]);
 
-	if (fam_ptr != NULL)
+	if (fam_ptr != NULL) {		/* Get rid of old familiar */
+	    register struct thing *fp = THINGPTR(fam_ptr);
+	    struct linked_list *fpack = fp->t_pack;
+	    struct linked_list *item;
+
+	    if (fpack != NULL) {	/* Transfer pack */
+		if (tp->t_pack == NULL)
+		    tp->t_pack = fpack;
+		else {
+		    for (item = tp->t_pack; item->l_next != NULL;
+			 item = next(item))
+			;		/* find last item in list */
+		    item->l_next = fpack;
+		    fpack->l_prev = item;
+		}
+	    }
+	    fp->t_pack = NULL;
 	    killed(NULL, fam_ptr, NOMESSAGE, NOPOINTS);
+	}
+
 	fam_ptr = mp;
 	fam_type = monster;
 
@@ -242,10 +264,8 @@ bool max_monster;
 	else
 	    tp->t_stats.s_intel = min_intel + rnd(max_intel - min_intel);
     }
-    /* Spell points = INT * LVL, for now */
-    tp->t_stats.s_power = tp->t_stats.s_intel * tp->t_stats.s_lvl;
+    tp->t_stats.s_power = (rnd(tp->t_stats.s_lvl / 5) + 1) * tp->t_stats.s_intel;
 
-    /* Set up maxstats */
     tp->maxstats = tp->t_stats;		/* structure assignment */
 
     /* If the monster can shoot, it may have a weapon */
@@ -774,7 +794,7 @@ int y, x;
     if ((rnd(player.t_ctype == C_THIEF ? 40 : 200) == 0 || on(player, CANHEAR))
 		 && !cansee(tp->t_pos.y, tp->t_pos.x))
 	msg("You hear a %s nearby.", mname);
-    if ((rnd(player.t_ctype == C_THIEF ? 40 : 200) == 0 || on(player, CANSCENT))
+    else if ((rnd(player.t_ctype == C_THIEF ? 40 : 200) == 0 || on(player, CANSCENT))
 		 && !cansee(tp->t_pos.y, tp->t_pos.x))
 	msg("You smell a %s nearby.", mname);
 
@@ -824,6 +844,9 @@ int flags;
     monsters[which_monst].m_wander = FALSE;
     mpos = 0;
     msg("You have wiped out the %s.", monsters[which_monst].m_name);
+
+    if (blessed)
+	genocide(ISNORMAL);
 }
 
 

@@ -1559,5 +1559,7 @@
 29)	get_monster_number() created - kludgy until menu code arrives
 30)	Fixed WS_HIT bug that caused core dumps and slowed monsters
 	above by Carl Hommel
+31)	fixed tr_name so that the names are spaced correctly in noterse
+	mode
 
 -------	End of File ------
