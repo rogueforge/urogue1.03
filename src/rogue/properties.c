@@ -136,11 +136,11 @@ int junk;
 }
 
 /*
- * bff_ring_on
+ * bffron
  *
  * returns TRUE if hero is wearing this ring
  */
-bff_ring_on(obj_p, junk)
+bffron(obj_p, junk)
 register object *obj_p;
 int junk;
 {
@@ -151,16 +151,16 @@ int junk;
 }
 
 /*
- * bff_ring_off
+ * bffroff
  *
  * returns TRUE if hero isn't wearing this ring
  */
 
-bff_ring_off(obj_p, junk)
+bffroff(obj_p, junk)
 register object *obj_p;
 int junk;
 {
-	return(!bff_ring_on(obj_p, junk));
+	return(!bffron(obj_p, junk));
 }
 
 /*
@@ -200,7 +200,7 @@ int junk;
  * bag action routine to fetch the current weapon
  */
 
-baf_cur_weapon(obj_p, junk)
+bafcweapon(obj_p, junk)
 register struct object *obj_p;
 int junk;
 {
@@ -212,7 +212,7 @@ int junk;
 /*
  * bag action routine to fetch the current armor
  */
-baf_cur_armor(obj_p, junk)
+bafcarmor(obj_p, junk)
 register struct object *obj_p;
 int junk;
 {

@@ -1483,4 +1483,8 @@
 1.03 Alpha, Sep 16, 86
 1)	integrated failed patches from Carl
 
+1.03 Alpha, Sep 24, 86
+1)	applied patches by Mike Cooper to make variable names unique in
+	first 7 characters
+
 -------	End of File ------

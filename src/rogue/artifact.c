@@ -702,7 +702,7 @@ struct object *tr;
     }
     when 8: {
 	register object *obj;
-	int baf_cur_weapon();
+	int bafcweapon();
 	object *apply_to_bag();
 
 	if (cur_weapon == NULL) {
@@ -710,7 +710,7 @@ struct object *tr;
 	    pstats.s_dmg = "1d2";
 	    return;
 	}
-	obj = apply_to_bag(pack, NULL, NULL, baf_cur_weapon, NULL);
+	obj = apply_to_bag(pack, NULL, NULL, bafcweapon, NULL);
 	if (obj->o_flags & ISMETAL)
 	    msg("Your %s melts and disappears.", inv_name(obj, TRUE));
 	else
@@ -723,12 +723,12 @@ struct object *tr;
     when 9: {
 	register object *obj;
 	object *apply_to_bag();
-	int baf_cur_armor();
+	int bafcarmor();
 	if (cur_armor == NULL) {
 	    msg("Your body tingles a moment.");
 	    return;
 	}
-	obj = apply_to_bag(pack, NULL, NULL, baf_cur_armor, NULL);
+	obj = apply_to_bag(pack, NULL, NULL, bafcarmor, NULL);
 	msg("Your %s crumbles into small black powdery dust.",
 	      inv_name(obj, TRUE));
 	obj->o_flags &= ~ISCURSED;

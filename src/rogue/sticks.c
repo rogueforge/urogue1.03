@@ -781,16 +781,16 @@ int flags;
 		    msg("A secret door stands revealed before you!");
 		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		}
-		else goto nothing_doing;
+		else goto n_doing;
 	    when DOOR:
 		if (which == WS_CLOSE) {
 		    mvaddch(zap_loc.y, zap_loc.x, DOOR);
 		    msg("You block the door off.");
 		    if (is_stick) know_items[TYP_STICK][which] = TRUE;
 		}
-		else goto nothing_doing;
+		else goto n_doing;
 	    otherwise:
-nothing_doing:
+n_doing:
 		nothing_message(flags);
 	    }
 	}

@@ -1407,32 +1407,32 @@ register int dexterity;
  *	compute bonus/penalties for strength on the "to hit" roll
  */
 
-static int strength_to_hit[] =
+static int strtohit[] =
 {
   0,0,0,-3,-2,-2,-1,-1,0,0,0,0,0,0,0,0,0,1,1,3,3,4,4,5,6,7
 };
 str_plus(str)
 register short str;
 {
-  if (str < 3) return(strength_to_hit[3]);
-  else if (str > 25) return(strength_to_hit[25]);
-  else return(strength_to_hit[str]);
+  if (str < 3) return(strtohit[3]);
+  else if (str > 25) return(strtohit[25]);
+  else return(strtohit[str]);
 }
 
 /*
  * add_dam:
  *	compute additional damage done for exceptionally high or low strength
  */
-static int strength_damage[] =
+static int str_damage[] =
 {
   0,0,0,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,1,1,2,7,8,9,10,11,12,14
 };
 add_dam(str)
 register short str;
 {
-  if (str < 3) return(strength_damage[3]);
-  else if (str > 25) return(strength_damage[25]);
-  else return(strength_damage[str]);
+  if (str < 3) return(str_damage[3]);
+  else if (str > 25) return(str_damage[25]);
+  else return(str_damage[str]);
 }
 
 /*

@@ -35,7 +35,7 @@ int flags;
     char buf[2*LINELEN];
 
     if (reader != &player) {
-	monster_read(reader, which, flags);
+	monread(reader, which, flags);
 	return;
     }
     if (is_scroll) {					/* A regular scroll */
@@ -1095,9 +1095,9 @@ register struct object *obj;
 }
 
 /*
- * monster_read - monster gets the effect
+ * monread - monster gets the effect
  */
-monster_read(reader, which, flags)
+monread(reader, which, flags)
 struct thing *reader;
 int which;
 int flags;

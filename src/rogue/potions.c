@@ -35,7 +35,7 @@ int flags;
     char buf[2*LINELEN];
 
     if (quaffer != &player) {
-	monster_quaff(quaffer, which, flags);
+	monquaff(quaffer, which, flags);
 	return;
     }
     if (is_potion) {			/* A regular potion */
@@ -1052,9 +1052,9 @@ bool cursed;
 }
 
 /*
- * monster_quaff - monster gets the effect
+ * monquaff - monster gets the effect
  */
-monster_quaff(quaffer, which, flags)
+monquaff(quaffer, which, flags)
 struct thing *quaffer;
 int which;
 int flags;

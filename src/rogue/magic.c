@@ -43,11 +43,11 @@ int spell_cost[] = { 1, 5, 17, 29, 53, 91, 159, 247, 396};
 struct spells monst_spells[] = {
 #define		M_SELFTELEP	0
 	{ 5,	S_SELFTELEP,	SCR_MAGIC},
-#define		M_HEALING2	1
+#define		M_HLNG2	1
 	{ 4,	P_HEALING,	POT_MAGIC|_TWO_},
 #define		M_REGENERATE	2
 	{ 3,	P_REGENERATE,	POT_MAGIC},
-#define		M_HEALING	3
+#define		M_HLNG	3
 	{ 2,	P_HEALING,	POT_MAGIC},
 #define 	NUM_RUN 	4
 
@@ -184,15 +184,15 @@ coord shoot_dir;
     struct stats *maxp = &(caster->maxstats);
     bool is_player = (caster == &player);
 
-    int casters_class;				/* For determining ISKNOW */
-    int casters_stat;				/* s_intel or s_wisdom */
-    int casters_level;				/* spellcasting level */
-    int casters_points = curp->s_power;
+    int class_casters;				/* For determining ISKNOW */
+    int stat_casters;				/* s_intel or s_wisdom */
+    int level_casters;				/* spellcasting level */
+    int points_casters = curp->s_power;
     char *casters_name = (on(player, ISBLIND)) ? "it" : monsters[caster->t_index].m_name;
 
     char buf[2*LINELEN];
 
-    if (casters_points <= 0) {
+    if (points_casters <= 0) {
 	if (is_player)
 	    msg("You don't have any spell points.");
 	return;
@@ -202,48 +202,48 @@ coord shoot_dir;
      * Paladins, Rangers, ringwearers, and monsters cast at 4 levels below.
      * Other non-specialists at 8 below
      */
-    casters_level = curp->s_lvl;
+    level_casters = curp->s_lvl;
     switch (caster->t_ctype) {
     when C_PALADIN:
-	casters_level -= 4;
+	level_casters -= 4;
     case C_CLERIC:
-	casters_class = SP_CLERIC;
-	casters_stat = curp->s_wisdom;
+	class_casters = SP_CLERIC;
+	stat_casters = curp->s_wisdom;
     when C_RANGER:
-	casters_level -= 4;
+	level_casters -= 4;
     case C_DRUID:
-	casters_class = SP_DRUID;
-	casters_stat = curp->s_wisdom;
+	class_casters = SP_DRUID;
+	stat_casters = curp->s_wisdom;
     when C_MAGICIAN:
-	casters_class = SP_WIZARD;
-	casters_stat = curp->s_intel;
+	class_casters = SP_WIZARD;
+	stat_casters = curp->s_intel;
     when C_ILLUSION:
-	casters_class = SP_ILLUSION;
-	casters_stat = curp->s_intel;
+	class_casters = SP_ILLUSION;
+	stat_casters = curp->s_intel;
     when C_MONSTER:
 	if (off(*caster, ISUNIQUE))
-	    casters_level -= 4;
-	casters_class = 0x0;
-	casters_stat = curp->s_intel;
+	    level_casters -= 4;
+	class_casters = 0x0;
+	stat_casters = curp->s_intel;
     otherwise:
 	if (is_wearing(R_WIZARD)) {
-	    casters_level -= 4;
-	    casters_class = (rnd(4) ? SP_WIZARD : SP_ILLUSION);
-	    casters_stat = curp->s_intel;
+	    level_casters -= 4;
+	    class_casters = (rnd(4) ? SP_WIZARD : SP_ILLUSION);
+	    stat_casters = curp->s_intel;
 	}
 	else if (is_wearing(R_PIETY)) {
-	    casters_level -= 4;
-	    casters_class = (rnd(4) ? SP_CLERIC : SP_DRUID);
-	    casters_stat = curp->s_wisdom;
+	    level_casters -= 4;
+	    class_casters = (rnd(4) ? SP_CLERIC : SP_DRUID);
+	    stat_casters = curp->s_wisdom;
 	}
 	else  {
-	    casters_level -= 8;
-	    casters_class = 0x0;
-	    casters_stat = (rnd(2) ? curp->s_wisdom : curp->s_intel);
+	    level_casters -= 8;
+	    class_casters = 0x0;
+	    stat_casters = (rnd(2) ? curp->s_wisdom : curp->s_intel);
 	}
     }
     /* Bug - What about when WIS == INT? */
-    spell_type = (casters_stat == curp->s_intel) ? "spell" : "prayer";
+    spell_type = (stat_casters == curp->s_intel) ? "spell" : "prayer";
 
     if (!is_player && (sp = pick_monster_spell(caster)) == NULL)
 	return;
@@ -255,12 +255,12 @@ coord shoot_dir;
 	sorted_spells[0].sp_cost = -1;
 
 	for (sp=player_spells; sp->sp_level != -1; sp++) {
-	    if (sp->sp_flags & casters_class) {	/* Does class know spell? */
+	    if (sp->sp_flags & class_casters) {	/* Does class know spell? */
 		int rnd_number = rnd(2*sp->sp_level) - sp->sp_level;
 
 		/* Knows normal spell one level below others */
 		casting_cost = spell_cost[sp->sp_level - 1] + rnd_number;
-		if (casters_points >= casting_cost) {
+		if (points_casters >= casting_cost) {
 		    sorted_spells[++num_spells] = *sp;
 		    sorted_spells[num_spells].sp_cost = casting_cost;
 		    sorted_spells[num_spells].sp_level = sp->sp_level - 1;
@@ -268,7 +268,7 @@ coord shoot_dir;
 
 		/* Knows blessed spell one level above others */
 		casting_cost = spell_cost[sp->sp_level + 1] + rnd_number;
-		if (casters_points >= casting_cost) {
+		if (points_casters >= casting_cost) {
 		    sorted_spells[++num_spells] = *sp;
 		    sorted_spells[num_spells].sp_level = sp->sp_level + 1;
 		    sorted_spells[num_spells].sp_cost = casting_cost;
@@ -282,7 +282,7 @@ coord shoot_dir;
 		int rnd_number = rnd(4*sp->sp_level) - sp->sp_level;
 
 		casting_cost = spell_cost[sp->sp_level] + rnd_number;
-		if (casters_points >= casting_cost) {
+		if (points_casters >= casting_cost) {
 		    sorted_spells[++num_spells] = *sp;
 		    sorted_spells[num_spells].sp_cost = casting_cost;
 		}
@@ -303,7 +303,7 @@ coord shoot_dir;
 	    buf[0] = '\0';
 	    msg("");				/* Get rid of --More-- */
 	    msg("Which %s are you casting [%d points left] (* for list)? ",
-		spell_type, casters_points);
+		spell_type, points_casters);
 
 	    switch (get_str(buf, cw)) {
 	    when NORM:
@@ -351,18 +351,18 @@ coord shoot_dir;
      */
     cast_name = spell_name(sp);
 
-    fumble_chance = (10*sp->sp_level/4 - 10*casters_level/13) * 5;
+    fumble_chance = (10*sp->sp_level/4 - 10*level_casters/13) * 5;
     if (cur_weapon!=NULL && wield_ok(&player, cur_weapon, FALSE) == FALSE) {
 	switch(caster->t_ctype) {
 	when C_MAGICIAN:
 	case C_ILLUSION:
 	    msg("You should have both hands free.");
-	    fumble_chance += rnd(casters_level) * 5;
+	    fumble_chance += rnd(level_casters) * 5;
 	when C_CLERIC:
 	case C_DRUID:
 	case C_PALADIN:
 	    msg("Your god looks askance at the weapon you wield.");
-	    fumble_chance += rnd(casters_level) * 5;
+	    fumble_chance += rnd(level_casters) * 5;
 	otherwise:
 	    break;
 	}
@@ -659,9 +659,9 @@ struct thing *caster;
     register int i;
     struct spells *sp = NULL;
     struct stats *curp = &(caster->t_stats);
-    int casters_level = curp->s_lvl;
-    int casters_stat = curp->s_intel;
-    int casters_points = curp->s_power;
+    int level_casters = curp->s_lvl;
+    int stat_casters = curp->s_intel;
+    int points_casters = curp->s_power;
 
     /* Discover castable spells */
     for (sp=monst_spells; sp->sp_level != -1; sp++) {
@@ -669,7 +669,7 @@ struct thing *caster;
 	int rnd_number = rnd(2*spell_level) - spell_level;
 	int casting_cost = spell_cost[spell_level] + rnd_number;
 
-	if (casters_points >= casting_cost)
+	if (points_casters >= casting_cost)
 	     sp->sp_flags |= ISKNOW;
 	else sp->sp_flags &= ~ISKNOW;
     }
@@ -680,7 +680,7 @@ struct thing *caster;
     if (curp->s_hpt < rnd(caster->maxstats.s_hpt)) {	/* think defense */
 	register int i;
 	static int run_or_heal[NUM_RUN] =
-		{ M_SELFTELEP, M_HEALING2, M_HEALING, M_REGENERATE };
+		{ M_SELFTELEP, M_HLNG2, M_HLNG, M_REGENERATE };
 
 	for (i=0; i<NUM_RUN; i++) {
 	    sp = &monst_spells[run_or_heal[i]];
