@@ -562,6 +562,8 @@ reg double *avg;
 	extern char LOADAV_PROG[];
 	extern char LOADAV_SCAN[];
 
+	if (getloadavg(avg, 3) == 3)
+		return;
 	if( (pp = popen (LOADAV_PROG, "r")) == (FILE*) 0) {
 		avg[0] = 0;
 		avg[1] = 0;
