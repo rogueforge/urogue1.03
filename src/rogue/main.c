@@ -171,6 +171,12 @@ char **envp;
      * Check to see if he is a wizard
      */
     makesure();
+    if ((setregid(getgid(), getgid()) < 0 || setreuid(getuid(), getuid()) < 0)
+	&& (getegid() != getgid() || geteuid() != getuid()))
+    {
+	perror("urogue");
+	exit(1);
+    }
     if (argc >= 2 && argv[1][0] == '\0')
 	if (strcmp(PASSWD, crypt(getpass("Wizard's password: "), PASSWDSEED)) == 0) {
 		if (canwizard) {
