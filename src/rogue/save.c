@@ -18,8 +18,6 @@ typedef struct stat STAT;
 extern char version[], *strerror();
 #include <errno.h>
 
-char _putchar();
-
 STAT sbuf;
 
 int sigdie = -1;
@@ -206,31 +204,7 @@ char **envp;
     environ = envp;
     if ((sp = getenv(OPTIONS)) != NULL)
 	parse_opts(sp);
-#if defined(USGV5)
-    if (isatty(2)) {
-#else
-    if (!My_term && isatty(2)) {
-#endif
-	_tty_ch = 2;
-#if !defined(USGV5)
-	gettmode();
-#endif
-	if ((sp = getenv("TERM")) == NULL)
-	    sp = Def_term;
-    }
-    else
-	sp = Def_term;
-#if defined(attron)
-    savetty();
-    restartterm(sp, 1, 0);
-    resetty();
-#else
-    setterm(sp);
-#endif attron
-#if !defined(USGV5)
-    _puts(TI);
-    _puts(VS);
-#endif
+    setterm(getenv("TERM"));
 
     /*
      * Should we turn keypad mode on?
