@@ -353,7 +353,7 @@ setup()
     void areuok();
     int  checkout();
 
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
     int  tstop();
     signal(SIGTSTP, tstop);
 #endif
