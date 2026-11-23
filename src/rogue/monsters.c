@@ -625,7 +625,7 @@ int y, x;
 	if (on(*tp, CANHUH)) {
 	    if (on(player, CANREFLECT)) {
 		msg("You reflect the bewildering stare of the %s.", mname);
-		if (save_throw(tp, VS_MAGIC)) {
+		if (save_throw(VS_MAGIC, tp)) {
 		    msg("The %s is confused!", mname);
 		    turn_on(*tp, ISHUH);
 		}
@@ -652,7 +652,7 @@ int y, x;
         if (on(*tp, CANSNORE)) {
 	    if (on(player, CANREFLECT)) {
 		msg("You reflect the lethargic glance of the %s", mname);
-		if (save_throw(tp, VS_PARALYZATION)) {
+		if (save_throw(VS_PARALYZATION, tp)) {
 		    msg("The %s falls asleep!", mname);
 		    tp->t_no_move += SLEEPTIME;
 		}
@@ -673,7 +673,7 @@ int y, x;
 	    turn_off(*tp, CANFRIGHTEN);
 	    if (on(player, CANREFLECT)) {
 		msg("The %s sees its reflection. ", mname);
-		if (save_throw(tp, VS_MAGIC)) {
+		if (save_throw(VS_MAGIC, tp)) {
 		    msg("The %s is terrified by its reflection!", mname);
 		    turn_on(*tp, ISFLEE);
 		}
@@ -699,7 +699,7 @@ int y, x;
 	    turn_off(*tp, LOOKSLOW); 
 	    if (on(player, CANREFLECT)) {
 		msg("You reflect the mournful glare of the %s.", mname);
-		if (save_throw(tp, VS_MAGIC)) {
+		if (save_throw(VS_MAGIC, tp)) {
 		    msg("The %s is slowing down!", mname);
 		    turn_on(*tp, ISSLOW);
 		}
@@ -730,7 +730,7 @@ int y, x;
 	    turn_off(*tp, CANBLIND);
 	    if (on(player, CANREFLECT)) {
 		msg("You reflect the blinding stare of the %s.", mname);
-		if (save_throw(tp, VS_WAND)) {
+		if (save_throw(VS_WAND, tp)) {
 		    msg("The %s is blinded!", mname);
 		    turn_on(*tp, ISHUH);
 		}
@@ -751,7 +751,7 @@ int y, x;
 	    turn_off(*tp, LOOKSTONE);
 	    if (on(player, CANREFLECT)) {
 		msg("You reflect the flinty look of the %s.", mname);
-		if (save_throw(tp, VS_PETRIFICATION)) {
+		if (save_throw(VS_PETRIFICATION, tp)) {
 		    msg("The %s suddenly stiffens", mname);
 		    tp->t_no_move += STONETIME;
 		}
