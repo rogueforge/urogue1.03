@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <sys/types.h>
+#include <fcntl.h>
 #include <pwd.h>
 #include "rogue.h"
 #include "mach_dep.h"
@@ -248,6 +249,8 @@ int lvl;
 	fflush(stdout);
 	fgets(prbuf, 2*LINELEN, stdin);
     }
+    if (!waswizard)
+	hold_sc(fd_score);
     encread((char *) top_ten, sizeof top_ten, fd_score);
     /*
      * Insert player in list if need be
@@ -361,11 +364,14 @@ int lvl;
 	    putchar('\n');
 	}
     }
-    lseek(fd_score, 0L, 0);
     /*
      * Update the list file
      */
-    encwrite((char *) top_ten, sizeof top_ten, fd_score);
+    if (!waswizard)
+    {
+	lseek(fd_score, 0L, 0);
+	encwrite((char *) top_ten, sizeof top_ten, fd_score);
+    }
     close(fd_score);
     if(!prscore) {
     	putchar('\n');
@@ -373,6 +379,27 @@ int lvl;
     	fflush(stdout);
     	fgets(prbuf, 2*LINELEN, stdin);
     }
+}
+
+/*
+ * hold_sc:
+ *	Lock the score file.  The lock goes when the file is closed.
+ *	Return TRUE if the file could be locked.
+ */
+hold_sc(fd)
+int fd;
+{
+    register int cnt;
+    static struct flock fl;
+
+    fl.l_type = F_WRLCK;
+    for (cnt = 0; fcntl(fd, F_SETLK, &fl) < 0; cnt++)
+    {
+	if (cnt == 5)
+	    return FALSE;
+	sleep(1);
+    }
+    return TRUE;
 }
 
 total_winner()
