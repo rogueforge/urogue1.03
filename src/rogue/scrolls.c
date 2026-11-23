@@ -541,11 +541,11 @@ pet_message:	    msg("The dungeon begins to rumble and shake!");
 	    if ((ll = get_item("enchant",0)) != NULL) {
 		lb = OBJPTR(ll);
 		lb->o_flags &= ~ISCURSED;
-		if (is_scroll && (obj->o_flags & ISBLESSED)) {
+		if (is_scroll && blessed) {
 		    howmuch = 2;
 		    flags = ISBLESSED;
 		}
-		else if (is_scroll && (obj->o_flags & ISCURSED)) {
+		else if (is_scroll && cursed) {
 		    howmuch = -1;
 		    flags = ISCURSED;
 		}
