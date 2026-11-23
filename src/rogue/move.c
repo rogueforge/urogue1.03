@@ -306,6 +306,8 @@ int dy, dx;
 	    player.t_oldch = t;
 
 	    turn_on(*tp, ISRUN);
+	    if (tp->t_dest == NULL)
+		tp->t_dest = &hero;
 
 	    mvwaddch(cw,hero.y,hero.x,PLAYER);
 	    wrefresh(cw);
