@@ -1037,7 +1037,7 @@ extern struct real_pass rpass;		/* For protection's sake! */
 extern char *cnames[][15];		/* Character level names */
 extern char PLAYER;			/* what the player looks like */
 extern int resurrect;			/* resurrection counter */
-extern bool char_type;			/* what type of character is player */
+extern char char_type;			/* what type of character is player */
 extern int foodlev;			/* how fast he eats food */
 extern int see_dist;			/* how far he can see^2 */
 extern int level;			/* What level rogue is on */
@@ -1114,7 +1114,7 @@ extern bool moving;			/* move using 'm' command */
 extern bool know_items[MAXMAGICTYPES][MAXMAGICITEMS]; /* Does he know what a magic item does */
 extern bool in_shell;			/* True if executing a shell */
 extern coord delta;			/* Change indicated to get_dir() */
-extern bool inv_type;			/* Inven style. Bool so options works */
+extern char inv_type;			/* Inven style. Bool so options works */
 extern int line_cnt;			/* Counter for inventory style */
 extern int newpage;
 extern char *lastfmt;
