@@ -4,7 +4,7 @@
 /*
  * Machine dependent (tunable) parameters.
  */
-#define	ROGUEPATH(FILE)	"/usr/games/lib/urogue/FILE"
+#define	ROGUEPATH(FILE)	"/usr/games/lib/urogue/" #FILE
 
 /*
  * Wizard's identity.
