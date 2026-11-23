@@ -1197,7 +1197,7 @@ at_hero:
 			show(spotpos[x].y, spotpos[x].x));
     }
     if (take_that[BOLT_LENGTH] != 0) {
-	if (tp != THINGPTR(fam_ptr)) {
+	if (fam_ptr == NULL || tp != THINGPTR(fam_ptr)) {
 	    if (terse) 
 		msg("The %s hits you.", name);
 	    else 
