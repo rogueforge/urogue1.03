@@ -1058,8 +1058,8 @@ bool mark;
 	else {
 	    if (guess_items[item_type][obj->o_which] != NULL)
 		free(guess_items[item_type][obj->o_which]);
-	    guess_items[item_type][obj->o_which] =
-		new((unsigned int) strlen(prbuf) + 1);
+	    guess_items[item_type][obj->o_which] = new((unsigned int) (strlen(prbuf)
+		< sizeof (struct thing) ? sizeof (struct thing) : strlen(prbuf) + 1));
 	    strcpy(guess_items[item_type][obj->o_which], prbuf);
 	}
     }
