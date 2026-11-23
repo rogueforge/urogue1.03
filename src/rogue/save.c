@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <signal.h>
 #include "rogue.h"
 #include "mach_dep.h"
@@ -114,7 +115,7 @@ gotfile:
 	wclear(hw);
 	wmove(hw, LINES-1, 0);
 	wrefresh(hw);
-	if ((savefd = creat(file_name, 0400)) == -1)
+	if ((savefd = save_open()) == -1)
 	    msg(strerror(errno));	/* fake perror() */
     } while (savefd == -1);
 
@@ -161,13 +162,28 @@ int sig;
 
 got1sig:
     if (file_name[0] != '\0' && save_ok()
-	&& (savefd = creat(file_name, 0400)) > -1)
+	&& (savefd = save_open()) > -1)
 	save_file(savefd);
 #if defined(BSD4) && !defined(NCURSES_VERSION)
     (void) TtySetOriginalChars();
 #endif
     endwin();
     exit(1);
+}
+
+/*
+ * save_open:
+ *	Make the file to save the game in, new, and closed to everyone
+ *	but the player.  A regular file in the way is removed first, and
+ *	anything else there makes it fail.
+ */
+save_open()
+{
+    STAT sb;
+
+    if (stat(file_name, &sb) >= 0 && (sb.st_mode & S_IFMT) == S_IFREG)
+	unlink(file_name);
+    return open(file_name, O_WRONLY|O_CREAT|O_EXCL, 0400);
 }
 
 save_file(savefd)
@@ -217,6 +233,11 @@ char **envp;
     if (sbuf2.st_uid != getuid())
     {
 	printf("Sorry, saved game is not yours.\n");
+	return FALSE;
+    }
+    if ((sbuf2.st_mode & 022) != 0)
+    {
+	printf("Sorry, saved game can be written by others.\n");
 	return FALSE;
     }
 

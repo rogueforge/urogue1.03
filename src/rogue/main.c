@@ -516,7 +516,7 @@ checkout()
 		endwin();
 		printf("\n");	/* now do a save if possible */
 		if (file_name[0] != '\0' && save_ok()
-			&& (savefd = creat(file_name, 0400)) > -1)
+			&& (savefd = save_open()) > -1)
 		    save_file(savefd);
 #if defined(BSD4) && !defined(NCURSES_VERSION)
 		(void) TtySetOriginalChars();
