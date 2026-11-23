@@ -384,7 +384,7 @@ sell_it()
 {
 	reg struct object *obj;
 	reg struct linked_list *item;
-	char buf[2*LINELEN];
+	char buf[4*LINELEN + 32];
 
 	if ((item = get_item("sell", 0)) == NULL)
 	    return;
