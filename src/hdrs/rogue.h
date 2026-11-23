@@ -8,6 +8,7 @@
 #include "defs.h"
 #include "curses.h"
 #include "tunable.h"
+#include <stdarg.h>
 
 /*
  * Maximum number of different things
@@ -980,6 +981,8 @@ bool	blue_light(), can_blink(), shoot_bolt(), add_pack(),
 	wear_ok(), wield_ok(), is_stealth(), is_wearing();
 
 void	byebye(), id_monst();
+
+int	msg(char *fmt, ...), addmsg(char *fmt, ...);
 
 long lseek();
 

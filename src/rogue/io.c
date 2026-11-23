@@ -11,7 +11,6 @@
 #include "rogue.h"
 #include "mach_dep.h"
 #include "stepok.h"
-#include "varargs.h"
 
 static char mbuf[2*BUFSIZ];
 static int newpos = 0;
@@ -23,9 +22,7 @@ static int newpos = 0;
 
 
 /*VARARGS1*/
-msg(fmt, va_alist)
-char *fmt;
-va_dcl
+msg(char *fmt, ...)
 {
     va_list ap;
 
@@ -42,7 +39,7 @@ va_dcl
     /*
      * otherwise add to the message and flush it out
      */
-    va_start(ap);
+    va_start(ap, fmt);
     doadd(fmt, ap);
     va_end(ap);
     endmsg();
@@ -52,13 +49,11 @@ va_dcl
  * add things to the current message
  */
 /*VARARGS1*/
-addmsg(fmt, va_alist)
-char *fmt;
-va_dcl
+addmsg(char *fmt, ...)
 {
     va_list ap;
 
-    va_start(ap);
+    va_start(ap, fmt);
     doadd(fmt, ap);
     va_end(ap);
 }
@@ -87,24 +82,12 @@ endmsg()
 /*VARARGS1*/
 doadd(fmt, args)
 char *fmt;
-int **args;
+va_list args;
 {
-    static FILE junk;
-
     /*
      * Do the printf into buf
      */
-    junk._flag = _IOWRT;  /* Under 3.0 IOUNK was IOSTRG */
-    junk._ptr = &mbuf[newpos];
-#if defined(STDIO_BASE_P)
-    junk._base = junk._ptr;
-#endif STDIO_BASE_P
-#if defined(_NFILE)
-    junk._file = _NFILE;
-#endif _NFILE
-    junk._cnt = 32767;
-    _doprnt(fmt, args, &junk);
-    putc('\0', &junk);
+    vsprintf(&mbuf[newpos], fmt, args);
     newpos = strlen(mbuf);
 }
 
