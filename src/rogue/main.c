@@ -289,6 +289,12 @@ char **envp;
     (void) TtyInit();			/* Set up for the tty magic */
 #endif
     initscr();				/* Start up cursor package */
+    if (LINES < 15 || COLS < 40)
+    {
+	endwin();
+	printf("\nSorry, urogue needs a terminal with at least 15 lines and 40 columns.\n");
+	exit(1);
+    }
 #if defined(attron)
     typeahead(-1);	/* Turn off typeahead checking */
 #endif attron
