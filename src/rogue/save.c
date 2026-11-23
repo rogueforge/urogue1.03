@@ -175,8 +175,8 @@ char **envp;
 	    return FALSE;
 	}
 	else if (sbuf2.st_ctime - sbuf.st_ctime > SAVETIME) {
-	    printf("(%d): Sorry, file has been touched.\n",
-		sbuf2.st_ctime - sbuf.st_ctime);
+	    printf("(%ld): Sorry, file has been touched.\n",
+		(long) (sbuf2.st_ctime - sbuf.st_ctime));
 	    return FALSE;
 	}
     }

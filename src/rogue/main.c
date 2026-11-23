@@ -142,7 +142,7 @@ char **envp;
      */
     if (prnews) {
 	pagerbase = strrchr(PAGER, '/')+1;
-	(void) execl(PAGER, pagerbase, NEWS, 0);
+	(void) execl(PAGER, pagerbase, NEWS, (char *) 0);
 	exit(0);
     }
 
@@ -285,7 +285,7 @@ char **envp;
     /*
      * Start up daemons and fuses
      */
-    start_daemon(doctor, (int) &player, AFTER);
+    start_daemon(doctor, (long) &player, AFTER);
     fuse(swander, 0, WANDERTIME, AFTER);
     start_daemon(stomach, 0, AFTER);
     start_daemon(runners, 0, AFTER);
