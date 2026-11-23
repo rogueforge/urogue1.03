@@ -209,8 +209,14 @@ char **envp;
 
     if (strcmp(file, "-r") == 0)
 	file = strcpy(name, file_name);
-    if ((infd = open(file, 0)) < 0) {
+    if ((infd = open(file, 0)) < 0
+	|| fstat(infd, &sbuf2) < 0) {
 	perror(file);
+	return FALSE;
+    }
+    if (sbuf2.st_uid != getuid())
+    {
+	printf("Sorry, saved game is not yours.\n");
 	return FALSE;
     }
 
@@ -222,7 +228,6 @@ char **envp;
 	return FALSE;
     }
 
-    fstat(infd, &sbuf2);
     if (sbuf2.st_size != save_size())
     {
 	printf("Sorry, saved game is out of date.\n");
