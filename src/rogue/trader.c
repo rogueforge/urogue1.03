@@ -415,12 +415,12 @@ sell_it()
 		return;
 	}
 
+	sprintf(buf, "Sold %s.  Hit space to continue.", inv_name(obj, LOWERCASE));
 	rem_pack(obj);
 	discard(item);
 	purse += cur_worth;		/* give him his money */
 	++num_transactions;
 	effective_purse += cur_worth;
-	sprintf(buf, "Sold %s.  Hit space to continue.", inv_name(obj, LOWERCASE));
 	mvwaddstr(hw, 13, 0, buf);
 	touchwin(hw);
 	wrefresh(hw);
