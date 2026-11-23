@@ -96,9 +96,7 @@
 #define	o_charges o_ac
 #define	mi_wght mi_worth
 
-#if	defined(TCFLSH)
-#define	flushout() ioctl(_tty_ch,TCFLSH,0)
-#endif
+#define	flushout() flushinp()
 
 /*
  * Things that appear on the screens

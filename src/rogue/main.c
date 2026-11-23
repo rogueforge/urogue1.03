@@ -391,19 +391,7 @@ playit()
      * set up defaults for slow terminals
      */
 
-#if defined(attron)
-	if(baudrate() < B1200)
-#else
-#if defined(USGV5) || defined(USGV3)
-	if((_tty.c_cflag & CBAUD) < B1200)
-#endif
-#if defined(BSD4)
-	if(_tty.sg_ospeed < B1200)
-#endif
-#if defined(RTU2)
-	if(TRUE == FALSE)  /* dummy if since RTU screws up BSD simulation */
-#endif
-#endif attron
+	if (baudrate() < 1200)
     {
 	terse = TRUE;
 	jump = TRUE;

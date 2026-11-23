@@ -25,15 +25,6 @@ extern SGTTY _tty;
 #endif NOT attron
 #endif
 
-#if !defined(flushout) && !defined(USGV5)
-flushout()
-{
-	int out = 1;
-
-	ioctl(_tty_ch, TIOCFLUSH, (char *)&out);
-}
-#endif
-
 #if defined(NRANDOM)
 #define		TYPE_0		0		/* linear congruential */
 #define		BREAK_0		8

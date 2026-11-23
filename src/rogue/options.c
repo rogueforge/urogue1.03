@@ -247,12 +247,7 @@ WINDOW *win;
 	wclrtoeol(win), wrefresh(win)) {
 	if (c == -1)
 	    continue;
-#if (defined(USGV3) || defined(USGV5) || defined(attron)) && !defined(SCO5)
-	else if (c == _tty.c_cc[VERASE]) /* process erase character */
-#endif
-#if defined(BSD4) || defined(RTU2) || defined(SCO5)
-	else if (c == _tty.sg_erase) /* process erase character */
-#endif
+	else if (c == erasechar()) /* process erase character */
 	{
 	    if (sp > buf) {
 		register int i;
@@ -263,12 +258,7 @@ WINDOW *win;
 	    }
 	    continue;
 	}
-#if (defined(USGV3) || defined(USGV5) || defined(attron)) && !defined(SCO5)
-	else if (c == _tty.c_cc[VKILL])  /* process kill character */
-#endif
-#if defined(BSD4) || defined(RTU2) || defined(SCO5)
-	else if (c == _tty.sg_kill)  /* process kill character */
-#endif
+	else if (c == killchar())  /* process kill character */
 	{
 	    sp = buf;
 	    wmove(win, oy, ox);

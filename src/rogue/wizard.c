@@ -171,19 +171,9 @@ passwd()
     mpos = 0;
     sp = buf;
     while ((c = (getchar() & 0177)) != '\n' && c != '\r' && c != '\033')
-#if (defined(USGV3) || defined(USGV5)) && !defined(SCO5)
-	if (c == _tty.c_cc[VKILL])
-#endif
-#if defined(BSD4) || defined(RTU2) || defined(SCO5)
-	if (c == _tty.sg_kill)
-#endif
+	if (c == killchar())
 	    sp = buf;
-#if (defined(USGV3) || defined(USGV5)) && !defined(SCO5)
-	else if (c == _tty.c_cc[VERASE] && sp > buf)
-#endif
-#if defined(BSD4) || defined(RTU2) || defined(SCO5)
-	else if (c == _tty.sg_erase && sp > buf)
-#endif
+	else if (c == erasechar() && sp > buf)
 	    sp--;
 	else
 	    *sp++ = c;
