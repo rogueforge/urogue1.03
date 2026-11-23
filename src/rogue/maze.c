@@ -2,6 +2,9 @@
  * Last Modified: 06/28/86
  */
 #include "rogue.h"
+#undef malloc
+#undef free
+#include <stdlib.h>
 
 struct cell {
 	char y_pos;
