@@ -8,6 +8,7 @@
 
 #include <ctype.h>
 #include <signal.h>
+#include <errno.h>
 #include "rogue.h"
 #include "score.h"
 #include "death.h"
@@ -974,7 +975,7 @@ shell()
     else {
 	signal(SIGINT, SIG_IGN);
 	signal(SIGQUIT, SIG_IGN);
-	while (wait(&ret_status) != pid)
+	while (wait(&ret_status) != pid && errno != ECHILD)
 	    continue;
 	signal(SIGINT, quit);
 	signal(SIGQUIT, quit);
