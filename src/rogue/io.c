@@ -314,7 +314,7 @@ char *fmt, *arg;
                 touchwin(tw);
                 wrefresh(tw);
                 wait_for(' ');
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
                 if (CE) {
                     werase(tw);
                     wrefresh(tw);
