@@ -363,7 +363,7 @@ register char *str;
 		    *(bool *)op->o_opt = TRUE;
 		else {			/* string option */
 		    register char *start;
-		    char value[80];
+		    char value[4*LINELEN];
 
 		    /*
 		     * Skip to start of string value
@@ -387,7 +387,7 @@ register char *str;
 
 		    /* Put the value into the option field */
 		    if (op->o_putfunc != put_abil && op->o_putfunc != put_inv)
-			strcpy(op->o_opt, value);
+			strucpy(op->o_opt, value, strlen(value));
 
 		    if (op->o_putfunc == put_inv) {
 			register int len = strlen(value);
@@ -448,17 +448,21 @@ register char *str;
 }
 
 /*
- * copy string using unctrl for things
+ * copy string using unctrl for things, but no more of it than a
+ * string of 2*LINELEN holds
  */
 strucpy(s1, s2, len)
 register char *s1, *s2;
 register int len;
 {
-    register char *sp;
+    register char *sp, *end = s1 + 2*LINELEN - 1;
 
     while (len--)
     {
-	strcpy(s1, (sp = unctrl(*s2++)));
+	sp = unctrl(*s2++);
+	if (s1 + strlen(sp) > end)
+	    break;
+	strcpy(s1, sp);
 	s1 += strlen(sp);
     }
     *s1 = '\0';
