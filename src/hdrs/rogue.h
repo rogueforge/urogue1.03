@@ -10,6 +10,7 @@
 #include "tunable.h"
 #include <stdarg.h>
 #include <time.h>
+#include <unistd.h>
 
 /*
  * Maximum number of different things
@@ -954,7 +955,7 @@ struct linked_list
 struct object *wield_weap();
 
 char *malloc(), *getenv(), *tr_name(), *new();
-char *vowelstr(), *inv_name(), *strcpy(), *strcat(), *sbrk(), *brk();
+char *vowelstr(), *inv_name(), *strcpy(), *strcat();
 char *ctime(), *num(), *ring_num(), *blesscurse();
 #if !defined(unctrl)
 char *unctrl();
@@ -985,7 +986,6 @@ void	byebye(), id_monst();
 
 int	msg(char *fmt, ...), addmsg(char *fmt, ...);
 
-long lseek();
 
 struct trap *trap_at();
 
