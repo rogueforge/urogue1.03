@@ -184,6 +184,7 @@ int dy, dx;
 	}
 	else {
 	    msg("You are being held.");
+	    running = FALSE;
 	    return;
 	}
     }
