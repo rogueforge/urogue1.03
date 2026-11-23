@@ -589,9 +589,7 @@ char *howso;
 void
 byebye()
 {
-    extern bool _endwin;
-
-    if (!_endwin) {
+    if (!isendwin()) {
 	endwin();
     }
     printf("\n");
