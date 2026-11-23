@@ -256,7 +256,7 @@ bool thrown;
 		    else {
 			msg("Your armor shatters from the shriek.");
 			cur_armor = NULL;
-			del_pack(item);
+			discard_pack(obj);
 		    }
 		}
 	    }
@@ -421,7 +421,7 @@ bool thrown;
 		    else {
 			msg("Your armor is shattered by the blow.");
 			cur_armor = NULL;
-			del_pack(item);
+			discard_pack(obj);
 		    }
 		}
 		else if (rnd(mp->t_stats.s_str) > 15) {
@@ -825,7 +825,7 @@ bool thrown;
 			obj->o_flags &= ~ISCURSED;
 			dropcheck(obj);
 			rem_pack(obj);
-			attach(mp->t_pack, steal);
+			attach(mp->t_pack, make_item(obj));
 			if (obj->o_type == ARTIFACT)
 			    has_artifact &= ~(1 << obj->o_which);
 		    }
