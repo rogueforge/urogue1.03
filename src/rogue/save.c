@@ -213,7 +213,7 @@ char **envp;
     register char *sp;
     char buf[2*LINELEN], name[2*LINELEN];
     STAT sbuf2;
-    int y, x;
+    int y, x, owiz;
 
     makesure();
 
@@ -256,6 +256,7 @@ char **envp;
     }
     fflush(stdout);
     lseek(infd, 0L, 0);
+    owiz = wizard;
     if (encread(version, rg_edata - version, infd) != rg_edata - version
 	|| strcmp(buf, version) != 0
 	|| encread(rg_bss, rg_ebss - rg_bss, infd) != rg_ebss - rg_bss)
@@ -275,13 +276,15 @@ char **envp;
 	printf("Sorry, saved game is damaged.\n");
 	return FALSE;
     }
+    if ((wizard = owiz) != FALSE)
+	waswizard = TRUE;
 
     /*
      * we do not close the file so that we will have a hold of the
      * inode for as long as possible
      */
 
-    if (!wizard) {
+    if (!owiz) {
 	if (sbuf2.st_ino != sbuf.st_ino) {
 	    printf("Sorry, saved game is not in the same file.\n");
 	    return FALSE;
@@ -312,7 +315,7 @@ char **envp;
     /*
      * defeat multiple restarting from the same place
      */
-    if (!wizard) {
+    if (!owiz) {
 	if (sbuf2.st_nlink != 1) {
 	    endwin();
 	    printf("Cannot restore from a linked file\n");
