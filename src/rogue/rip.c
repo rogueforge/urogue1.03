@@ -253,7 +253,17 @@ int lvl;
     }
     if (!waswizard)
 	hold_sc(fd_score);
-    encread((char *) top_ten, sizeof top_ten, fd_score);
+    i = encread((char *) top_ten, sizeof top_ten, fd_score);
+    for (scp = sc2 = top_ten; scp < &top_ten[10]; scp++)
+	if ((char *) (scp + 1) - (char *) top_ten <= i && scp->sc_score != 0
+	    && scp->sc_flags >= 0 && scp->sc_flags <= 3
+	    && scp->sc_monster >= D_CLUMSY && scp->sc_monster <= nummonst + 2)
+		*sc2++ = *scp;
+    while (sc2 < &top_ten[10]) {
+	sc2->sc_lvl = 0;
+	sc2->sc_uid = RN;
+	sc2++->sc_score = 0;
+    }
     /*
      * Insert player in list if need be
      */
