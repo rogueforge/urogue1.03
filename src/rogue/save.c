@@ -378,7 +378,7 @@ char **envp;
     nonl();
 #endif
 #endif attron
-    srand(getpid());
+    srand48(getpid());
     playit();
     /*NOTREACHED*/
 }
