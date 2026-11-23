@@ -736,7 +736,7 @@ do_phial()
     /* Prompt for action */
     msg("How do you wish to apply the Phial of Galadriel (* for list)? ");
 
-    which = (short) ((getchar() & 0177) - 'a');
+    which = (short) (readchar() - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
 	after = FALSE;
 	return;
@@ -747,7 +747,7 @@ do_phial()
 	end_line();
 	msg("");
 	msg("Which power do you wish to use? ");
-	which = (short) ((getchar() & 0177) - 'a');
+	which = (short) (readchar() - 'a');
 	while (which < 0 || which > 1) {
 	    if (which == (short) ESCAPE - (short) 'a') {
 		after = FALSE;
@@ -755,7 +755,7 @@ do_phial()
 	    }
 	    msg("");
 	    msg("Please enter one of the listed powers: ");
-	    which = (short) ((getchar() & 0177) - 'a');
+	    which = (short) (readchar() - 'a');
 	}
 	msg("Your attempt is successful.");
     }
@@ -796,7 +796,7 @@ do_palantir()
     if (is_carrying(TR_CROWN))
 	limit += 1;
 
-    which = (short) ((getchar() & 0177) - 'a');
+    which = (short) (readchar() - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
 	after = FALSE;
 	return;
@@ -813,14 +813,14 @@ do_palantir()
 	    add_line( "[f] clear thought");
 	end_line();
 	msg("Which power do you wish to use?");
-	which = (short) ((getchar() & 0177) - 'a');
+	which = (short) (readchar() - 'a');
 	while (which < 0 || which > limit) {
 	    if (which == (short) ESCAPE - (short) 'a') {
 		after = FALSE;
 		return;
 	    }
 	    msg("Please enter one of the listed powers: ");
-	    which = (short) ((getchar() & 0177) - 'a');
+	    which = (short) (readchar() - 'a');
 	}
 	msg("Your attempt is successful.");
     }
@@ -848,7 +848,7 @@ do_silmaril()
     /* Prompt for action */
     msg("How do you wish to apply the Silamril of Ea (* for list)? ");
 
-    which = (short) ((getchar() & 0177) - 'a');
+    which = (short) (readchar() - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
 	after = FALSE;
 	return;
@@ -860,7 +860,7 @@ do_silmaril()
 	add_line( "[c] stairwell downwards");
 	end_line();
 	msg("Which power do you wish to use?");
-	which = (short) ((getchar() & 0177) - 'a');
+	which = (short) (readchar() - 'a');
 	while (which < 0 || which > 2) {
 	    if (which == (short) ESCAPE - (short) 'a') {
 		after = FALSE;
@@ -868,7 +868,7 @@ do_silmaril()
 	    }
 	    msg("");
 	    msg("Please enter one of the listed powers: ");
-	    which = (short) ((getchar() & 0177) - 'a');
+	    which = (short) (readchar() - 'a');
 	}
 	msg("Your attempt is successful.");
     }
@@ -899,7 +899,7 @@ do_amulet()
     limit = 0;
     if (is_carrying(TR_PURSE))
 	limit += 1;
-    which = (short) ((getchar() & 0177) - 'a');
+    which = (short) (readchar() - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
 	after = FALSE;
 	return;
@@ -911,7 +911,7 @@ do_amulet()
 	    add_line( "[b] invisibility");
 	end_line();
 	msg("Which power do you wish to use?");
-	which = (short) ((getchar() & 0177) - 'a');
+	which = (short) (readchar() - 'a');
 	while (which < 0 || which > limit) {
 	    if (which == (short) ESCAPE - (short) 'a') {
 		after = FALSE;
@@ -919,7 +919,7 @@ do_amulet()
 	    }
 	    msg("");
 	    msg("Please enter one of the listed powers: ");
-	    which = (short) ((getchar() & 0177) - 'a');
+	    which = (short) (readchar() - 'a');
 	}
 	msg("Your attempt is successful.");
     }
@@ -946,7 +946,7 @@ do_bag(obj)
   /* Prompt for action */
   msg("How do you wish to apply the Magic Purse of Yendor (* for list)? ");
   
-  which = (short) ((getchar() & 0177) - 'a');
+  which = (short) (readchar() - 'a');
   if (which == (short) ESCAPE - (short) 'a') 
     {
       after = FALSE;
@@ -967,7 +967,7 @@ do_bag(obj)
 	add_line( "[d] see invisible");
       end_line();
       msg("Which power do you wish to use?");
-      which = (short) ((getchar() & 0177) - 'a');
+      which = (short) (readchar() - 'a');
       while (which < 0 || which > limit) {
 	if (which == (short) ESCAPE - (short) 'a') 
 	  {
@@ -976,7 +976,7 @@ do_bag(obj)
 	  }
 	msg("");
 	msg("Please enter one of the listed powers: ");
-	which = (short) ((getchar() & 0177) - 'a');
+	which = (short) (readchar() - 'a');
       }
       msg("Your attempt is successful.");
     }
@@ -1022,7 +1022,7 @@ do_sceptre()
     /* Prompt for action */
     msg("How do you wish to apply the Sceptre of Might (* for list)? ");
 
-    which = (short) ((getchar() & 0177) - 'a');
+    which = (short) (readchar() - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
 	after = FALSE;
 	return;
@@ -1048,7 +1048,7 @@ do_sceptre()
 	    add_line( "[h] smell monster");
 	end_line();
 	msg("Which power do you wish to use?");
-	which = (short) ((getchar() & 0177) - 'a');
+	which = (short) (readchar() - 'a');
 	while (which < 0 || which > limit) {
 	    if (which == (short) ESCAPE - (short) 'a') {
 		after = FALSE;
@@ -1056,7 +1056,7 @@ do_sceptre()
 	    }
 	    msg("");
 	    msg("Please enter one of the listed powers: ");
-	    which = (short) ((getchar() & 0177) - 'a');
+	    which = (short) (readchar() - 'a');
 	}
 	msg("Your attempt is successful.");
     }
@@ -1110,7 +1110,7 @@ do_wand()
     /* Prompt for action */
     msg("How do you wish to apply the Wand of Orcus (* for list)? ");
 
-    which = (short) ((getchar() & 0177) - 'a');
+    which = (short) (readchar() - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
 	after = FALSE;
 	return;
@@ -1124,7 +1124,7 @@ do_wand()
 	}
 	end_line();
 	msg("Which power do you wish to use?");
-	which = (short) ((getchar() & 0177) - 'a');
+	which = (short) (readchar() - 'a');
 	while (which < 0 || which >= maxsticks) {
 	    if (which == (short) ESCAPE - (short) 'a') {
 		after = FALSE;
@@ -1132,7 +1132,7 @@ do_wand()
 	    }
 	    msg("");
 	    msg("Please enter one of the listed powers: ");
-	    which = (short) ((getchar() & 0177) - 'a');
+	    which = (short) (readchar() - 'a');
 	}
 	msg("Your attempt is successful.");
     }
@@ -1169,7 +1169,7 @@ do_crown()
     /* Prompt for action */
     msg("How do you wish to apply the Crown of Might (* for list)? ");
 
-    which = (short) ((getchar() & 0177) - 'a');
+    which = (short) (readchar() - 'a');
     if (which == (short) ESCAPE - (short) 'a') {
 	after = FALSE;
 	return;
@@ -1199,7 +1199,7 @@ do_crown()
 	    add_line( "[l] super heroism");
 	end_line();
 	msg("Which power do you wish to use?");
-	which = (short) ((getchar() & 0177) - 'a');
+	which = (short) (readchar() - 'a');
 	while (which < 0 || which > limit) {
 	    if (which == (short) ESCAPE - (short) 'a') {
 		after = FALSE;
@@ -1207,7 +1207,7 @@ do_crown()
 	    }
 	    msg("");
 	    msg("Please enter one of the listed powers: ");
-	    which = (short) ((getchar() & 0177) - 'a');
+	    which = (short) (readchar() - 'a');
 	}
 	msg("Your attempt is successful.");
     }
