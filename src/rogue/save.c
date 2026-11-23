@@ -192,10 +192,20 @@ got1sig:
 save_open()
 {
     STAT sb;
+    int fd;
 
     if (stat(file_name, &sb) >= 0 && (sb.st_mode & S_IFMT) == S_IFREG)
 	unlink(file_name);
-    return open(file_name, O_WRONLY|O_CREAT|O_EXCL, 0400);
+    fd = open(file_name, O_WRONLY|O_CREAT|O_EXCL, 0400);
+    if (fd >= 0 && fstat(fd, &sb) == 0
+	&& (sb.st_uid != getuid() || (sb.st_mode & 022) != 0))
+    {
+	close(fd);
+	unlink(file_name);
+	fd = -1;
+	errno = EPERM;
+    }
+    return fd;
 }
 
 save_file(savefd)
