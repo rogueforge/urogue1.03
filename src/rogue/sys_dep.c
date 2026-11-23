@@ -243,7 +243,7 @@ rand_percent(percentage)
 }
 #endif
 
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
 
 static  struct  ltchars OriginalLtchars;
 static  struct  ltchars GameLtchars;

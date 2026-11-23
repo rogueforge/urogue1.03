@@ -182,7 +182,7 @@ int lvl;
 
 
     signal(SIGINT, byebye);
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
     (void) TtySetOriginalChars();
 #endif
 #if defined(attron)
@@ -595,7 +595,7 @@ byebye()
 	endwin();
     }
     printf("\n");
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
     (void) TtySetOriginalChars();
 #endif
     exit(0);

@@ -106,7 +106,7 @@ int sig;
 got1sig:
     if (file_name[0] != '\0' && (savefd = creat(file_name, 0400)) > -1)
 	save_file(savefd);
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
     (void) TtySetOriginalChars();
 #endif
     endwin();
@@ -197,7 +197,7 @@ char **envp;
 	}
     }
 
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
     (void) TtyInit();
     (void) TtyGetGameChars();
     (void) TtyMapGameChars();

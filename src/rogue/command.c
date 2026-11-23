@@ -268,7 +268,7 @@ command()
 			wclear(cw);
 			wrefresh(cw);
 			endwin();
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
 			(void) TtySetOriginalChars();
 #endif
 			exit(0);
@@ -938,7 +938,7 @@ shell()
     wclear(hw);
     wmove(hw, LINES-1, 0);
     wrefresh(hw);
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
     (void) TtySetOriginalChars();
 #endif
 #if defined(USGV3) || defined(RTU2) || defined(attron)
@@ -960,7 +960,7 @@ shell()
 	execl(sh == NULL ? "/bin/sh" : sh, "shell", "-i", (char *) 0);
 	perror("No shelly");
 	endwin();
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
 	(void) TtySetOriginalChars();
 #endif
 	exit(-1);
@@ -972,7 +972,7 @@ shell()
 	    continue;
 	signal(SIGINT, quit);
 	signal(SIGQUIT, quit);
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
 	(void) TtySetGameChars();
 #endif
 #if defined(USGV3) || defined(RTU2)

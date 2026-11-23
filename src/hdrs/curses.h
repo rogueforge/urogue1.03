@@ -11,7 +11,7 @@
 
 #include	"/usr/include/curses.h"
 
-#if	defined(BSD4)
+#if	defined(BSD4) && !defined(NCURSES_VERSION)
 /*
  * Set these routines to point to my routines
  */

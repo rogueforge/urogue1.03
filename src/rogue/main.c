@@ -129,7 +129,7 @@ char **envp;
      */
     if (prscore) {
 	waswizard = TRUE;
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
 	(void) TtyInit();		/* Set up for the tty magic */
 	(void) TtyMapGameChars();
 #endif
@@ -249,7 +249,7 @@ char **envp;
     init_colors();			/* Set up colors of potions */
     init_stones();			/* Set up stone settings of rings */
     init_materials();			/* Set up materials of wands */
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
     (void) TtyInit();			/* Set up for the tty magic */
 #endif
     initscr();				/* Start up cursor package */
@@ -316,7 +316,7 @@ char *s;
     wrefresh(stdscr);
     endwin();
     printf("\n");	/* So the cursor doesn't stop at the end of the line */
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
     (void) TtySetOriginalChars();
 #endif
     exit(0);
@@ -515,7 +515,7 @@ checkout()
 		if (file_name[0] != '\0' 
 			&& (savef = fopen(file_name, "w")) != NULL)
 		    save_file(savef);
-#if defined(BSD4)
+#if defined(BSD4) && !defined(NCURSES_VERSION)
 		(void) TtySetOriginalChars();
 #endif
 		exit(1);
