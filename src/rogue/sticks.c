@@ -914,6 +914,7 @@ int damage;			/* make zapee suffer */
     register struct thing *tp;
     register char *mname;
     int bounced;		/* where along BOLT_LENGTH it hit a wall */
+    int lastbounce = -1;
     int player_damage;		/* damage if player saved */
     bool no_effect;		/* zap does not effect zapee */
     int take_that[BOLT_LENGTH+1]; /* damage to each monster */
@@ -1000,7 +1001,10 @@ int damage;			/* make zapee suffer */
 		    else if (dirch == '/') dirch = '\\';
 		}
 
-		y--;
+		if (y != lastbounce) {
+		    lastbounce = y;
+		    y--;
+		}
 		msg("The %s bounces!", name);
 	    otherwise:
 		if (isalpha(ch)) {			/* hit a monster */
