@@ -31,6 +31,8 @@ register struct thing *tp;
     }
     obj = OBJPTR(item);
     if (!dropcheck(obj) || is_current(obj)) {
+	if (tp == &player)
+	    ur_free((char *) item);
 	return;
     }
     /*
@@ -51,6 +53,8 @@ register struct thing *tp;
 	obj = OBJPTR(nitem);
 	*obj = *(OBJPTR(item));
 	obj->o_count = 1;
+	if (tp == &player)
+	    ur_free((char *) item);
 	item = nitem;
     }
     if (obj->o_type == ARTIFACT)
@@ -313,6 +317,7 @@ wield()
 	return;
     }
     obj = OBJPTR(item);
+    ur_free((char *) item);
     if (!wield_ok(&player, obj, TRUE))
 	return;
 

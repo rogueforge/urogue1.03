@@ -22,6 +22,7 @@ ring_on()
     if (item == NULL)
 	return;
     obj = OBJPTR(item);
+    ur_free((char *) item);
     if (obj->o_type != RING) {
 	msg("You can't put that on!");
 	return;
@@ -138,6 +139,7 @@ ring_off()
 	    return;
     mpos = 0;
     obj = OBJPTR(item);
+    ur_free((char *) item);
     if (obj == NULL) {
 	msg("%s wearing such a ring.", terse ? "Not" : "You are not");
 	return;

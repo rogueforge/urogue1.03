@@ -284,8 +284,10 @@ struct linked_list *item;
     }
     obj = item;
     op = OBJPTR(obj);
-    if (!dropcheck(op))
+    if (!dropcheck(op)) {
+	ur_free((char *) obj);
 	return(FALSE);
+    }
 
     /*
      * If it is a scare monster scroll, curse it
@@ -305,6 +307,7 @@ struct linked_list *item;
 	op = OBJPTR(nobj);
 	*op = *(OBJPTR(obj));
 	op->o_count = 1;
+	ur_free((char *) obj);
 	obj = nobj;
     }
     else {
