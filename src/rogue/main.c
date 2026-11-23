@@ -285,10 +285,10 @@ char **envp;
     /*
      * Start up daemons and fuses
      */
-    daemon(doctor, (int) &player, AFTER);
+    start_daemon(doctor, (int) &player, AFTER);
     fuse(swander, 0, WANDERTIME, AFTER);
-    daemon(stomach, 0, AFTER);
-    daemon(runners, 0, AFTER);
+    start_daemon(stomach, 0, AFTER);
+    start_daemon(runners, 0, AFTER);
     playit();
 }
 
