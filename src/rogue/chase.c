@@ -499,9 +499,9 @@ register bool flee;
 		shoot_bolt(tp, *er, *shoot_dir, (tp == THINGPTR(fam_ptr)),
 			   tp->t_index, breath, roll(tp->t_stats.s_lvl, 6));
 
+		if (!curr_mons) return(TRUE);
 		ch_ret = *er;
 		dist = DISTANCE(ch_ret.y, ch_ret.x, ee->y, ee->x);
-		if (!curr_mons) return(TRUE);
 	}
 
     /* 
