@@ -87,9 +87,8 @@
     ((thing).t_flags[(flag >> FLAGSHIFT) & FLAGINDEX] |= (flag & ~FLAGMASK))
 #define	turn_off(thing, flag) \
     ((thing).t_flags[(flag >> FLAGSHIFT) & FLAGINDEX] &= ~flag)
-#if !defined(CTRL)
-#define	CTRL(ch) ('ch' & 037)
-#endif
+#undef	CTRL
+#define	CTRL(ch) (ch & 037)
 #define	GOLDCALC (rnd(50 + 30 * level) + 2)
 #define	o_charges o_ac
 #define	mi_wght mi_worth

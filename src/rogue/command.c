@@ -228,7 +228,7 @@ command()
 		when '<' : after = FALSE; u_level();
 		when '?' : after = FALSE; help();
 		when '/' : after = FALSE; identify();
-		when CTRL(T) :
+		when CTRL('T') :
 		    if (get_dir()) 
 			 steal();
 		    else after = FALSE;
@@ -247,11 +247,11 @@ command()
 		    else after = FALSE;
 		when 'v' : after = FALSE;
 			   msg("UltraRogue Version %s.", release);
-		when CTRL(R) :
+		when CTRL('R') :
 		    after = FALSE;
 		    clearok(curscr, TRUE);
 		    touchwin(cw);
-		when CTRL(P) : {
+		when CTRL('P') : {
 			    register bool decrement = FALSE;
 
 			    after = FALSE; 
@@ -275,7 +275,7 @@ command()
 		    }
 		when '.' : ;			/* Rest command */
 		when ' ' : after = FALSE;	/* Do Nothing */
-		when CTRL(W) :
+		when CTRL('W') :
 		    after = FALSE;
 		    if (!wizard) {
 			if (passwd()) {

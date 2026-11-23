@@ -462,9 +462,8 @@ TtyMapGameChars()
   extern	struct  ltchars GameLtchars;
   extern	struct  tchars  GameTchars;
 
-#if !defined(CTRL)
-#define CTRL(x) (('x') & (~'@'))
-#endif
+#undef	CTRL
+#define CTRL(x) ((x) & (~'@'))
 
   GameLtchars.t_dsuspc = -1;
   GameLtchars.t_rprntc = -1;
@@ -472,9 +471,9 @@ TtyMapGameChars()
   GameLtchars.t_werasc = -1;
   GameLtchars.t_lnextc = -1;
 
-  GameTchars.t_quitc = CTRL(\\);
-  GameTchars.t_startc = CTRL(Q);
-  GameTchars.t_stopc = CTRL(S);
+  GameTchars.t_quitc = CTRL('\\');
+  GameTchars.t_startc = CTRL('Q');
+  GameTchars.t_stopc = CTRL('S');
   GameTchars.t_eofc = -1;
   GameTchars.t_brkc = -1;
 
