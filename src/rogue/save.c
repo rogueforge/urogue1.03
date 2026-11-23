@@ -167,6 +167,8 @@ int sig;
     }
 
 got1sig:
+    if (pstats.s_hpt <= 0)
+	file_name[0] = '\0';
     if (file_name[0] != '\0' && save_ok()
 	&& (savefd = save_open()) > -1
 	&& !save_file(savefd))
