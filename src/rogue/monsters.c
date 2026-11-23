@@ -72,7 +72,7 @@ bool familiar,print_message;
 	if (fam_ptr != NULL) {		/* Get rid of old familiar */
 	    register struct thing *fp = THINGPTR(fam_ptr);
 	    struct linked_list *fpack = fp->t_pack;
-	    struct linked_list *item;
+	    struct linked_list *item, *ofam = fam_ptr;
 
 	    if (fpack != NULL) {	/* Transfer pack */
 		if (tp->t_pack == NULL)
@@ -86,7 +86,8 @@ bool familiar,print_message;
 		}
 	    }
 	    fp->t_pack = NULL;
-	    killed(NULL, fam_ptr, NOMESSAGE, NOPOINTS);
+	    fam_ptr = NULL;
+	    killed(NULL, ofam, NOMESSAGE, NOPOINTS);
 	}
 
 	fam_ptr = mp;

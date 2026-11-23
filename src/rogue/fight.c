@@ -1622,7 +1622,7 @@ bool print_message, give_points;
 	}
     }
 
-    if (killer != NULL && item == fam_ptr) {
+    if (item == fam_ptr) {
 	/* The player's familiar died */
 	turn_off(player,HASFAMILIAR);
 	fam_ptr = NULL;
