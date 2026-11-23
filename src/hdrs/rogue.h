@@ -9,6 +9,7 @@
 #include "curses.h"
 #include "tunable.h"
 #include <stdarg.h>
+#include <time.h>
 
 /*
  * Maximum number of different things
