@@ -215,7 +215,7 @@ char **envp;
 		putchar(ch);
 	putchar('\n');
 	printf(retstr);
-	gets(prbuf);
+	fgets(prbuf, 2*LINELEN, stdin);
 	fclose(filep);
     }
 
