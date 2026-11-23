@@ -875,6 +875,11 @@ register char monster;
 check_residue(tp)
 register struct thing *tp;
 {
+    if (curr_mons != NULL && THINGPTR(curr_mons) == tp)
+	curr_mons = NULL;
+    else if (next_mons != NULL && THINGPTR(next_mons) == tp)
+	next_mons = next(next_mons);
+
     /*
      * Take care of special abilities
      */
