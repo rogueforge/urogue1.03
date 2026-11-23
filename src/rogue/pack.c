@@ -72,7 +72,7 @@ get_stack(item)
 register struct linked_list *item;
 {
     register struct object *obj;
-    char buf[2*LINELEN];
+    char buf[4*LINELEN + 16];
     register int i = 0, j;
     register struct linked_list *ll;
 
@@ -81,12 +81,12 @@ register struct linked_list *item;
 	sprintf(buf, "You are standing on top of the following stack of items: ");
 	add_line(buf);
 	sprintf(buf, "%d) -- %s", i, inv_name(obj, TRUE));
-	add_line(buf);
+	add_line("%s", buf);
 	while (ll) {
 	    i++;
 	    obj = OBJPTR(ll);
 	    sprintf(buf, "%d) -- %s", i, inv_name(obj, TRUE));
-	    add_line(buf);
+	    add_line("%s", buf);
 	    ll = next(ll);
 	}
 	end_line();
