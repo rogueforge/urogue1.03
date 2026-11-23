@@ -54,7 +54,6 @@ geta_player()
 	 * Now check to see if the player tried to alter it.
 	 */
 	if (stbuf.st_ino != st2buf.st_ino ||
-	    stbuf.st_dev != st2buf.st_dev ||
 	    stbuf.st_nlink != 1 ||
 	    ((stbuf.st_ctime - st2buf.st_ctime) > 25 )) {
 		return FALSE;
