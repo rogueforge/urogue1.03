@@ -507,8 +507,7 @@ checkout()
 	signal(SIGALRM, checkout);
 	if (too_much() || !holiday()) {
 	    if (num_checks >= 3) {
-		register FILE *savef;
-		FILE *fopen();
+		register int savefd;
 
 		clear();
 		move(LINES-2, 0);
@@ -516,9 +515,9 @@ checkout()
 		wrefresh(stdscr);
 		endwin();
 		printf("\n");	/* now do a save if possible */
-		if (file_name[0] != '\0' 
-			&& (savef = fopen(file_name, "w")) != NULL)
-		    save_file(savef);
+		if (file_name[0] != '\0' && save_ok()
+			&& (savefd = creat(file_name, 0400)) > -1)
+		    save_file(savefd);
 #if defined(BSD4) && !defined(NCURSES_VERSION)
 		(void) TtySetOriginalChars();
 #endif
