@@ -107,7 +107,7 @@ keypadoff()
     printf("\033>");
 }
 
-static char *keypad[] = {
+static char *kp_pic[] = {
 "+-------------+---------+--------------+",
 "|  left & up  |   up    |  right & up  |",
 "|       7     |    8    |      9       |",
@@ -146,9 +146,9 @@ keypadhelp()
 
     wrefresh(hw);
     i = 0;
-    while(keypad[i]) {
-        wmove(hw,  2 + i, (COLS - strlen(keypad[i])) / 2);
-	wprintw(hw, keypad[i]);
+    while(kp_pic[i]) {
+        wmove(hw,  2 + i, (COLS - strlen(kp_pic[i])) / 2);
+	wprintw(hw, kp_pic[i]);
 	++i;
     }
     wrefresh(hw);
