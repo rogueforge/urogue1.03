@@ -97,6 +97,10 @@ char **envp;
      * Grab a file descriptor to the score file before the
      * effective uid and gid are reset to the real ones.
      */
+    while ((i = open("/dev/null", 2)) >= 0 && i < 3)
+	continue;
+    if (i >= 3)
+	close(i);
     fd_score = open(score_file, 2);
 
     if ((env = getenv(OPTIONS)) != NULL)
