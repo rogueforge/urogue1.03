@@ -21,6 +21,7 @@ register struct thing *tp;
 {
     register struct object *obj;
     register struct linked_list *nitem;
+    char name[4*LINELEN];
 
     /*
     * Get which thing we are hurling
@@ -95,14 +96,16 @@ register struct thing *tp;
 	else {
 	    long flags = obj->o_flags;
 
+	    strcpy(name, inv_name(obj, LOWERCASE));
 	    fall(&player, item, TRUE);
 	    if (flags & CANRETURN)
-		msg("You have %s.", inv_name(obj, LOWERCASE));
+		msg("You have %s.", name);
 	}
     }
     else if (obj->o_flags & ISOWNED) {
+	strcpy(name, inv_name(obj, LOWERCASE));
 	add_pack(item, NOMESSAGE);
-	msg("You have %s.", inv_name(obj, LOWERCASE));
+	msg("You have %s.", name);
     }
     else
 	discard(item);
