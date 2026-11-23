@@ -15,8 +15,8 @@
 
 typedef struct stat STAT;
 
-extern char *sys_errlist[], version[];
-extern int errno;
+extern char version[], *strerror();
+#include <errno.h>
 
 char *sbrk(), _putchar();
 
@@ -59,7 +59,7 @@ gotfile:
 	wmove(hw, LINES-1, 0);
 	wrefresh(hw);
 	if ((savefd = creat(file_name, 0400)) == -1)
-	    msg(sys_errlist[errno]);	/* fake perror() */
+	    msg(strerror(errno));	/* fake perror() */
     } while (savefd == -1);
 
     /*
