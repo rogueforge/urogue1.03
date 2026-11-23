@@ -372,6 +372,9 @@ setup()
 
     signal(SIGHUP, auto_save);
     signal(SIGINT, quit);
+#ifdef SIGXFSZ
+    signal(SIGXFSZ, SIG_IGN);
+#endif
 
 #if !defined(USGV5)
     if (!author()) {
@@ -516,8 +519,9 @@ checkout()
 		endwin();
 		printf("\n");	/* now do a save if possible */
 		if (file_name[0] != '\0' && save_ok()
-			&& (savefd = save_open()) > -1)
-		    save_file(savefd);
+			&& (savefd = save_open()) > -1
+			&& !save_file(savefd))
+		    unlink(file_name);
 #if defined(BSD4) && !defined(NCURSES_VERSION)
 		(void) TtySetOriginalChars();
 #endif
