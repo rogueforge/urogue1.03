@@ -34,7 +34,11 @@ char	NEWS[]		=	ROGUEPATH(news);
 /*
  * File where top ten scores are kept
  */
+#ifdef SCOREFILE
+char	SCOREDIR[]	=	SCOREFILE;
+#else
 char	SCOREDIR[]	=	ROGUEPATH(scorefile);
+#endif
 
 /*
  * Where MOTD file is
