@@ -368,6 +368,10 @@ setup()
 	num_checks = 0;
     }
 #endif
+    sprintf(prbuf, "%d", LINES);
+    setenv("LINES", prbuf, 1);
+    sprintf(prbuf, "%d", COLS);
+    setenv("COLUMNS", prbuf, 1);
 #if defined(attron)
     cbreak();
 #else
