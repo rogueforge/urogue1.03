@@ -271,6 +271,7 @@ int lvl;
     {
 	struct	sc_ent	*sc3;
 	int uid = getuid();
+	char name[3*LINELEN];
 	for (scp = top_ten; scp < &top_ten[10]; scp++) {
 	    if ( lvl > scp->sc_lvl)
 		break;
@@ -302,19 +303,21 @@ int lvl;
 	    scp->sc_score = amount;
 	    scp->sc_gold = purse;
 	    scp->sc_uid = getuid();
-	    strcpy(scp->sc_name, whoami);
+	    strcpy(name, whoami);
 	    if ((pp = getpwuid(scp->sc_uid)) == NULL) {
 		sprintf(prbuf, " (%d)", scp->sc_uid);
-		strcat(scp->sc_name, prbuf);
+		strcat(name, prbuf);
 	    }
 	    else {
 		sprintf(prbuf, " (%s)", pp->pw_name);
-		if (strcmp(scp->sc_name, pp->pw_name))
-		    strcat(scp->sc_name, prbuf);
+		if (strcmp(name, pp->pw_name))
+		    strcat(name, prbuf);
 	    }
 	    sprintf(prbuf, " %s", 
 			cnames[player.t_ctype][min(pstats.s_lvl,11) - 1]);
-	    strcat(scp->sc_name, prbuf);
+	    strcat(name, prbuf);
+	    strncpy(scp->sc_name, name, 75);
+	    scp->sc_name[75] = '\0';
 	    scp->sc_flags = flags;
 	    if (flags == WINNER || flags == TOTAL)
 		scp->sc_level = max_level;
