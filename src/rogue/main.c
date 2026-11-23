@@ -76,12 +76,14 @@ char **envp;
     /*
      * get home and options from environment
      */
+    i = 2*LINELEN - 2 - strlen(ROGUE_SAVE);
     if ((env = getenv("HOME")) != NULL)
-	strcpy(home, env);
+	strncpy(home, env, i);
     else if ((pw = getpwuid(getuid())) != NULL)
-	strcpy(home, pw->pw_dir);
+	strncpy(home, pw->pw_dir, i);
     else
 	home[0] = '\0';
+    home[i] = '\0';
     strcat(home, "/");
 
     /* Get default save file */
@@ -89,7 +91,7 @@ char **envp;
     strcat(file_name, ROGUE_SAVE);
 
     /* Get default score file */
-    strcpy(score_file, SCOREDIR);
+    strncpy(score_file, SCOREDIR, 2*LINELEN - 1);
 
     /*
      * Grab a file descriptor to the score file before the
