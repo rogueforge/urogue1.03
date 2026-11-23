@@ -546,9 +546,16 @@ struct thing
 char
     *mname;
 struct linked_list
-    *sum_monst;
+    *sum_monst, *item;
 
     sum_monst = (struct linked_list *) monst;
+    for (item = mlist; item != NULL; item = next(item))
+	if (item == sum_monst && on(*THINGPTR(item), WASSUMMONED))
+	    break;
+    if (item == NULL) {
+	turn_off(player, HASSUMMONED);
+	return;
+    }
     tp = THINGPTR(sum_monst);
     turn_off(*tp, WASSUMMONED);
     turn_off(player, HASSUMMONED);
