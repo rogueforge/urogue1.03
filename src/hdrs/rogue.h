@@ -12,6 +12,10 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifdef NCURSES_VERSION
+#define unctrl unctrl
+#endif
+
 /*
  * Maximum number of different things
  */
