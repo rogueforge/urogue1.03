@@ -1071,7 +1071,7 @@ check_level()
      * Create a more powerful familiar (if player has one)
      */
     if (on(player,HASFAMILIAR) && on(player,CANSUMMON)) 
-	summon_monster((short) 0,FAMILIAR,NOMESSAGE);
+	fam_upgrade = TRUE;
 }
 
 /*

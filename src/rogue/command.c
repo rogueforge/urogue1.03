@@ -33,6 +33,11 @@ command()
 
     an_after = FALSE;
     newcount = FALSE;
+    if (fam_upgrade) {
+	fam_upgrade = FALSE;
+	if (on(player, HASFAMILIAR) && on(player, CANSUMMON))
+	    summon_monster((short) 0, FAMILIAR, NOMESSAGE);
+    }
     if (on(player, CANFLY) && rnd(2)) 
 	ntimes++;
     if (on(player, ISHASTE)) 
