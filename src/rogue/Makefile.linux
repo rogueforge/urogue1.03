@@ -1,0 +1,149 @@
+#
+# Makefile for building UltraRogue 1.03 with gcc or clang on Linux
+#
+# CFLAGS may be replaced, with a distribution's own flags for one.
+# REQUIRED comes after it, so that nothing in CFLAGS undoes it, and
+# lets the compiler build the 1986 source as it stands:
+#
+#   -std=gnu89
+#	The source is C from before the 1989 standard: old-style
+#	function definitions, functions called without being declared
+#	and types left to default to int.  Later standards do not
+#	allow these.
+#   -w
+#	Silence the warnings that style draws.
+#   -fno-common
+#	Keep each file's variables together in that file's own data.
+#	Older compilers otherwise leave the ones with no initial
+#	value for the linker to place, apart from the rest, and a
+#	saved game takes the game's data to lie between its first
+#	file and its last.
+#   -fsigned-char
+#	The source keeps the characters of the map and of the keys
+#	typed in a char, and takes it that a char can be negative,
+#	as it could on a VAX.  On ARM and several other machines it
+#	cannot unless the compiler is told.
+#   -fwrapv
+#	The source takes it that signed arithmetic wraps around when
+#	it overflows, as it did on a VAX.  gcc otherwise assumes that
+#	it never overflows.
+#   -fno-strict-aliasing
+#	At -O2 gcc assumes that pointers to different types never
+#	point at the same storage.  The source was written before
+#	that rule.
+#   -fno-lto
+#	Restoring a saved game reads it back over the game's
+#	variables.  Compiling a file at a time gcc cannot tell, but
+#	optimizing the whole program at once it can go on using
+#	values that the restore has replaced.  It is left out when
+#	linking, where NetBSD's gcc hands it on to the linker.
+#
+# gcc and clang do not take all the same flags, and not every version
+# of either takes them all, so each of these is used only if $(CC)
+# accepts it:
+#
+#   -Wno-error=return-type
+#	Functions with no declared type return without a value,
+#	which clang makes an error.
+#   -Wno-error=incompatible-function-pointer-types
+#	Signal handlers are functions with no declared type, which
+#	makes them int and not void.  clang makes that an error too.
+#   -Wno-error=incompatible-pointer-types
+#	gcc from version 14 makes that an error as well.
+#   -Wno-error=int-conversion
+#	Strings are ended by storing NULL in a char, which clang and
+#	gcc from version 14 make an error.
+#
+# ../hdrs/defs.h defines BSD4, which makes the System V names the
+# game is written with, strchr(), lrand48() and the like, stand for
+# their BSD counterparts in mach_dep.h.  Linux has both.  The game's
+# headers are in ../hdrs, and its curses.h there includes the
+# system's as /usr/include/curses.h.
+#
+# The game's site settings are in ../commands/tunable.c, which is
+# compiled here as tunable.o and linked ahead of the game, so that
+# they are not part of a saved game.  SCOREFILE says where the scores
+# are kept.  It is ~/.local/urogue1.03/scorefile unless it is given on
+# the make line, and make writes $(HOME) out when it builds, as
+# open() does not know ~.  Set it empty to go by tunable.c's place
+# for it.  The game does not make the file; 'make -f Makefile.linux
+# install' makes it and the directory it is in.  A player can name
+# another score file with the score option.  The password and
+# permission files that control makes stay where tunable.c has them.
+#
+# tunable.c also has the game turn away new players, and end games
+# that are going, when the load average is over 30.0 or there are
+# more than 50 users.  LIMITS lifts both, as the machines of today run past
+# that load on their own.  Give it empty on the make line to keep them.
+#
+# crypt(), which checks the wizard's password, is in libcrypt.
+#
+# A saved game is an image of the game's data and can only be
+# restored by the same build of urogue that saved it.
+#
+CC=	gcc
+CFLAGS=	-O2 -g
+SCOREFILE= $(HOME)/.local/urogue1.03/scorefile
+SF=	$(if $(SCOREFILE),-DSCOREFILE='"$(SCOREFILE)"')
+LIMITS=	-DNOLOADCHECK
+REQUIRED= -std=gnu89 -w -fno-common -fsigned-char -fwrapv \
+	-fno-strict-aliasing \
+	-fno-lto -I$(HDRS) $(ACCEPTED) $(DEFS)
+accepts= $(shell $(CC) -Werror $(1) -E -x c /dev/null >/dev/null 2>&1 \
+	&& echo $(1))
+ACCEPTED:= $(call accepts,-Wno-error=return-type) \
+	$(call accepts,-Wno-error=incompatible-function-pointer-types) \
+	$(call accepts,-Wno-error=incompatible-pointer-types) \
+	$(call accepts,-Wno-error=int-conversion)
+CRLIB=	-lcurses
+CRYPTLIB= -lcrypt
+OBJS=	vers.o monsdata.o magic_items.o armor.o artifact.o chase.o \
+	command.o daemon.o bag.o properties.o ident.o daemons.o fight.o \
+	encumb.o get_play.o init.o io.o keypad.o list.o main.o maze.o \
+	misc.o monsters.o move.o new_level.o options.o pack.o passages.o \
+	player.o potions.o rings.o rip.o rooms.o save.o scrolls.o sticks.o \
+	things.o trader.o sys_dep.o weapons.o wizard.o rogue.o magic.o \
+	alloc.o
+
+TUNE=	../commands
+HDRS=	../hdrs
+
+urogue: tunable.o $(OBJS)
+	$(CC) $(CFLAGS) $(filter-out -fno-lto,$(REQUIRED)) $(LDFLAGS) -o urogue tunable.o $(OBJS) $(CRLIB) $(CRYPTLIB)
+
+.c.o:
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(REQUIRED) -c $<
+
+tunable.o: $(TUNE)/tunable.c $(HDRS)/tunable.h
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(REQUIRED) $(SF) $(LIMITS) -c $(TUNE)/tunable.c
+
+$(OBJS): $(HDRS)/rogue.h $(HDRS)/defs.h $(HDRS)/curses.h $(HDRS)/tunable.h
+$(OBJS): $(HDRS)/mach_dep.h $(HDRS)/death.h $(HDRS)/stepok.h $(HDRS)/score.h
+
+#
+# 'make -f Makefile.linux check' builds check/urogue with the address
+# sanitizer.  That urogue stops with a report on any read or write
+# outside an array and on any use of freed memory.  gcc defines
+# __SANITIZE_ADDRESS__ when the sanitizer is on, and save.c and
+# alloc.c go by it; clang may not, so it is defined here.
+#
+.PHONY: check
+check:
+	mkdir -p check
+	cd check && ln -sf ../*.c ../Makefile.linux . && \
+	$(MAKE) -f Makefile.linux urogue TUNE=../../commands HDRS=../../hdrs \
+	    DEFS="-D__SANITIZE_ADDRESS__=1 -fsanitize=address \
+	    -fno-omit-frame-pointer"
+
+#
+# 'make -f Makefile.linux install' makes the directory the score file
+# goes in, and the score file itself, empty, if it is not there yet.
+#
+.PHONY: install
+install:
+	mkdir -p "$(dir $(SCOREFILE))"
+	test -f "$(SCOREFILE)" || : > "$(SCOREFILE)"
+
+clean:
+	rm -f tunable.o $(OBJS) urogue
+	rm -rf check
