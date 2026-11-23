@@ -194,7 +194,9 @@ char **envp;
 	exit(1);
     }
     if (argc >= 2 && argv[1][0] == '\0')
-	if (strcmp(PASSWD, crypt(getpass("Wizard's password: "), PASSWDSEED)) == 0) {
+	if ((env = getpass("Wizard's password: ")) != NULL
+	    && (env = crypt(env, PASSWDSEED)) != NULL
+	    && strcmp(PASSWD, env) == 0) {
 		if (canwizard) {
 		    signal(SIGQUIT, SIG_DFL);
 		    wizard = TRUE;
