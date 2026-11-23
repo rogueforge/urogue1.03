@@ -355,7 +355,7 @@ init_names()
 	    nsyl = rnd(3)+1 ;
 	    while(nsyl--) {
 		sp = sylls[rnd((sizeof sylls) / (sizeof (char *)))] ;
-		while(*sp)
+		while(*sp && cp < &prbuf[LINELEN])
 		    *cp++ = *sp++ ;
 	    }
 	    *cp++ = ' ' ;
