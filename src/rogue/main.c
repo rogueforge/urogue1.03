@@ -509,10 +509,10 @@ checkout()
 	    if (num_checks >= 3) {
 		register int savefd;
 
-		clear();
-		move(LINES-2, 0);
-		printw("You didn't listen, so now you are DEAD!!\n");
-		wrefresh(stdscr);
+		wclear(hw);
+		wmove(hw, LINES-2, 0);
+		wprintw(hw, "You didn't listen, so now you are DEAD!!\n");
+		wrefresh(hw);
 		endwin();
 		printf("\n");	/* now do a save if possible */
 		if (file_name[0] != '\0' && save_ok()
