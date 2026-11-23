@@ -931,6 +931,7 @@ shell()
     register int pid;
     register char *sh;
     int ret_status;
+    extern int fd_score;
 
     /*
      * Set the terminal back to original mode
@@ -953,6 +954,7 @@ shell()
     while((pid = fork()) < 0)
 	sleep(1);
     if (pid == 0) {
+	close(fd_score);
 	/*
 	 * Set back to original user, just in case
 	 */
