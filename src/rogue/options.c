@@ -351,7 +351,7 @@ register char *str;
 	/*
 	 * Get option name
 	 */
-	for (sp = str; isalpha(*sp); sp++)
+	for (sp = str; isalpha((unsigned char) *sp); sp++)
 	    continue;
 	len = sp - str;
 	/*
@@ -392,7 +392,7 @@ register char *str;
 		    if (op->o_putfunc == put_inv) {
 			register int len = strlen(value);
 
-			if (isupper(value[0]))
+			if (isupper((unsigned char) value[0]))
 				value[0] = tolower(value[0]);
 			if (EQSTR(value, "overwrite", len))
 				*op->o_opt = INV_OVER;
@@ -404,7 +404,7 @@ register char *str;
 		    else if (*op->o_opt == -1) { /* Only init ability once */
 			register int len = strlen(value);
 
-			if (isupper(value[0])) value[0] = tolower(value[0]);
+			if (isupper((unsigned char) value[0])) value[0] = tolower(value[0]);
 			if (EQSTR(value, "fighter", len))
 				*op->o_opt = C_FIGHTER;
 			else if (EQSTR(value, "magic", min(len, 5)))
@@ -441,7 +441,7 @@ register char *str;
 	/*
 	 * skip to start of next option name
 	 */
-	while (*sp && !isalpha(*sp))
+	while (*sp && !isalpha((unsigned char) *sp))
 	    sp++;
 	str = sp;
     }
