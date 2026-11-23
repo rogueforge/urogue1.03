@@ -1627,7 +1627,6 @@ bool print_message, give_points;
 	msg("An incredible wave of sadness sweeps over you.");
 	/* There should be some penalty here... */
     }
-    check_residue(tp);
 
     if (is_player) {
 	fighting = FALSE;
@@ -1681,6 +1680,7 @@ bool print_message, give_points;
 	     discard(pitem);
 	else fall(killer, pitem, FALSE);
     }
+    check_residue(tp);
     remove_mon(&tp->t_pos, item);
 }
 
