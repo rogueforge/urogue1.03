@@ -324,6 +324,7 @@ struct linked_list *item;
 	/*
 	 * Link it into the level object list
 	 */
+	op->o_pos = hero;
 	add_obj(obj, hero.y, hero.x);
 	mvaddch(hero.y, hero.x, op->o_type);
     }
