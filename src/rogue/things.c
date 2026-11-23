@@ -356,6 +356,8 @@ register struct object *op;
 	cur_weapon = NULL;
     else if (op == cur_armor) {
 	waste_time();
+	if (op != cur_armor)
+	    return FALSE;
 	cur_armor = NULL;
     }
     else if (op == cur_ring[LEFT_1] || op == cur_ring[LEFT_2] ||
