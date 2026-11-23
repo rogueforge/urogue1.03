@@ -7,6 +7,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include "rogue.h"
 #include "mach_dep.h"
@@ -168,6 +169,8 @@ readchar()
     for (errno = 0; read(0, &c, 1) <= 0; errno = 0)
 	if (errno != EINTR && cnt++ > 100)	/* if we are getting infinite EOFs */
 	    auto_save(SIGHUP);	/* save the game */
+	else if (errno == EAGAIN)
+	    fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) & ~O_NONBLOCK);
     return (c & 0177);
 }
 
