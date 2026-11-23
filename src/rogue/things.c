@@ -310,6 +310,8 @@ struct linked_list *item;
     else {
       rem_pack(op);
     }
+    if (op->o_type == ARTIFACT)
+	has_artifact &= ~(1 << op->o_which);
     if(ch == POOL) {
 	msg("Your %s sinks out of sight.",inv_name(op,LOWERCASE));
 	discard(obj);
@@ -322,8 +324,6 @@ struct linked_list *item;
 	add_obj(obj, hero.y, hero.x);
 	mvaddch(hero.y, hero.x, op->o_type);
     }
-    if (op->o_type == ARTIFACT)
-	has_artifact &= ~(1 << op->o_which);
     updpack();
     return (TRUE);
 }
